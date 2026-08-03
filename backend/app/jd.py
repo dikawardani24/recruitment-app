@@ -19,33 +19,46 @@ _EMPLOYMENT = re.compile(
     re.I,
 )
 _EDUCATION_RE = re.compile(
-    r"\b(bachelor['’]s|b\.?s\.?c?|b\.?a\.?|master['’]s|m\.?s\.?c?|m\.?b\.?a\.?|"
-    r"ph\.?d|doctorate|sarjana|magister|doktor|s1|s2|s3|minimal\s+d3|diploma)\b",
+    r"\b(bachelor['’]?s?|b\.?s\.?c?|b\.?a\.?|b\.?eng\.?|b\.?tech\.?|"
+    r"master['’]?s?|m\.?s\.?c?|m\.?b\.?a\.?|m\.?a\.?|m\.?eng\.?|m\.?tech\.?|"
+    r"ph\.?d|doctorate|sarjana|magister|doktor|s1|s2|s3|minimal\s+d3|diploma|"
+    r"associate['’]?s?\s+degree|associate)\b",
     re.I,
 )
 
+_MD_HEADER = re.compile(r"^#+\s*")
+_HEADER_TRAILER = r"(?:\s+(?:qualifications?|skills?|requirements?))?\s*:?\s*$"
+
 _REQUIRED_SECTION = re.compile(
-    r"^\s*(requirements|must have|must-have|qualifications|minimum qualifications|required|"
-    r"skills required|what you['’]?ll need|kualifikasi|persyaratan|syarat)\s*:?\s*$",
+    r"^(requirements|must have|must-have|minimum qualifications?|qualifications?|"
+    r"required|key requirements|skills required|what you['’]?ll need|"
+    r"kualifikasi|persyaratan|syarat)" + _HEADER_TRAILER,
     re.I,
 )
 _PREFERRED_SECTION = re.compile(
-    r"^\s*(nice[- ]to[- ]have|preferred|preferred qualifications|bonus|pluses|good to have|"
-    r"diutamakan|nilai tambah)\s*:?\s*$",
+    r"^(nice[- ]to[- ]have|preferred|bonus|pluses|good to have|diutamakan|nilai tambah)"
+    + _HEADER_TRAILER,
     re.I,
 )
 _RESPONSIBILITIES_SECTION = re.compile(
-    r"^\s*(responsibilities|what you['’]?ll do|role\s*&\s*responsibilities|job\s+description|"
-    r"about the role|duties|tugas|tanggung\s+jawab|deskripsi\s+pekerjaan|about the job)\s*:?\s*$",
+    r"^(responsibilities|what you['’]?ll do|role\s*&\s*responsibilities|job\s+description|"
+    r"about the role|duties|tugas|tanggung\s+jawab|deskripsi\s+pekerjaan|about the job)"
+    + _HEADER_TRAILER,
     re.I,
 )
-_TITLE_SECTION = re.compile(r"^\s*(job\s+title|position|role|posisi)\s*:?\s*$", re.I)
+_TITLE_SECTION = re.compile(r"^(job\s+title|position|role|posisi)\s*:?\s*$", re.I)
 _SECTION_HEADER = re.compile(
-    r"^(requirements|must have|qualifications|nice to have|preferred|responsibilities|"
-    r"about|company|job description|skills|benefits|what you)",
+    r"^(?:#+\s*)?(requirements|must have|qualifications|nice to have|preferred|"
+    r"responsibilities|technical|soft|about|company|job description|skills|benefits|"
+    r"what you|experience|education|summary)",
     re.I,
 )
 _DATE_ONLY = re.compile(r"^[\s\d/.\-–—]*$")
+
+
+def _normalize_header(line: str) -> str:
+    """Strip markdown heading prefix and trailing colon from a section header."""
+    return _MD_HEADER.sub("", line).strip().rstrip(":").strip()
 
 
 def structure_jd(text: str) -> dict | None:
@@ -54,12 +67,13 @@ def structure_jd(text: str) -> dict | None:
         return None
     sections = _detect_sections(text)
     lines = text.splitlines()
-    blocks = {
-        s["name"]: "\n".join(lines[s["start"] + 1 : s["end"]]).strip() for s in sections
-    }
-    req_block = blocks.get("required", "")
-    pref_block = blocks.get("preferred", "")
-    resp_block = blocks.get("responsibilities", "")
+    blocks: dict[str, list[str]] = {}
+    for s in sections:
+        block = "\n".join(lines[s["start"] + 1 : s["end"]]).strip()
+        blocks.setdefault(s["name"], []).append(block)
+    req_block = "\n".join(blocks.get("required", [])).strip()
+    pref_block = "\n".join(blocks.get("preferred", [])).strip()
+    resp_block = "\n".join(blocks.get("responsibilities", [])).strip()
 
     req_text = req_block or text
     required_skills = _jd_skills(req_text)
@@ -103,13 +117,14 @@ def _detect_sections(text: str) -> list[dict]:
     lines = text.splitlines()
     found: list[dict] = []
     for idx, line in enumerate(lines):
+        header = _normalize_header(line)
         for pattern, name in (
             (_REQUIRED_SECTION, "required"),
             (_PREFERRED_SECTION, "preferred"),
             (_RESPONSIBILITIES_SECTION, "responsibilities"),
             (_TITLE_SECTION, "title"),
         ):
-            if pattern.match(line) and len(line) < 80:
+            if pattern.match(header) and len(header) < 80:
                 found.append({"name": name, "start": idx, "end": len(lines)})
                 break
     found.sort(key=lambda s: s["start"])
@@ -122,11 +137,18 @@ def _extract_title(text: str, sections: list[dict]) -> str:
     title_sec = next((s for s in sections if s["name"] == "title"), None)
     if title_sec:
         lines = text.splitlines()[title_sec["start"] + 1 : title_sec["end"]]
-        first = next((ln.strip() for ln in lines if ln.strip() and len(ln.strip()) < 80), None)
+        first = next(
+            (
+                _MD_HEADER.sub("", ln).strip()
+                for ln in lines
+                if ln.strip() and len(_MD_HEADER.sub("", ln).strip()) < 80
+            ),
+            None,
+        )
         if first:
             return first
     for line in text.splitlines():
-        line = line.strip()
+        line = _MD_HEADER.sub("", line).strip()
         if not line or len(line) > 70 or _SECTION_HEADER.match(line):
             continue
         if 8 <= len(line) <= 60:
@@ -168,7 +190,7 @@ def _extract_education(text: str) -> str | None:
     for key in ("bsc", "bachelor", "sarjana", "s1", "bs", "ba"):
         if key in token:
             return "bsc"
-    if "diploma" in token or "d3" in token:
+    if "diploma" in token or "d3" in token or "associate" in token:
         return "diploma"
     return None
 

@@ -10,6 +10,7 @@ from app import db
 from app.config import Settings
 from app.jd import structure_jd
 from app.llm import LLMRankingError, rank_with_llm
+from app.llm_extract import extract_profile_text
 from app.parsers import extract_text
 from app.ranking import Profile, bucket_for, extract_profile, rule_reasoning, score_profile
 
@@ -123,15 +124,15 @@ async def upload_cvs(
         content = await file.read()
         try:
             text = await extract_text(name, content)
-            profile = extract_profile(text, name)
+            profile, source = await extract_profile_text(settings, text, name)
             storage = _save_file(settings.upload_dir, Path(name).suffix.lower(), content)
             cv_id = str(uuid4())
             async with db.connect() as conn:
                 await conn.execute(
                     "INSERT INTO cvs (id, job_id, file_name, storage_path, status,"
                     " candidate_name, profile_text, skills, years_experience, education,"
-                    " certifications)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " certifications, source)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         cv_id,
                         job["id"],
@@ -144,6 +145,7 @@ async def upload_cvs(
                         profile.years_experience,
                         profile.education,
                         _json_dumps(profile.certifications),
+                        source,
                     ),
                 )
                 await conn.commit()
@@ -153,6 +155,7 @@ async def upload_cvs(
                     "file_name": name,
                     "status": "parsed",
                     "candidate_name": profile.candidate_name,
+                    "source": source,
                     "error": None,
                 }
             )
@@ -201,7 +204,7 @@ async def rank_job(job_id: str) -> dict:
             llm_rankings = None
 
     ranked = []
-    if llm_rankings:
+    if llm_rankings and len(llm_rankings) == len(parsed):
         for i, cv in enumerate(parsed):
             llm = llm_rankings[i]
             scores = scores_by_cv[cv["id"]]
@@ -338,6 +341,7 @@ def _cv_payload(cv: dict) -> dict:
         "ranked_at", "rank",
     ]
     payload = {k: cv.get(k) for k in keys}
+    payload["source"] = cv.get("source")
     payload["skills"] = cv.get("skills") or []
     payload["years_experience"] = cv.get("years_experience")
     payload["education"] = cv.get("education")

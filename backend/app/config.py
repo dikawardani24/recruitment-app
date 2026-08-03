@@ -30,6 +30,15 @@ class Settings:
     llm_model: str = os.getenv("ATS_LLM__MODEL", "gpt-4o-mini")
     llm_timeout_ms: int = int(os.getenv("ATS_LLM__TIMEOUT_MS", "20000"))
 
+    # Local BERT resume-NER (optional; overrides LLM extraction when enabled).
+    ner_enabled: bool = os.getenv("ATS_EXTRACT__NER", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    ner_model: str = os.getenv("ATS_EXTRACT__NER_MODEL", "yashpwr/resume-ner-bert")
+    ner_confidence: float = float(os.getenv("ATS_EXTRACT__NER_CONFIDENCE", "0.5"))
+
     # Ranking weights (must sum to 1.0).
     w_skill: float = float(os.getenv("ATS_RANKING__SKILL", "0.40"))
     w_experience: float = float(os.getenv("ATS_RANKING__EXPERIENCE", "0.30"))

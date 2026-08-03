@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS cvs (
     explanation         TEXT,
     interview_questions TEXT,
     ranked_at           TEXT,
-    error               TEXT
+    error               TEXT,
+    source              TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_cvs_job ON cvs(job_id);
@@ -56,6 +57,10 @@ async def init_db() -> None:
     settings.ensure_dirs()
     async with aiosqlite.connect(settings.db_path) as db:
         await db.executescript(SCHEMA)
+        try:
+            await db.execute("ALTER TABLE cvs ADD COLUMN source TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
         await db.commit()
 
 

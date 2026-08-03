@@ -60,7 +60,7 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
 {{
   "candidates": [
     {{
-      "candidate": "exact candidate name",
+      "candidate": 1,
       "rank": 1,
       "overall": 0.95,
       "recommendation": "strong_match | good_match | possible_match | weak_match",
@@ -70,6 +70,10 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     }}
   ]
 }}
+
+Rules:
+- "candidate" is the NUMBER of the candidate from the list above (1-based), not the name.
+- Include exactly {len(candidates)} entries, one per candidate.
 """
 
 
@@ -117,29 +121,53 @@ def _parse_response(content: str, candidates: list[dict]) -> list[LLMReasoning]:
     except json.JSONDecodeError as exc:
         raise LLMRankingError("llm_invalid_json") from exc
 
-    by_name = {c["candidate_name"].lower(): c for c in candidates}
-    out: list[LLMReasoning] = []
+    by_name: dict[str, list[int]] = {}
+    for idx, c in enumerate(candidates):
+        by_name.setdefault(c["candidate_name"].lower(), []).append(idx)
+
+    entries: dict[int, LLMReasoning] = {}
     for item in data.get("candidates", []):
-        name = str(item.get("candidate", "")).strip()
-        candidate = by_name.get(name.lower())
-        if candidate is None and by_name:
-            candidate = by_name.get(next(iter(by_name)))
-        if candidate is None:
+        idx = _resolve_candidate_idx(item.get("candidate"), by_name, len(candidates))
+        if idx is None:
             continue
         try:
             overall = float(item.get("overall", 0.0))
         except (TypeError, ValueError):
             overall = 0.0
-        out.append(
-            LLMReasoning(
-                rank=int(item.get("rank", 0)),
-                overall=max(0.0, min(1.0, overall)),
-                recommendation=str(item.get("recommendation", "possible_match")),
-                explanation=str(item.get("explanation", "")),
-                strengths=[str(s) for s in item.get("strengths", [])],
-                weaknesses=[str(w) for w in item.get("weaknesses", [])],
-            )
+        entries[idx] = LLMReasoning(
+            rank=int(item.get("rank", 0)),
+            overall=max(0.0, min(1.0, overall)),
+            recommendation=str(item.get("recommendation", "possible_match")),
+            explanation=str(item.get("explanation", "")),
+            strengths=[str(s) for s in item.get("strengths", [])],
+            weaknesses=[str(w) for w in item.get("weaknesses", [])],
         )
-    if not out:
-        raise LLMRankingError("llm_empty_result")
-    return out
+
+    if len(entries) != len(candidates):
+        raise LLMRankingError("llm_incomplete_ranking")
+    return [entries[i] for i in range(len(candidates))]
+
+
+def _resolve_candidate_idx(
+    raw, by_name: dict[str, list[int]], n_candidates: int
+) -> int | None:
+    """Resolve the model's ``candidate`` reference to a 0-based index.
+
+    Prefers the 1-based number; falls back to a unique name match. Returns None
+    for ambiguous/missing references."""
+    if isinstance(raw, int):
+        idx = raw - 1
+        if 0 <= idx < n_candidates:
+            return idx
+        return None
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s.isdigit():
+            idx = int(s) - 1
+            if 0 <= idx < n_candidates:
+                return idx
+            return None
+        matches = by_name.get(s.lower(), [])
+        if len(matches) == 1:
+            return matches[0]
+    return None

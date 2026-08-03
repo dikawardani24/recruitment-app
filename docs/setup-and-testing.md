@@ -48,6 +48,28 @@ ATS_LLM__MODEL=gpt-4o-mini
 Without a key, the app still ranks candidates and produces template reasoning via
 a deterministic rule-based engine.
 
+### Optional: local BERT resume-NER extraction
+
+By default CVs are parsed with deterministic rules (fast), or with an LLM when
+`ATS_LLM__API_KEY` is set. To parse CVs with a **local** BERT resume-NER model
+instead (runs on CPU in <1s per resume, no API key), install the optional deps
+and enable it:
+
+```bash
+cd backend
+.venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch   # ~2GB
+.venv/bin/pip install -r requirements-ml.txt
+```
+
+```
+ATS_EXTRACT__NER=true            # NER takes priority over LLM/rules for CV parsing
+ATS_EXTRACT__NER_MODEL=yashpwr/resume-ner-bert
+ATS_EXTRACT__NER_CONFIDENCE=0.5
+```
+
+Extraction priority is: NER → LLM → rules. The `source` field on each CV records
+which engine produced it (`ner` / `llm` / `rules`).
+
 ### Run the API
 
 ```bash

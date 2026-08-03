@@ -173,7 +173,7 @@ def skill_like_terms(text: str) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
     for raw in re.split(r"[\n,;•·・•]", text):
-        item = re.sub(r"^[\s\-*•◦▪▫·・]+", "", raw).strip().strip(":.,()[]")
+        item = re.sub(r"^[\s#\-*•◦▪▫·・]+", "", raw).strip().strip(":.,()[]")
         if not item or len(item) < 2 or len(item) > 48:
             continue
         words = item.split()
@@ -182,11 +182,12 @@ def skill_like_terms(text: str) -> list[str]:
         low = item.lower()
         if re.search(r"\d", low):
             continue
-        if any(w in _NOISE_WORDS for w in words):
+        low_words = [w.lower() for w in words]
+        if any(w in _NOISE_WORDS for w in low_words):
             continue
-        if words[0] in _ACTION_VERBS:
+        if low_words[0] in _ACTION_VERBS or low_words[0] in ("and", "or"):
             continue
-        if all(w in _FILLER_WORDS or w in _ROLE_WORDS for w in words):
+        if all(w in _FILLER_WORDS or w in _ROLE_WORDS for w in low_words):
             continue
         if _covered_by_known_skill(low):
             continue

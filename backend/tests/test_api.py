@@ -62,6 +62,7 @@ def test_upload_multiple_cvs(client, cv_builder):
     results = resp.json()["results"]
     assert len(results) == 2
     assert all(r["status"] == "parsed" for r in results)
+    assert all(r["source"] == "rules" for r in results)  # no LLM key in tests
     names = {r["candidate_name"] for r in results}
     assert "John Doe" in names
 
