@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Flutter
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins*
+frontend/android/.gradle/
+frontend/ios/Pods/
+
+# Env / secrets
+.env
+*.pem
+
+# Data / artifacts
+backend/data/
+*.log
+
+# macOS
+.DS_Store

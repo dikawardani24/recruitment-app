@@ -1,0 +1,58 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ATS_DB__URL: postgresql+asyncpg://ats:ats@pg:5432/ats
+      ATS_REDIS__URL: redis://redis:6379/0
+      ATS_VECTOR__URL: http://qdrant:6333
+      ATS_EMBEDDING__PROVIDER: debug
+    depends_on:
+      - pg
+      - qdrant
+      - redis
+    volumes:
+      - ./backend:/app
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/worker.Dockerfile
+    command: arq app.workers.task_queue.WorkerSettings
+    environment:
+      ATS_DB__URL: postgresql+asyncpg://ats:ats@pg:5432/ats
+      ATS_REDIS__URL: redis://redis:6379/0
+      ATS_VECTOR__URL: http://qdrant:6333
+      ATS_EMBEDDING__PROVIDER: debug
+    depends_on:
+      - pg
+      - qdrant
+      - redis
+
+  pg:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ats
+      POSTGRES_PASSWORD: ats
+      POSTGRES_DB: ats
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
