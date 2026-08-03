@@ -12,11 +12,15 @@ A production-ready, AI-native ATS that transforms resumes into **structured cand
 ## Repositories Layout
 
 ```
-ai-ats/
-├── docs/          # Full design package (14 deliverables)
+recruitment-app/
+├── docs/          # Full design package (14 deliverables) + setup guide
 ├── backend/       # Python FastAPI — Clean Architecture
 └── frontend/      # Flutter (Material 3) — Clean Architecture
 ```
+
+## Setup & Testing
+
+Follow **[docs/setup-and-testing.md](docs/setup-and-testing.md)** to run the application and its test suites.
 
 ## Documentation Index
 

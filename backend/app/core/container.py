@@ -84,5 +84,5 @@ class Container:
             embedding=self.embedding,
             vector_store=self.vector_store,
             candidate_repo=self.candidate_repo,
-            settings=self.settings,
+            settings=self.settings.search,
         )
