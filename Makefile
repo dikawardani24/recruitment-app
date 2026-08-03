@@ -1,24 +1,23 @@
-.PHONY: up down logs backend-test frontend-test lint
+.PHONY: backend-test backend-run backend-analyze frontend-run frontend-test frontend-analyze lint
 
-up:
-	docker compose up -d --build
-
-down:
-	docker compose down
-
-logs:
-	docker compose logs -f
-
-backend-test:
-	cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
+PY ?= .venv/bin/python
 
 backend-analyze:
-	cd backend && .venv/bin/python -m compileall -q app
+	cd backend && PYTHONPATH=app $(PY) -m compileall -q app
 
-frontend-test:
-	cd frontend && flutter test
+backend-test:
+	cd backend && PYTHONPATH=. $(PY) -m pytest tests -q
+
+backend-run:
+	cd backend && .venv/bin/uvicorn app.main:app --reload
+
+frontend-run:
+	cd frontend && flutter run
 
 frontend-analyze:
 	cd frontend && flutter analyze
+
+frontend-test:
+	cd frontend && flutter test
 
 lint: backend-analyze frontend-analyze

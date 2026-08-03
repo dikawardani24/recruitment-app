@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
 
-import 'app/di.dart';
-import 'app/router.dart';
-import 'app/theme/app_theme.dart';
+import 'screens/job_list_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initDi(Environment.dev);
-  runApp(const AiAtsApp());
+void main() {
+  runApp(const AtsApp());
 }
 
-class AiAtsApp extends StatelessWidget {
-  const AiAtsApp({super.key});
+class AtsApp extends StatelessWidget {
+  const AtsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
+    return MaterialApp(
       title: 'AI ATS',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      routerConfig: appRouter,
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3F51B5)),
+        useMaterial3: true,
+      ),
+      home: const JobListScreen(),
     );
   }
 }

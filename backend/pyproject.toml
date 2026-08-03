@@ -12,4 +12,4 @@ ignore = ["E501"]
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["app/api/routers/*"]
+omit = ["app/routers/*"]

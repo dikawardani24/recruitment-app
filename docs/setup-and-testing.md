@@ -2,14 +2,23 @@
 
 How to run the application locally, run its test suites, and smoke-test the API and UI.
 
+## Stack (simple, no external services)
+
+| Layer | Choice |
+|-------|--------|
+| Backend | Python FastAPI, single process |
+| Storage | SQLite (`backend/data/ats.db`) — no database server needed |
+| File uploads | Local disk (`backend/data/uploads/`) |
+| Ranking | Rule-based scoring always; AI reasoning via any OpenAI-compatible LLM when a key is set |
+
+No PostgreSQL, Qdrant, Redis, Docker, or model downloads are required.
+
 ## Prerequisites
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| Python | 3.11+ | See `backend/.python-version`. Python 3.9 works for tests but Pydantic model annotations require 3.10+ for `str \| None` |
-| Docker | any recent | Optional for `docker compose` stack (PostgreSQL, Qdrant, Redis) |
+| Python | 3.9+ (3.12 recommended) | `python3 -m venv` |
 | Flutter | 3.x stable | `frontend/` |
-| Tesseract | any | Optional — OCR fallback for scanned PDFs (`brew install tesseract`) |
 
 ---
 
@@ -18,106 +27,93 @@ How to run the application locally, run its test suites, and smoke-test the API 
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt
 ```
 
-> Heavy optional deps (`sentence-transformers`, `paddleocr`, `boto3`, `openai`, `google-genai`) are installed lazily on first use. For a quick dev run without model downloads, use the **debug embedding provider** (see below).
-
-### Configure environment
+### Configure environment (optional)
 
 ```bash
 cp ../.env.example .env
 ```
 
-The default `.env` uses the real `bge-small-en-v1.5` embedding model (downloads ~130 MB on first use). To run without any model download, override in `.env`:
+Nothing needs to be set to run. To enable **AI reasoning** during ranking, set an
+OpenAI-compatible endpoint in `.env`:
 
 ```
-ATS_EMBEDDING__PROVIDER=debug
+ATS_LLM__API_KEY=sk-...
+ATS_LLM__BASE_URL=https://api.openai.com/v1   # or Ollama/vLLM/DeepSeek/...
+ATS_LLM__MODEL=gpt-4o-mini
 ```
 
-`debug` produces deterministic hash vectors — fine for exercising the pipeline end-to-end, **not** for meaningful search results.
+Without a key, the app still ranks candidates and produces template reasoning via
+a deterministic rule-based engine.
 
 ### Run the API
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+cd backend
+.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
 - Interactive docs: <http://localhost:8000/docs>
-- Health: <http://localhost:8000/healthz> → `{"status": "ok"}`
+- Health: <http://localhost:8000/health>
 
-### Run the worker (resume pipeline)
+### Recruiter workflow (the whole product)
 
-```bash
-arq app.workers.task_queue.WorkerSettings
-```
-
----
-
-## 2. Full Stack — Docker Compose (Recommended)
-
-Brings up API + worker + PostgreSQL + Qdrant + Redis:
-
-```bash
-docker compose up --build
-```
-
-| Service | URL |
-|---------|-----|
-| API | http://localhost:8000 |
-| Qdrant dashboard | http://localhost:6333/dashboard |
-| Postgres | localhost:5432 (`ats`/`ats`) |
-| Redis | localhost:6379 |
-
-Compose config sets `ATS_EMBEDDING__PROVIDER=debug` so it runs without model downloads. Stop with `docker compose down` (add `-v` to drop the PG volume).
+1. `POST /api/jobs` — describe the job (pasted text and/or an uploaded JD file: PDF/DOCX/TXT). Skills, min years, education, and certifications are extracted automatically.
+2. `POST /api/jobs/{id}/cvs` — batch-upload CVs (PDF/DOCX/TXT). Each is parsed immediately into a structured profile.
+3. `POST /api/jobs/{id}/rank` — scores and ranks every candidate, best match first, with an explanation, strengths, weaknesses, skill gaps, and a hiring recommendation.
+4. `GET /api/jobs/{id}/rankings` — persisted ranking results, best match first.
 
 ---
 
-## 3. Frontend — Setup & Run
+## 2. Frontend — Setup & Run
 
 ```bash
 cd frontend
 flutter pub get
-flutter run          # pick a device; web/macOS/iOS/Android are configured
+flutter run
 ```
 
-The app points at `http://localhost:8000/v1` by default (`Environment.dev` in `lib/app/di.dart`). Run the backend first.
+The app calls `http://127.0.0.1:8000/api` by default. Run the backend first, or
+override with:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
+```
+
+Screens: **Jobs** (list) → **New job** (paste description and/or upload a JD file)
+→ **Job detail** (add CVs, then "Rank candidates") → **Rankings** (scores +
+expandable reasoning).
 
 ---
 
-## 4. Testing — Backend
+## 3. Testing — Backend
 
 ```bash
 cd backend
-PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
+PYTHONPATH=. .venv/bin/python -m pytest tests -q
 ```
 
-or via Makefile:
+or:
 
 ```bash
 make backend-test
 ```
 
-**8 tests, no external services required.** The suites are:
-
-- `tests/unit/test_domain_services.py` — skill canonicalization, years-of-experience calc, fast-progression heuristic.
-- `tests/unit/test_ranking_engine.py` — bucket assignment (best / strong / hidden gem / alternative) and hidden-gem signals.
-- `tests/integration/test_pipeline_search.py` — full search → rank flow using an in-memory `VectorStore` fake (Qdrant not needed).
+**9 tests, no external services.** `tests/test_api.py` covers: health, create job
+from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
+persisted rankings, and error cases (missing title, missing JD, unknown job).
 
 ### Code check
 
 ```bash
-make backend-analyze      # compileall smoke check
+make backend-analyze
 ```
-
-### What needs real services (later milestones)
-
-The resume upload → OCR → structuring → Qdrant indexing path is not yet wired to a live worker/vector store. Until Phase 1 lands, pipeline tests use fakes; real integrations are covered by `docs/14-implementation-roadmap.md`.
 
 ---
 
-## 5. Testing — Frontend
+## 4. Testing — Frontend
 
 ```bash
 cd frontend
@@ -132,61 +128,57 @@ make frontend-test
 make frontend-analyze
 ```
 
-**4 tests, analyzer clean.** Coverage: theme seeding, `RankedCandidate` API parsing, and `SearchCubit` state transitions.
-
 ---
 
-## 6. API Smoke Test
+## 5. API Smoke Test
 
-With the backend running (or `docker compose up`):
+With the backend running:
 
 ```bash
 # Health
-curl http://localhost:8000/healthz
+curl http://localhost:8000/health
 
-# Natural-language search (needs Qdrant running + indexed data; see note below)
-curl -X POST http://localhost:8000/v1/search/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Find Senior Flutter Developers with banking experience", "top_k": 20}'
+# 1. Create a job (paste JD text; upload an optional JD file)
+curl -X POST http://localhost:8000/api/jobs \
+  -F "title=Senior Backend Engineer" \
+  -F "description=Requirements%0A- Python%0A- 5+ years%0AResponsibilities%0A- Build backend services"
 
-# Resume upload (needs object storage + worker pipeline configured)
-curl -X POST http://localhost:8000/v1/resumes/upload \
-  -F "file=@resume.pdf"
+# 2. Upload CVs
+curl -X POST http://localhost:8000/api/jobs/<job_id>/cvs \
+  -F "files=@john.pdf;type=application/pdf" \
+  -F "files=@jane.docx"
 
-# Poll processing status
-curl http://localhost:8000/v1/resumes/<resume_id>
+# 3. Rank all candidates (returns scores + reasoning)
+curl -X POST http://localhost:8000/api/jobs/<job_id>/rank
+
+# 4. Persisted rankings (best match first)
+curl http://localhost:8000/api/jobs/<job_id>/rankings
 ```
-
-> **Note:** `POST /search/query` currently requires a running vector store (Qdrant) and returns an empty result set until candidates are indexed. The deterministic ranking logic is fully exercised by the backend test suite without infrastructure.
 
 ---
 
-## 7. Troubleshooting
+## 6. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `Settings has no attribute top_k` | Stale code — re-pull/pull latest; bug fixed in DI container wiring |
 | `Form data requires python-multipart` | `pip install python-multipart` |
-| `sentence-transformers not installed` | Use `ATS_EMBEDDING__PROVIDER=debug` or `pip install sentence-transformers` |
-| `qdrant-client not installed` | `pip install qdrant-client` or run the stack via Docker |
-| `pydantic ... 'str \| None'` | Use Python 3.10+ (see `.python-version`) |
-| Flutter `getIt`/Dio errors on first run | `flutter pub get`, then `flutter clean` if stale |
-| Port 8000 already in use | Change `--port`, or `lsof -ti:8000 | xargs kill` |
+| Port 8000 already in use | Change `--port`, or `lsof -ti:8000 \| xargs kill` |
+| Flutter build errors after dep changes | `flutter pub get`, then `flutter clean` |
+| Scanned/image-only PDFs yield no text | Not supported yet — convert to text or DOCX |
 
 ---
 
-## 8. Quick Reference
+## 7. Quick Reference
 
 ```bash
-# Full stack
-docker compose up --build
+# Backend
+cd backend && .venv/bin/uvicorn app.main:app --reload
 
-# Backend only (debug embeddings)
-cd backend && source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+# Frontend
+cd frontend && flutter run
 
 # Tests
-make backend-test       # 8 tests
-make frontend-test      # 4 tests
+make backend-test       # 9 tests
+make frontend-test
 make lint               # compileall + flutter analyze
 ```
