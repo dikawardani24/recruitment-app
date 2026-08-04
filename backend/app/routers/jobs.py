@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as _json
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -42,6 +43,18 @@ def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:
     return str(path)
 
 
+def _try_parse_json(text: str) -> dict | None:
+    """Try to parse text as JSON. Returns the parsed dict if valid, None otherwise."""
+    text = text.strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        data = _json.loads(text)
+        return data if isinstance(data, dict) else None
+    except (_json.JSONDecodeError, ValueError):
+        return None
+
+
 @router.post("/jobs", status_code=201)
 async def create_job(
     title: str = Form(...),
@@ -66,7 +79,14 @@ async def create_job(
         suffix = Path(jd_file.filename or "job.txt").suffix.lower()
         jd_key = _save_file(settings.upload_dir / "jd", suffix, jd_bytes)
 
-    requirements = structure_jd(description) if description.strip() else None
+    # If description is valid JSON, use it as requirements directly.
+    # Otherwise, parse it as plain text with structure_jd().
+    requirements = _try_parse_json(description) if description.strip() else None
+    if requirements is not None:
+        # JSON was parsed — clear the raw text so it doesn't show as JSON in the UI.
+        description = ""
+    elif description.strip():
+        requirements = structure_jd(description)
 
     job = {
         "id": str(uuid4()),

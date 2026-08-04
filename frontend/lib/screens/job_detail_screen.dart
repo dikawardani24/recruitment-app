@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -124,7 +125,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(job.description.isEmpty ? 'No description' : job.description),
+            Text(
+              job.title,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            if (job.description.isEmpty)
+              const Text('No description')
+            else
+              MarkdownBody(data: job.description),
             if (job.requirements != null) ...[
               const SizedBox(height: 16),
               _RequirementsView(requirements: job.requirements!),
