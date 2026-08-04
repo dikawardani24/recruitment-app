@@ -30,13 +30,29 @@ class _JobFormScreenState extends State<JobFormScreen> {
   Future<void> _pickJdFile() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'docx', 'doc', 'txt'],
+      allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
     );
     if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final name = result.files.single.name;
+      final ext = name.split('.').last.toLowerCase();
+
       setState(() {
-        _jdFile = File(result.files.single.path!);
-        _jdFileName = result.files.single.name;
+        _jdFile = file;
+        _jdFileName = name;
       });
+
+      // For text/markdown files, extract content and show in description.
+      if (ext == 'txt' || ext == 'md' || ext == 'text') {
+        try {
+          final content = await file.readAsString();
+          if (content.trim().isNotEmpty) {
+            _descriptionController.text = content;
+          }
+        } catch (_) {
+          // Ignore read errors — user can still type manually.
+        }
+      }
     }
   }
 

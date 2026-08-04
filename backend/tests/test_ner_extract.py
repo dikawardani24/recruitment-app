@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.ner_extract import _dedupe, profile_from_ner
-from app.ranking import Profile
+from app.extraction import Profile
+from app.extraction._ner import _dedupe, profile_from_ner
 
 
 def _profile(**kw) -> Profile:

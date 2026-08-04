@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,11 +27,12 @@ class Settings:
         )
     )
 
-    # LLM (optional). When OPENAI_API_KEY is unset, ranking falls back to
-    # deterministic rule-based scoring + template reasoning.
-    llm_api_key: str | None = os.getenv("ATS_LLM__API_KEY") or os.getenv("OPENAI_API_KEY")
-    llm_base_url: str | None = os.getenv("ATS_LLM__BASE_URL")
-    llm_model: str = os.getenv("ATS_LLM__MODEL", "gpt-4o-mini")
+    # LLM (optional). When unset, ranking falls back to deterministic rule-based
+    # scoring + template reasoning. Supports OpenAI and OpenAI-compatible endpoints
+    # (e.g. Google Gemini at https://generativelanguage.googleapis.com/v1beta/openai/).
+    llm_api_key: str | None = os.getenv("ATS_LLM__API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
+    llm_base_url: str | None = os.getenv("ATS_LLM__BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+    llm_model: str = os.getenv("ATS_LLM__MODEL", "gemini-1.5-flash")
     llm_timeout_ms: int = int(os.getenv("ATS_LLM__TIMEOUT_MS", "20000"))
 
     # Local BERT resume-NER (optional; overrides LLM extraction when enabled).

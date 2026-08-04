@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -124,7 +126,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(job.description.isEmpty ? 'No description' : job.description),
+            Text(
+              job.title,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            if (job.description.isEmpty)
+              const Text('No description')
+            else
+              _DescriptionView(description: job.description),
             if (job.requirements != null) ...[
               const SizedBox(height: 16),
               _RequirementsView(requirements: job.requirements!),
@@ -168,6 +178,91 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ),
       ),
     );
+  }
+}
+
+class _DescriptionView extends StatelessWidget {
+  final String description;
+
+  const _DescriptionView({required this.description});
+
+  String? _jsonToMarkdown(String text) {
+    final trimmed = text.trim();
+    if (!trimmed.startsWith('{')) return null;
+    Object? data;
+    try {
+      data = json.decode(trimmed);
+    } catch (_) {
+      return null;
+    }
+    if (data is! Map) return null;
+
+    final buffer = StringBuffer();
+    _appendMap(buffer, data, level: 1);
+    return buffer.toString().trim();
+  }
+
+  String _humanize(String key) {
+    return key
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m[1]} ${m[2]}',
+        )
+        .split(RegExp(r'_|\-'))
+        .map((w) => w.isEmpty
+            ? w
+            : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  void _appendMap(StringBuffer buffer, Map<dynamic, dynamic> map,
+      {required int level}) {
+    final header = level == 1 ? '### ' : '#### ';
+    bool firstSection = level == 1;
+    for (final entry in map.entries) {
+      final key = entry.key.toString();
+      final label = _humanize(key);
+      final value = entry.value;
+      if (value is Map) {
+        buffer.writeln();
+        buffer.writeln('$header$label');
+        _appendMap(buffer, value, level: level + 1);
+        if (firstSection) firstSection = false;
+      } else if (value is List) {
+        buffer.writeln();
+        buffer.writeln('$header$label');
+        if (value.isEmpty) {
+          buffer.writeln('- none');
+        } else {
+          for (final item in value) {
+            if (item is Map) {
+              buffer.writeln();
+              _appendMap(buffer, item, level: level + 1);
+            } else {
+              buffer.writeln('- ${item.toString().trim()}');
+            }
+          }
+        }
+        if (level == 1) buffer.writeln();
+      } else {
+        final str = value.toString().trim();
+        if (str.isNotEmpty) {
+          buffer.writeln('**$label:** $str');
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final md = _jsonToMarkdown(description);
+    if (md != null) {
+      return MarkdownBody(
+        data: md,
+        selectable: true,
+      );
+    }
+    return MarkdownBody(data: description);
   }
 }
 

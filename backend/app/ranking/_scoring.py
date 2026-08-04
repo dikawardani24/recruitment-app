@@ -1,20 +1,9 @@
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass
-
 from app.config import Settings
-from app.jd import _extract_education
-from app.skills import (
-    CERT_KEYWORDS,
-    SOFT_SKILLS,
-    TECH_SKILLS,
-    find_certifications,
-    find_skills,
-)
+from app.extraction import Profile
 
 EDUCATION_LEVELS = {"": 0, "diploma": 1, "bsc": 2, "msc": 3, "phd": 4}
-EXPERIENCE_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:years?|yrs?|tahun)", re.I)
 RECOMMENDATIONS = {
     "strong_match": "Strong match — prioritize for interview",
     "good_match": "Good match — worth interviewing",
@@ -29,119 +18,6 @@ BUCKET_RANGES = [
 ]
 
 
-@dataclass
-class Profile:
-    candidate_name: str
-    skills: list[str]
-    years_experience: float
-    education: str | None
-    certifications: list[str]
-    profile_text: str
-
-    def as_dict(self) -> dict:
-        return {
-            "candidate_name": self.candidate_name,
-            "skills": self.skills,
-            "years_experience": self.years_experience,
-            "education": self.education,
-            "certifications": self.certifications,
-        }
-
-
-def extract_profile(text: str, file_name: str = "") -> Profile:
-    skills = find_skills(text, TECH_SKILLS + SOFT_SKILLS)
-    m = EXPERIENCE_RE.search(text)
-    years = float(m.group(1)) if m else 0.0
-    return Profile(
-        candidate_name=_extract_name(text, file_name),
-        skills=skills,
-        years_experience=years,
-        education=_extract_education(text),
-        certifications=find_certifications(text),
-        profile_text=text,
-    )
-
-
-_SECTION_HEADERS = re.compile(
-    r"^(profile|summary|education|experience|skills?|projects?|languages?|contact|"
-    r"objective|about|work|employment|professional|personal|technical|interest|"
-    r"certifications?|achievements?|awards?|references?|qualifications?|strengths?|"
-    r"riwayat|pendidikan|pengalaman|kemampuan|keahlian)\b",
-    re.I,
-)
-_ROLE_WORDS = re.compile(
-    r"^(developer|engineer|designer|consultant|manager|analyst|architect|"
-    r"lead|intern|specialist|director|head|officer|founder|recruiter|"
-    r"mobile|flutter|frontend|backend|fullstack|software|web|graphic|devops|"
-    r"ui|ux|data|tech|staff|senior|junior|principal)$",
-    re.I,
-)
-_ROLE_RE = re.compile(
-    r"\b(developer|engineer|designer|consultant|manager|analyst|architect|"
-    r"lead|intern|specialist|director|head|officer|founder|recruiter|student)\b",
-    re.I,
-)
-_PERSON_RE = re.compile(r"^[A-Za-z][A-Za-z'’.\-]*(?: [A-Za-z][A-Za-z'’.\-]*){1,3}$")
-_NAME_SCAN_LINES = 6
-
-
-def _name_from_filename(file_name: str) -> str:
-    stem = re.sub(r"\.(pdf|docx|doc|txt)$", "", file_name, flags=re.I)
-    first = stem.split("_", maxsplit=1)[0]
-    noise = re.compile(
-        r"^(cv|resume|résumé|curriculum vitae|linkedin|updated|new|final|copy)$", re.I
-    )
-    words = [
-        w
-        for w in re.split(r"[\s\-–—]+", first.strip())
-        if w and not noise.match(w) and not _ROLE_WORDS.match(w)
-    ]
-    if words:
-        return " ".join(w.title() for w in words)
-    return stem.replace("_", " ").replace("-", " ").strip().title()
-
-
-def _extract_name(text: str, file_name: str) -> str:
-    fn_name = _name_from_filename(file_name)
-    fn_compact = re.sub(r"\s+", "", fn_name.lower())
-
-    # A full person name in the filename ("First Last", confirmed in the text)
-    # is the most reliable signal — e.g. "RANGGA DWI SAPUTRA" in the header.
-    if fn_compact and _PERSON_RE.match(fn_name) and fn_compact in re.sub(
-        r"\s+", "", text.lower()
-    ):
-        return fn_name
-
-    lines = text.splitlines()
-    for raw in lines[:_NAME_SCAN_LINES]:
-        line = raw.strip()
-        if not line or _SECTION_HEADERS.match(line) or _ROLE_RE.search(line):
-            continue
-        words = line.split()
-
-        # letter-spaced name, e.g. "F A T H A N A Z K A P R A D A N A" (LinkedIn
-        # exports). Confirm against the filename before accepting it.
-        if len(words) >= 4 and all(len(w) == 1 and w.isalpha() for w in words):
-            if "".join(words).lower() == fn_compact:
-                return fn_name
-            continue
-
-        # name line: 2-4 Title Case words (headers are usually ALL CAPS)
-        if 2 <= len(words) <= 4 and all(w.istitle() for w in words):
-            return " ".join(words)
-
-    # secondary pass: all-caps name (e.g. "JOHN DOE") in the header area only
-    for raw in lines[:6]:
-        line = raw.strip()
-        if not line or _SECTION_HEADERS.match(line) or _ROLE_RE.search(line):
-            continue
-        words = line.split()
-        if 2 <= len(words) <= 4 and all(w.isalpha() and w.isupper() for w in words):
-            return " ".join(w.title() for w in words)
-
-    return fn_name or "Unknown Candidate"
-
-
 def score_profile(profile: Profile, requirements: dict, settings: Settings) -> dict:
     req_skills = requirements.get("required_skills") or []
     pref_skills = requirements.get("preferred_skills") or []
@@ -149,9 +25,13 @@ def score_profile(profile: Profile, requirements: dict, settings: Settings) -> d
     req_edu = requirements.get("education")
     req_certs = requirements.get("certifications") or []
 
-    matched_req = [s for s in req_skills if s in profile.skills]
-    matched_pref = [s for s in pref_skills if s in profile.skills]
-    matched_certs = [c for c in req_certs if c in profile.certifications]
+    # Case-insensitive matching: canonical skills are lowercase; LLM skills may be capitalized.
+    profile_skills = {s.lower() for s in profile.skills}
+    profile_certs = {c.lower() for c in profile.certifications}
+
+    matched_req = [s for s in req_skills if s.lower() in profile_skills]
+    matched_pref = [s for s in pref_skills if s.lower() in profile_skills]
+    matched_certs = [c for c in req_certs if c.lower() in profile_certs]
 
     if req_skills:
         skill_score = 0.7 * (len(matched_req) / len(req_skills)) + 0.3 * (
@@ -203,7 +83,7 @@ def score_profile(profile: Profile, requirements: dict, settings: Settings) -> d
         "overall": round(overall, 3),
         "matched_required": matched_req,
         "matched_preferred": matched_pref,
-        "missing_required": [s for s in req_skills if s not in profile.skills],
+        "missing_required": [s for s in req_skills if s.lower() not in profile_skills],
         "matched_certs": matched_certs,
     }
 

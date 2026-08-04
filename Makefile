@@ -1,4 +1,4 @@
-.PHONY: backend-test backend-run backend-analyze frontend-run frontend-test frontend-analyze lint
+.PHONY: backend-test backend-run backend-analyze backend-script frontend-run frontend-test frontend-analyze lint
 
 PY ?= .venv/bin/python
 
@@ -11,13 +11,16 @@ backend-test:
 backend-run:
 	cd backend && .venv/bin/uvicorn app.main:app --reload
 
+backend-script:
+	scripts/run_script.sh backend/$(SCRIPT)
+
 frontend-run:
-	cd frontend && flutter run
+	scripts/run_script.sh frontend/run
 
 frontend-analyze:
-	cd frontend && flutter analyze
+	scripts/run_script.sh frontend/analyze
 
 frontend-test:
-	cd frontend && flutter test
+	scripts/run_script.sh frontend/test
 
 lint: backend-analyze frontend-analyze
