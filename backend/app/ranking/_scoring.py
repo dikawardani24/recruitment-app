@@ -25,9 +25,13 @@ def score_profile(profile: Profile, requirements: dict, settings: Settings) -> d
     req_edu = requirements.get("education")
     req_certs = requirements.get("certifications") or []
 
-    matched_req = [s for s in req_skills if s in profile.skills]
-    matched_pref = [s for s in pref_skills if s in profile.skills]
-    matched_certs = [c for c in req_certs if c in profile.certifications]
+    # Case-insensitive matching: canonical skills are lowercase; LLM skills may be capitalized.
+    profile_skills = {s.lower() for s in profile.skills}
+    profile_certs = {c.lower() for c in profile.certifications}
+
+    matched_req = [s for s in req_skills if s.lower() in profile_skills]
+    matched_pref = [s for s in pref_skills if s.lower() in profile_skills]
+    matched_certs = [c for c in req_certs if c.lower() in profile_certs]
 
     if req_skills:
         skill_score = 0.7 * (len(matched_req) / len(req_skills)) + 0.3 * (

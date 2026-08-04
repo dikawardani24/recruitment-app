@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../api.dart';
@@ -187,55 +186,80 @@ class _DescriptionView extends StatelessWidget {
 
   const _DescriptionView({required this.description});
 
-  String? _tryFormatJson(String text) {
+  String? _jsonToMarkdown(String text) {
     final trimmed = text.trim();
     if (!trimmed.startsWith('{')) return null;
+    Object? data;
     try {
-      final decoded = json.decode(trimmed);
-      if (decoded is Map) {
-        const encoder = JsonEncoder.withIndent('  ');
-        return encoder.convert(decoded);
+      data = json.decode(trimmed);
+    } catch (_) {
+      return null;
+    }
+    if (data is! Map) return null;
+
+    final buffer = StringBuffer();
+    _appendMap(buffer, data, level: 1);
+    return buffer.toString().trim();
+  }
+
+  String _humanize(String key) {
+    return key
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m[1]} ${m[2]}',
+        )
+        .split(RegExp(r'_|\-'))
+        .map((w) => w.isEmpty
+            ? w
+            : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  void _appendMap(StringBuffer buffer, Map<dynamic, dynamic> map,
+      {required int level}) {
+    final header = level == 1 ? '### ' : '#### ';
+    bool firstSection = level == 1;
+    for (final entry in map.entries) {
+      final key = entry.key.toString();
+      final label = _humanize(key);
+      final value = entry.value;
+      if (value is Map) {
+        buffer.writeln();
+        buffer.writeln('$header$label');
+        _appendMap(buffer, value, level: level + 1);
+        if (firstSection) firstSection = false;
+      } else if (value is List) {
+        buffer.writeln();
+        buffer.writeln('$header$label');
+        if (value.isEmpty) {
+          buffer.writeln('- none');
+        } else {
+          for (final item in value) {
+            if (item is Map) {
+              buffer.writeln();
+              _appendMap(buffer, item, level: level + 1);
+            } else {
+              buffer.writeln('- ${item.toString().trim()}');
+            }
+          }
+        }
+        if (level == 1) buffer.writeln();
+      } else {
+        final str = value.toString().trim();
+        if (str.isNotEmpty) {
+          buffer.writeln('**$label:** $str');
+        }
       }
-    } catch (_) {}
-    return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final formatted = _tryFormatJson(description);
-    if (formatted != null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          children: [
-            SelectableText(
-              formatted,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                  ),
-            ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.copy, size: 18),
-                tooltip: 'Copy JSON',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: formatted));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard')),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+    final md = _jsonToMarkdown(description);
+    if (md != null) {
+      return MarkdownBody(
+        data: md,
+        selectable: true,
       );
     }
     return MarkdownBody(data: description);

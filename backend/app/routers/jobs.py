@@ -13,6 +13,7 @@ from app.extraction import Profile, extract_profile_text
 from app.jd import structure_jd
 from app.parsers import extract_text
 from app.ranking import LLMReasoning, LLMRankingError, bucket_for, rank_with_llm, rule_reasoning, score_profile
+from app.skills import find_skills, skill_like_terms, SOFT_SKILLS, TECH_SKILLS
 
 router = APIRouter(tags=["jobs"])
 
@@ -41,6 +42,30 @@ def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:
     path = upload_dir / f"{uuid4().hex}{suffix}"
     path.write_bytes(content)
     return str(path)
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _skill_tokens(items: list[str]) -> list[str]:
+    """Convert a list of strings (possibly full sentences) into canonical skill tokens.
+
+    Uses the same skill dictionary the rule-based engine uses for matching, so
+    "Flutter development" → "flutter", "RESTful APIs" → "rest", etc.
+    """
+    if not items:
+        return []
+    text = " ".join(items)
+    known = find_skills(text, TECH_SKILLS + SOFT_SKILLS)
+    extras = [t for t in skill_like_terms(text) if t not in known]
+    return known + extras
 
 
 def _try_parse_json(text: str) -> dict | None:
@@ -81,21 +106,30 @@ def _try_parse_json(text: str) -> dict | None:
         return None
 
     # Merge skill lists from various possible keys.
-    required_skills = _list("required_skills", "requiredQualifications", "skills", "mustHave", "must_have", "requirements")
-    preferred_skills = _list("preferred_skills", "preferredQualifications", "niceToHaveSkills", "niceToHave", "nice_to_have", "bonus")
-    technical_skills = _list("technicalSkills")
-    soft_skills = _list("softSkills")
+    # Full-sentence qualifications (e.g. "Experience building mobile apps...")
+    # are reduced to real skill tokens so the rule engine can match them.
+    required_skills = _skill_tokens(
+        _list("required_skills", "requiredQualifications", "mustHave", "must_have", "requirements")
+    )
+    preferred_skills = _skill_tokens(
+        _list("preferred_skills", "preferredQualifications", "niceToHaveSkills", "niceToHave", "nice_to_have", "bonus")
+    )
+    technical_skills = _skill_tokens(_list("technicalSkills"))
+    soft_skills = _skill_tokens(_list("softSkills"))
 
     # Combine technical + soft skills into preferred if no explicit lists.
     if not required_skills and not preferred_skills:
         required_skills = technical_skills
         preferred_skills = soft_skills
+    else:
+        required_skills = _dedupe(required_skills + technical_skills)
+        preferred_skills = _dedupe(preferred_skills + soft_skills + technical_skills)
 
     # Fallback: scan all array values for anything that looks like skill lists.
     if not required_skills and not preferred_skills:
         for key, val in data.items():
             if isinstance(val, list) and all(isinstance(s, str) for s in val):
-                skills = [s.strip() for s in val if s.strip()]
+                skills = _skill_tokens(val)
                 if skills:
                     # First array of strings found becomes required skills.
                     if not required_skills:
