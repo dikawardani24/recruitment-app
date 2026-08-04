@@ -83,7 +83,7 @@ def score_profile(profile: Profile, requirements: dict, settings: Settings) -> d
         "overall": round(overall, 3),
         "matched_required": matched_req,
         "matched_preferred": matched_pref,
-        "missing_required": [s for s in req_skills if s not in profile.skills],
+        "missing_required": [s for s in req_skills if s.lower() not in profile_skills],
         "matched_certs": matched_certs,
     }
 
