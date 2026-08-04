@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../api.dart';
@@ -133,7 +135,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             if (job.description.isEmpty)
               const Text('No description')
             else
-              MarkdownBody(data: job.description),
+              _DescriptionView(description: job.description),
             if (job.requirements != null) ...[
               const SizedBox(height: 16),
               _RequirementsView(requirements: job.requirements!),
@@ -177,6 +179,66 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ),
       ),
     );
+  }
+}
+
+class _DescriptionView extends StatelessWidget {
+  final String description;
+
+  const _DescriptionView({required this.description});
+
+  String? _tryFormatJson(String text) {
+    final trimmed = text.trim();
+    if (!trimmed.startsWith('{')) return null;
+    try {
+      final decoded = json.decode(trimmed);
+      if (decoded is Map) {
+        const encoder = JsonEncoder.withIndent('  ');
+        return encoder.convert(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final formatted = _tryFormatJson(description);
+    if (formatted != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Stack(
+          children: [
+            SelectableText(
+              formatted,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                  ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: 'Copy JSON',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: formatted));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard')),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return MarkdownBody(data: description);
   }
 }
 
