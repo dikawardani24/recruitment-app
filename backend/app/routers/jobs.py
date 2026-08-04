@@ -81,8 +81,8 @@ def _try_parse_json(text: str) -> dict | None:
         return None
 
     # Merge skill lists from various possible keys.
-    required_skills = _list("required_skills", "requiredQualifications", "skills")
-    preferred_skills = _list("preferred_skills", "preferredQualifications", "niceToHaveSkills")
+    required_skills = _list("required_skills", "requiredQualifications", "skills", "mustHave", "must_have", "requirements")
+    preferred_skills = _list("preferred_skills", "preferredQualifications", "niceToHaveSkills", "niceToHave", "nice_to_have", "bonus")
     technical_skills = _list("technicalSkills")
     soft_skills = _list("softSkills")
 
@@ -91,14 +91,27 @@ def _try_parse_json(text: str) -> dict | None:
         required_skills = technical_skills
         preferred_skills = soft_skills
 
+    # Fallback: scan all array values for anything that looks like skill lists.
+    if not required_skills and not preferred_skills:
+        for key, val in data.items():
+            if isinstance(val, list) and all(isinstance(s, str) for s in val):
+                skills = [s.strip() for s in val if s.strip()]
+                if skills:
+                    # First array of strings found becomes required skills.
+                    if not required_skills:
+                        required_skills = skills
+                    elif not preferred_skills:
+                        preferred_skills = skills
+                    break
+
     requirements = {
-        "title": _str("title", "position") or "",
+        "title": _str("title", "position", "jobTitle", "role", "job_title") or "",
         "required_skills": required_skills,
         "preferred_skills": preferred_skills,
-        "min_years": _float("min_years", "minYears", "experience"),
-        "education": _str("education"),
-        "certifications": _list("certifications"),
-        "responsibilities": _list("responsibilities"),
+        "min_years": _float("min_years", "minYears", "experience", "years", "yearsNeeded", "years_needed", "minExperience"),
+        "education": _str("education", "educationLevel", "degree"),
+        "certifications": _list("certifications", "certs"),
+        "responsibilities": _list("responsibilities", "duties", "whatYouWillDo"),
     }
     return requirements
 
