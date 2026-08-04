@@ -36,6 +36,21 @@ make frontend-test  # flutter test
 make lint           # compileall + flutter analyze
 ```
 
+## Scripts
+
+One-off bash scripts live in `scripts/<project>/*.sh`. They run with their
+project directory as the working directory and load the repo-root `.env` file.
+
+```bash
+./scripts/run_script.sh                          # list all scripts
+./scripts/run_script.sh run                      # backend run
+./scripts/run_script.sh frontend/test            # frontend test
+./scripts/run_script.sh frontend/run -d chrome   # pass extra args
+```
+
+Or via Make: `make backend-script SCRIPT=seed`.
+New scripts are discovered automatically by filename in `scripts/<project>/`.
+
 ## API
 
 | Method | Path | Purpose |
