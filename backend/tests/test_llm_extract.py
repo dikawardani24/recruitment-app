@@ -3,13 +3,8 @@ from __future__ import annotations
 import pytest
 
 from app.config import settings
-from app.llm_extract import (
-    LLMExtractError,
-    _build_prompt,
-    _parse_response,
-    extract_profile_text,
-)
-from app.ranking import Profile
+from app.extraction import LLMExtractError, Profile, extract_profile_text
+from app.extraction._orchestrator import _build_prompt, _parse_response
 
 
 def _profile(**kw) -> Profile:

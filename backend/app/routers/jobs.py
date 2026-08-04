@@ -8,11 +8,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app import db
 from app.config import Settings
+from app.extraction import Profile, extract_profile_text
 from app.jd import structure_jd
-from app.llm import LLMRankingError, rank_with_llm
-from app.llm_extract import extract_profile_text
 from app.parsers import extract_text
-from app.ranking import Profile, bucket_for, extract_profile, rule_reasoning, score_profile
+from app.ranking import LLMReasoning, LLMRankingError, bucket_for, rank_with_llm, rule_reasoning, score_profile
 
 router = APIRouter(tags=["jobs"])
 

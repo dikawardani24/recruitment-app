@@ -5,9 +5,9 @@ import json
 import re
 
 from app.config import Settings
+from app.extraction._ner import NERExtractError
+from app.extraction._profile import Profile, extract_profile
 from app.jd import _extract_education
-from app.ner_extract import NERExtractError
-from app.ranking import Profile, extract_profile
 
 
 class LLMExtractError(Exception):
@@ -132,7 +132,7 @@ async def extract_profile_text(
     """Extraction priority: local NER -> LLM -> deterministic rules."""
     if settings.ner_enabled:
         try:
-            from app.ner_extract import extract_profile_ner
+            from app.extraction._ner import extract_profile_ner
 
             return await asyncio.to_thread(
                 extract_profile_ner, settings, text, file_name

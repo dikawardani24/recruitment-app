@@ -15,6 +15,49 @@ A simple recruiter tool:
 | Ranking | Deterministic rule-based scoring, plus AI reasoning via any OpenAI-compatible LLM when `ATS_LLM__API_KEY` is set |
 | Frontend | Flutter (Material 3) |
 
+## Backend structure
+
+```
+backend/app/
+├── main.py              # FastAPI app entry point
+├── config.py            # Settings singleton (env vars)
+├── db.py                # SQLite schema + async helpers
+│
+├── parsers/             # File parsing (PDF, DOCX, TXT)
+│   ├── __init__.py
+│   └── _extract.py
+│
+├── skills/              # Skill dictionaries + matching
+│   ├── __init__.py
+│   └── _match.py
+│
+├── jd/                  # Job description structuring
+│   ├── __init__.py
+│   └── _structure.py
+│
+├── extraction/          # CV profile extraction (orchestrator + NER + LLM + rules)
+│   ├── __init__.py
+│   ├── _profile.py      # Profile dataclass + deterministic extraction
+│   ├── _orchestrator.py # NER → LLM → Rules fallback chain
+│   └── _ner.py          # Local BERT NER extraction
+│
+├── ranking/             # Candidate scoring + reasoning
+│   ├── __init__.py
+│   ├── _scoring.py      # score_profile, bucket_for, rule_reasoning
+│   └── _llm.py          # LLM-powered ranking
+│
+└── routers/
+    ├── __init__.py
+    └── jobs.py          # All HTTP endpoints
+```
+
+Each folder is a domain:
+- **parsers/** — reads files
+- **skills/** — knows what skills are
+- **jd/** — parses job descriptions
+- **extraction/** — pulls structured data from resumes
+- **ranking/** — scores and ranks candidates
+
 ## Quick start
 
 See [docs/setup-and-testing.md](docs/setup-and-testing.md).

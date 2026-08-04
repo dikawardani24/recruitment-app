@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 
 from app.config import Settings
+from app.extraction._profile import Profile, extract_profile
 from app.jd import _extract_education
-from app.ranking import Profile, extract_profile
 
 YEARS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?|tahun)?", re.I)
 DESIGNATION_RE = re.compile(

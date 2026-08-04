@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from app.extraction import Profile, extract_profile
+from app.extraction._profile import _extract_name, _name_from_filename
 from app.jd import _extract_education, structure_jd
-from app.llm import LLMRankingError, _parse_response
-from app.ranking import _extract_name, _name_from_filename, extract_profile
+from app.ranking import LLMRankingError
+from app.ranking._llm import _parse_response
 from app.skills import find_skills, skill_like_terms, TECH_SKILLS, SOFT_SKILLS
 
 
