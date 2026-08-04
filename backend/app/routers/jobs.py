@@ -44,15 +44,63 @@ def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:
 
 
 def _try_parse_json(text: str) -> dict | None:
-    """Try to parse text as JSON. Returns the parsed dict if valid, None otherwise."""
+    """Try to parse text as JSON and normalize into the standard requirements format."""
     text = text.strip()
     if not text.startswith("{"):
         return None
     try:
         data = _json.loads(text)
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            return None
     except (_json.JSONDecodeError, ValueError):
         return None
+
+    # Normalize various JSON field names into the standard schema.
+    def _list(key: str, *alts: str) -> list[str]:
+        for k in (key, *alts):
+            val = data.get(k)
+            if isinstance(val, list):
+                return [str(s).strip() for s in val if str(s).strip()]
+        return []
+
+    def _float(key: str, *alts: str) -> float:
+        for k in (key, *alts):
+            val = data.get(k)
+            if val is not None:
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    pass
+        return 0.0
+
+    def _str(key: str, *alts: str) -> str | None:
+        for k in (key, *alts):
+            val = data.get(k)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return None
+
+    # Merge skill lists from various possible keys.
+    required_skills = _list("required_skills", "requiredQualifications", "skills")
+    preferred_skills = _list("preferred_skills", "preferredQualifications", "niceToHaveSkills")
+    technical_skills = _list("technicalSkills")
+    soft_skills = _list("softSkills")
+
+    # Combine technical + soft skills into preferred if no explicit lists.
+    if not required_skills and not preferred_skills:
+        required_skills = technical_skills
+        preferred_skills = soft_skills
+
+    requirements = {
+        "title": _str("title", "position") or "",
+        "required_skills": required_skills,
+        "preferred_skills": preferred_skills,
+        "min_years": _float("min_years", "minYears", "experience"),
+        "education": _str("education"),
+        "certifications": _list("certifications"),
+        "responsibilities": _list("responsibilities"),
+    }
+    return requirements
 
 
 @router.post("/jobs", status_code=201)
@@ -79,13 +127,11 @@ async def create_job(
         suffix = Path(jd_file.filename or "job.txt").suffix.lower()
         jd_key = _save_file(settings.upload_dir / "jd", suffix, jd_bytes)
 
-    # If description is valid JSON, use it as requirements directly.
+    # If description is valid JSON, normalize it into requirements.
     # Otherwise, parse it as plain text with structure_jd().
+    # Always keep the original description text for display.
     requirements = _try_parse_json(description) if description.strip() else None
-    if requirements is not None:
-        # JSON was parsed — clear the raw text so it doesn't show as JSON in the UI.
-        description = ""
-    elif description.strip():
+    if requirements is None and description.strip():
         requirements = structure_jd(description)
 
     job = {
