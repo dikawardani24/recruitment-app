@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Powered CV Pre-Screening Assistant — Project Proposal</title>
+<style>
+  :root{
+    --navy:#0B1D30; --navy2:#123553; --ink:#16263B;
+    --teal:#0FBFA6; --teal-d:#0D9486; --orange:#F59E0B; --pink:#F43F5E;
+    --violet:#8B5CF6; --blue:#3B82F6; --light:#F4F7FB; --line:#E2E8F0;
+    --grey:#5B6B84; --slate:#31415B;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Segoe UI","Calibri",Arial,sans-serif;
+    background:#0A1826; color:var(--slate); overflow:hidden;
+  }
+  .deck{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;}
+  .slide{
+    width:1280px; height:720px; flex:0 0 auto; position:relative; overflow:hidden;
+    border-radius:18px; box-shadow:0 30px 80px rgba(0,0,0,.55);
+    display:none; background:var(--light);
+  }
+  .slide.active{display:block;}
+
+  /* ---------- nav ---------- */
+  .nav{position:fixed; bottom:18px; right:22px; z-index:50; display:flex; gap:8px;}
+  .nav button{
+    background:rgba(255,255,255,.12); color:#dfe9f5; border:1px solid rgba(255,255,255,.25);
+    border-radius:10px; padding:9px 18px; font-size:15px; font-weight:600; cursor:pointer;
+    transition:background .15s;
+  }
+  .nav button:hover{background:rgba(255,255,255,.28);}
+  .dots{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:50; display:flex; gap:9px;}
+  .dot{width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,.22); cursor:pointer; transition:all .2s;}
+  .dot.on{background:var(--teal); transform:scale(1.35); box-shadow:0 0 0 4px rgba(15,191,166,.25);}
+  .counter{position:fixed; bottom:22px; left:24px; z-index:50; color:#7e94b0; font-size:13px; font-weight:600;}
+  .kbd{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:50; color:#5d7188; font-size:11px;}
+  .kbd b{color:#a9bed6;}
+
+  /* ---------- shared ---------- */
+  .kicker{display:inline-flex; align-items:center; gap:8px; font-size:12px; letter-spacing:.14em;
+    font-weight:800; color:var(--teal); text-transform:uppercase;}
+  .num-badge{display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+    border-radius:8px; background:linear-gradient(135deg,var(--teal),var(--teal-d));
+    color:#fff; font-weight:800; font-size:13px;}
+  .headbar{position:absolute; top:0; left:0; right:0; padding:26px 64px 20px;
+    background:linear-gradient(180deg,#fff, #ffffff00);}
+  .headbar .title{font-size:30px; font-weight:800; color:var(--ink); margin-top:6px; letter-spacing:-.01em;}
+  .headbar .underline{width:64px; height:5px; border-radius:3px;
+    background:linear-gradient(90deg,var(--teal),var(--blue)); margin-top:12px;}
+  .footbar{position:absolute; bottom:0; left:0; right:0; height:34px; padding:0 64px;
+    display:flex; align-items:center; justify-content:space-between; font-size:10px; color:#93a3bb;}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px 20px;
+    box-shadow:0 6px 24px rgba(15,42,67,.07);}
+  .card h3{font-size:15px; font-weight:800; color:var(--ink); margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .card li{font-size:13px; margin:4px 0 4px 18px; color:var(--slate);}
+  .card li::marker{color:var(--teal);}
+  .bullet{margin:9px 0;}
+  .bullet .dot{display:inline-block; width:8px; height:8px; border-radius:3px;
+    background:linear-gradient(135deg,var(--teal),var(--blue)); margin-right:12px; vertical-align:2px;}
+  .bullet.sub{padding-left:24px; font-size:.93em; color:var(--grey);}
+  .bullet.sub .dot{background:linear-gradient(135deg,var(--orange),var(--pink)); width:7px; height:7px;}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:18px; padding:18px 22px;
+    box-shadow:0 10px 30px rgba(15,42,67,.08);}
+
+  .chip{display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--line);
+    border-radius:999px; padding:7px 16px; font-size:13px; font-weight:700; color:var(--ink);
+    box-shadow:0 3px 10px rgba(15,42,67,.06);}
+  .grad-text{background:linear-gradient(90deg,var(--teal),var(--blue)); -webkit-background-clip:text;
+    background-clip:text; color:transparent;}
+</style>
+<style media="print">
+  body{overflow:visible; background:#fff;}
+  .deck{position:static; display:block;}
+  .slide{display:block; box-shadow:none; page-break-after:always; margin:0; border-radius:0;}
+  .slide:last-child{page-break-after:auto;}
+  .nav,.dots,.counter,.kbd{display:none;}
+  @page{size:1280px 720px; margin:0;}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- 1 · TITLE -->
+<section class="slide" style="background:radial-gradient(1200px 600px at 85% -10%, #15476e 0%, transparent 60%), radial-gradient(900px 500px at -10% 110%, #0e3a52 0%, transparent 55%), var(--navy); color:#fff;">
+  <div style="position:absolute; top:0; left:0; right:0; height:6px; background:linear-gradient(90deg,var(--teal),var(--blue),var(--orange));"></div>
+  <div style="padding:110px 90px;">
+    <div class="kicker" style="color:var(--teal); font-size:13px; letter-spacing:.22em;">
+      Project Proposal &nbsp;·&nbsp; Product &amp; Engineering &nbsp;·&nbsp; August 2026
+    </div>
+    <div style="font-size:52px; font-weight:800; margin-top:22px; line-height:1.08; letter-spacing:-.02em;">
+      AI-Powered CV<br><span class="grad-text" style="background:linear-gradient(90deg,#2dd4bf,#60a5fa); -webkit-background-clip:text; background-clip:text;">Pre-Screening</span> Assistant
+    </div>
+    <div style="font-size:19px; color:#C9D6E4; margin-top:18px; max-width:980px;">
+      Deterministic, explainable candidate ranking — <b style="color:#fff;">scores own the rank</b>, AI explains it.
+    </div>
+    <div style="display:flex; gap:14px; margin-top:40px; flex-wrap:wrap;">
+      <span style="background:rgba(15,191,166,.16); border:1px solid rgba(15,191,166,.4); color:#5eead4; border-radius:999px; padding:9px 18px; font-size:14px; font-weight:700;">⚡ Instant ranked shortlists</span>
+      <span style="background:rgba(59,130,246,.16); border:1px solid rgba(59,130,246,.4); color:#93c5fd; border-radius:999px; padding:9px 18px; font-size:14px; font-weight:700;">🧩 Explainable scores</span>
+      <span style="background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.4); color:#fcd34d; border-radius:999px; padding:9px 18px; font-size:14px; font-weight:700;">🔌 No external services</span>
+    </div>
+    <div style="margin-top:110px; display:flex; align-items:center; gap:14px;">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span class="chip" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#e2e8f0;">Flutter (M3)</span>
+        <span class="chip" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#e2e8f0;">FastAPI</span>
+        <span class="chip" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#e2e8f0;">SQLite</span>
+        <span class="chip" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#e2e8f0;">Deterministic scoring</span>
+        <span class="chip" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#e2e8f0;">Optional LLM</span>
+      </div>
+    </div>
+    <div style="margin-top:16px; font-size:12.5px; color:#8FA6BE;">
+      Status: MVP implemented &amp; tested — 37/37 backend tests passing · ready for production hardening
+    </div>
+  </div>
+</section>
+
+<!-- 2 · THE PROBLEM -->
+<section class="slide">
+  <div class="headbar">
+    <div class="kicker"><span class="num-badge">01</span>The problem</div>
+    <div class="title">Manual screening is slow, inconsistent, and hard to defend</div>
+    <div class="underline"></div>
+  </div>
+  <div style="position:absolute; top:170px; left:64px; right:64px; bottom:48px; display:flex; gap:26px;">
+    <div style="flex:1.3; padding-top:6px;">
+      <div class="bullet"><span class="dot"></span><b>Manual triage cost</b> — reading and comparing resumes consumes 30–40% of recruiter time per role</div>
+      <div class="bullet sub"><span class="dot"></span>Directly inflates cost-per-hire and time-to-fill</div>
+      <div class="bullet"><span class="dot"></span><b>Inconsistent screening</b> — different recruiters weight the same CV differently</div>
+      <div class="bullet sub"><span class="dot"></span>Decisions are subjective and hard to justify</div>
+      <div class="bullet"><span class="dot"></span><b>No audit trail</b> — no record of <i>why</i> a candidate was ranked where they were</div>
+      <div class="bullet"><span class="dot"></span><b>Skill mismatch blindness</b> — strong but differently-worded experience is easy to overlook</div>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:20px;">
+      <div class="card" style="border-left:6px solid var(--pink);">
+        <h3>📉 Impact</h3>
+        <li>Slower hiring</li>
+        <li>Lower quality shortlists</li>
+        <li>Undefendable decisions</li>
+        <li>Missed strong candidates</li>
+      </div>
+      <div class="card" style="border-left:6px solid var(--teal);">
+        <h3>🚀 The opportunity</h3>
+        <li>One rubric for every candidate</li>
+        <li>Same weights, same logic, every time</li>
+        <li>Reasoning shown, not hidden</li>
+      </div>
+    </div>
+  </div>
+  <div class="footbar"><span>AI-Powered CV Pre-Screening Assistant — Project Proposal</span><span>02 / 06</span></div>
+</section>
+
+<!-- 3 · THE SOLUTION -->
+<section class="slide">
+  <div class="headbar">
+    <div class="kicker"><span class="num-badge">02</span>The proposed solution</div>
+    <div class="title">An end-to-end pre-screening pipeline</div>
+    <div class="underline"></div>
+  </div>
+  <div style="position:absolute; top:170px; left:64px; right:64px; bottom:48px; display:flex; flex-direction:column; gap:22px;">
+    <div style="display:flex; gap:20px;">
+      <div class="panel" style="flex:1; text-align:center; padding:20px; background:linear-gradient(180deg,#fff, #f7fbfd);">
+        <div style="font-size:38px;">📝</div>
+        <div style="font-size:17px; font-weight:800; color:var(--ink); margin-top:8px;">Describe the job</div>
+        <div style="font-size:13px; color:var(--grey); margin-top:6px;">Paste a JD or upload a file → normalized into structured requirements</div>
+      </div>
+      <div style="display:flex; align-items:center; font-size:26px; font-weight:800; color:var(--teal);">→</div>
+      <div class="panel" style="flex:1; text-align:center; padding:20px; background:linear-gradient(180deg,#fff, #f7fbfd);">
+        <div style="font-size:38px;">📎</div>
+        <div style="font-size:17px; font-weight:800; color:var(--ink); margin-top:8px;">Upload CVs</div>
+        <div style="font-size:13px; color:var(--grey); margin-top:6px;">Batch PDF/DOCX/TXT files → each parsed into a structured candidate profile</div>
+      </div>
+      <div style="display:flex; align-items:center; font-size:26px; font-weight:800; color:var(--teal);">→</div>
+      <div class="panel" style="flex:1; text-align:center; padding:20px; background:linear-gradient(180deg,#fff, #f7fbfd);">
+        <div style="font-size:38px;">🏆</div>
+        <div style="font-size:17px; font-weight:800; color:var(--ink); margin-top:8px;">Rank &amp; shortlist</div>
+        <div style="font-size:13px; color:var(--grey); margin-top:6px;">Ranked candidates, best first, each with score + reasoning</div>
+      </div>
+    </div>
+    <div class="card" style="border-left:6px solid var(--teal);">
+      <h3>💡 Design principles</h3>
+      <li><b>Rules own the rank, AI explains.</b> Scores come from transparent formulas; the LLM only adds a reasoned narrative.</li>
+      <li><b>Deterministic fallback.</b> No LLM configured — or it fails? Full rankings still returned from rules alone.</li>
+      <li><b>Self-contained.</b> SQLite + local file storage. No external services required to run.</li>
+      <li><b>Provider-agnostic.</b> Any OpenAI-compatible LLM (OpenAI, Gemini, Ollama) selected by config, never code.</li>
+    </div>
+  </div>
+  <div class="footbar"><span>AI-Powered CV Pre-Screening Assistant — Project Proposal</span><span>03 / 06</span></div>
+</section>
+
+<!-- 4 · HOW IT FLOWS -->
+<section class="slide" style="background:linear-gradient(180deg,#0d2236 0%, #123553 100%); color:#fff;">
+  <div class="headbar" style="background:none;">
+    <div class="kicker" style="color:var(--teal);"><span class="num-badge">03</span>How it works</div>
+    <div class="title" style="color:#fff;">How the pieces interact</div>
+    <div class="underline"></div>
+  </div>
+  <div style="position:absolute; top:170px; left:64px; right:64px; bottom:48px; display:flex; flex-direction:column; align-items:center; gap:14px;">
+    <div style="display:flex; gap:24px; width:100%;">
+      <div style="flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:16px; text-align:center; padding:18px;">
+        <div style="font-size:15px; font-weight:800; color:#fff;">Job description</div>
+        <div style="font-size:12px; color:#9FB3C8; margin-top:4px;">Pasted text or JD file</div>
+        <div style="color:var(--teal); font-size:20px; font-weight:800; margin-top:10px;">↓</div>
+        <div style="font-size:13px; font-weight:700; color:#5eead4;">Structured requirements</div>
+        <div style="font-size:11.5px; color:#9FB3C8; margin-top:4px;">skills · years · education · certifications</div>
+      </div>
+      <div style="flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:16px; text-align:center; padding:18px;">
+        <div style="font-size:15px; font-weight:800; color:#fff;">CV files</div>
+        <div style="font-size:12px; color:#9FB3C8; margin-top:4px;">PDF / DOCX / TXT uploads</div>
+        <div style="color:var(--teal); font-size:20px; font-weight:800; margin-top:10px;">↓</div>
+        <div style="font-size:13px; font-weight:700; color:#5eead4;">Candidate profiles</div>
+        <div style="font-size:11.5px; color:#9FB3C8; margin-top:4px;">name · skills · years · education · certifications</div>
+      </div>
+    </div>
+    <div style="color:var(--teal); font-size:26px; font-weight:800; line-height:1;">▼</div>
+    <div style="width:100%; text-align:center; padding:20px; border-radius:16px;
+      background:linear-gradient(120deg, rgba(15,191,166,.18), rgba(59,130,246,.18));
+      border:1.5px solid rgba(15,191,166,.45);">
+      <div style="font-size:19px; font-weight:800; color:#fff;">Ranking engine</div>
+      <div style="font-size:13px; color:#C9D6E4; margin-top:6px;">
+        Deterministic scores set the rank &nbsp;·&nbsp; optional AI reasoning explains it
+      </div>
+      <div style="display:flex; justify-content:center; gap:26px; margin-top:14px; font-size:12.5px; color:#9FB3C8; align-items:center;">
+        <span>score each profile vs requirements</span>
+        <span style="color:var(--teal); font-weight:800;">→</span>
+        <span>assign a bucket (strong · good · possible · weak)</span>
+        <span style="color:var(--teal); font-weight:800;">→</span>
+        <span>add strengths · weaknesses · recommendation</span>
+      </div>
+    </div>
+    <div style="color:var(--teal); font-size:26px; font-weight:800; line-height:1;">▼</div>
+    <div style="width:100%; text-align:center; padding:20px; border-radius:16px;
+      background:linear-gradient(120deg, #0FBFA6, #0D9486); box-shadow:0 14px 40px rgba(15,191,166,.35);">
+      <div style="font-size:20px; font-weight:800; color:#fff;">🏆 Ranked shortlist</div>
+      <div style="font-size:12.5px; color:#e0f7f2; margin-top:6px;">
+        best candidates first · each with score + reasons · rankings saved for audit
+      </div>
+    </div>
+  </div>
+  <div class="footbar" style="color:#6d829c;"><span>AI-Powered CV Pre-Screening Assistant — Project Proposal</span><span>04 / 06</span></div>
+</section>
+
+<!-- 5 · TECHNOLOGY STACK -->
+<section class="slide">
+  <div class="headbar">
+    <div class="kicker"><span class="num-badge">04</span>Technology stack</div>
+    <div class="title">Proven, swappable, self-contained</div>
+    <div class="underline"></div>
+  </div>
+  <div style="position:absolute; top:170px; left:64px; right:64px; bottom:48px; display:flex; gap:30px;">
+    <div style="flex:1.25; padding-top:4px;">
+      <div class="bullet"><span class="dot"></span><b>Backend</b> — Python FastAPI (single process), async &amp; typed</div>
+      <div class="bullet sub"><span class="dot"></span>Domain folders: parsers · skills · jd · extraction · ranking</div>
+      <div class="bullet"><span class="dot"></span><b>Storage</b> — SQLite + on-disk uploads, zero external services</div>
+      <div class="bullet"><span class="dot"></span><b>Extraction</b> — local BERT NER → LLM → deterministic rules fallback chain</div>
+      <div class="bullet"><span class="dot"></span><b>Skill matching</b> — 200+ skills, aliases, certifications, open-vocabulary pass</div>
+      <div class="bullet"><span class="dot"></span><b>LLM</b> — any OpenAI-compatible endpoint, default Gemini, temperature 0</div>
+      <div class="bullet"><span class="dot"></span><b>Frontend</b> — Flutter (Material 3), one codebase for web/iOS/Android</div>
+      <div class="bullet"><span class="dot"></span><b>Quality</b> — pytest suite, 37/37 passing; script runner for dev</div>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:20px;">
+      <div class="card" style="border-left:6px solid var(--blue);">
+        <h3>⚙️ Key implementation facts</h3>
+        <li>Ranking weights configurable via environment</li>
+        <li>Skill dictionary is a single file to extend</li>
+        <li>LLM key optional — everything works without it</li>
+      </div>
+      <div class="card" style="border-left:6px solid var(--teal);">
+        <h3>🔌 No external services</h3>
+        <li>SQLite + local files</li>
+        <li>Runs on a single machine or container</li>
+        <li>Deploy anywhere, including on-prem</li>
+      </div>
+    </div>
+  </div>
+  <div class="footbar"><span>AI-Powered CV Pre-Screening Assistant — Project Proposal</span><span>05 / 06</span></div>
+</section>
+
+<!-- 6 · METRICS & NEXT STEPS -->
+<section class="slide" style="background:radial-gradient(1000px 500px at 90% -10%, #15476e 0%, transparent 60%), radial-gradient(800px 500px at -10% 110%, #0e3a52 0%, transparent 55%), var(--navy); color:#fff;">
+  <div style="position:absolute; top:0; left:0; right:0; height:6px; background:linear-gradient(90deg,var(--teal),var(--blue),var(--orange));"></div>
+  <div style="padding:90px 90px;">
+    <div class="kicker" style="color:var(--teal); font-size:13px;"><span class="num-badge" style="background:linear-gradient(135deg,var(--teal),var(--blue));">05</span>&nbsp; Success metrics &amp; next steps</div>
+    <div style="font-size:34px; font-weight:800; margin-top:10px; color:#fff;">How we measure success — and what we need</div>
+    <div style="margin-top:34px; display:grid; grid-template-columns:1fr 1fr; gap:26px;">
+      <div style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:24px 26px;">
+        <div style="font-weight:800; color:var(--teal); font-size:13px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:14px;">📊 Metrics</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--teal); font-weight:800;">▸</span> &nbsp;Pipeline reliability — ≥ 95% uploads parsed &amp; ranked</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--teal); font-weight:800;">▸</span> &nbsp;Ranking consistency — reproducible given same input</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--teal); font-weight:800;">▸</span> &nbsp;Time-to-shortlist — reduced ≥ 40% vs. manual review</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--teal); font-weight:800;">▸</span> &nbsp;Extraction accuracy — verified against golden sample set</div>
+      </div>
+      <div style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:24px 26px;">
+        <div style="font-weight:800; color:var(--orange); font-size:13px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:14px;">🤝 To move forward, we ask for</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--orange); font-weight:800;">▸</span> &nbsp;Approval of this proposal and the Phase 4 roadmap</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--orange); font-weight:800;">▸</span> &nbsp;Pilot dataset — 20–30 real sample resumes to validate parsing</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--orange); font-weight:800;">▸</span> &nbsp;Team allocation for Phase 4 roles</div>
+        <div style="font-size:14.5px; color:#dfe9f5; margin:10px 0;"><span style="color:var(--orange); font-weight:800;">▸</span> &nbsp;Deployment target — container host / VM / managed PaaS</div>
+      </div>
+    </div>
+  </div>
+  <div style="position:absolute; bottom:44px; left:90px; font-size:12px; color:#8FA6BE;">
+    FastAPI · Flutter · SQLite · Deterministic scoring · Provider-agnostic LLM — MVP tested, ready for production hardening
+  </div>
+  <div style="position:absolute; bottom:0; left:0; right:0; height:7px; background:linear-gradient(90deg,var(--teal),var(--blue),var(--orange));"></div>
+</section>
+
+</div>
+
+<div class="nav">
+  <button onclick="go(-1)">&#8592; Prev</button>
+  <button onclick="go(1)">Next &#8594;</button>
+</div>
+<div class="dots" id="dots"></div>
+<div class="counter" id="counter"></div>
+<div class="kbd">Use <b>&larr;</b> <b>&rarr;</b> or <b>Space</b> to navigate</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const dots=document.getElementById('dots');
+  let cur=0;
+  slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot';d.onclick=()=>show(i);dots.appendChild(d);});
+  function show(i){cur=(i+slides.length)%slides.length;slides.forEach((s,j)=>s.classList.toggle('active',j===cur));
+    [...dots.children].forEach((d,j)=>d.classList.toggle('on',j===cur));
+    document.getElementById('counter').textContent=(cur+1)+' / '+slides.length;}
+  function go(d){show(cur+d);}
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();go(1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(-1);}
+    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(slides.length-1);}
+  });
+  show(0);
+</script>
+</body>
+</html>
