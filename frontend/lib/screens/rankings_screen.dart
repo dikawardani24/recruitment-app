@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../models.dart';
 import '../providers.dart';
+import '../widgets/gradient_header.dart';
 import '../widgets/rankings_summary.dart';
 
 class RankingsScreen extends HookConsumerWidget {
@@ -23,20 +24,7 @@ class RankingsScreen extends HookConsumerWidget {
     final rankingsAsync = ref.watch(rankingsProvider(jobId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Ranked candidates'),
-            Text(
-              jobTitle,
-              style: Theme.of(context).textTheme.bodySmall,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
+      appBar: AppBar(),
       body: rankingsAsync.when(
         loading: () => const Center(
           child: Column(
@@ -61,6 +49,12 @@ class RankingsScreen extends HookConsumerWidget {
               if (index == 0) {
                 return Column(
                   children: [
+                    GradientHeader(
+                      icon: Icons.psychology,
+                      title: 'Ranked candidates',
+                      subtitle: jobTitle,
+                    ),
+                    const SizedBox(height: 12),
                     Chip(
                       avatar: const Icon(Icons.psychology, size: 18),
                       label: Text(
@@ -98,6 +92,9 @@ class _RankedCard extends HookWidget {
     final score = c.overallScore;
 
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: cardShape(Theme.of(context)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

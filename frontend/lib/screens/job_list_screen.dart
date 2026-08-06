@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../controllers/job_list_controller.dart';
 import '../models.dart';
 import '../providers.dart';
+import '../widgets/gradient_header.dart';
 
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -72,9 +73,10 @@ class JobListScreen extends HookConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               children: [
-                _JobsHeader(
-                  total: jobs.length,
-                  candidates: totalCandidates,
+                GradientHeader(
+                  icon: Icons.work,
+                  title: 'Your job board',
+                  subtitle: '$totalCandidates candidates · ${jobs.length} jobs',
                 ),
                 const SizedBox(height: 16),
                 for (final entry in jobs.asMap().entries)
@@ -97,70 +99,6 @@ class JobListScreen extends HookConsumerWidget {
   }
 }
 
-class _JobsHeader extends StatelessWidget {
-  final int total;
-  final int candidates;
-
-  const _JobsHeader({required this.total, required this.candidates});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your job board',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$candidates candidates · $total jobs',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.work, color: Colors.white, size: 32),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _JobCard extends StatelessWidget {
   final Job job;
   final int index;
@@ -172,26 +110,15 @@ class _JobCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _palette = [
-    Color(0xFF3F51B5),
-    Color(0xFF00897B),
-    Color(0xFFD81B60),
-    Color(0xFFF57C00),
-    Color(0xFF5E35B1),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = _palette[index % _palette.length];
+    final color = avatarColor(index);
 
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
+      shape: cardShape(theme),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

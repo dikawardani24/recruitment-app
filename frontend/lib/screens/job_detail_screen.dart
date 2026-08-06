@@ -11,6 +11,7 @@ import '../models.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
+import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
@@ -97,20 +98,43 @@ class JobDetailScreen extends HookConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  job.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                GradientHeader(
+                  icon: Icons.work_outline,
+                  title: job.title,
+                  subtitle: '${cvs.length} CVs uploaded',
                 ),
-                const SizedBox(height: 12),
-                if (job.description.isEmpty)
-                  const Text('No description')
-                else
-                  _ExpandableSection(
-                    maxLines: 10,
-                    lineHeight: 22,
-                    lineSpacing: 0,
-                    child: _DescriptionView(description: job.description),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 0,
+                  shape: cardShape(Theme.of(context)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Description',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        if (job.description.isEmpty)
+                          const Text('No description')
+                        else
+                          _ExpandableSection(
+                            maxLines: 10,
+                            lineHeight: 22,
+                            lineSpacing: 0,
+                            child: _DescriptionView(
+                              description: job.description,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
+                ),
                 if (job.requirements != null) ...[
                   const SizedBox(height: 16),
                   _RequirementsView(requirements: job.requirements!),
@@ -192,7 +216,9 @@ class JobDetailScreen extends HookConsumerWidget {
                     ),
                   )
                 else
-                  ...cvs.map((cv) => _CandidateTile(cv: cv)),
+                  ...cvs.asMap().entries.map(
+                        (e) => _CandidateTile(cv: e.value, index: e.key),
+                      ),
               ],
             ),
           ),
@@ -335,6 +361,8 @@ class _RequirementsView extends StatelessWidget {
     );
 
     return Card(
+      elevation: 0,
+      shape: cardShape(Theme.of(context)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: content,
@@ -419,31 +447,59 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
 
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
+  final int index;
 
-  const _CandidateTile({required this.cv});
+  const _CandidateTile({required this.cv, required this.index});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final name = cv.candidateName ?? cv.fileName;
     final score = cv.overallScore;
+    final color = avatarColor(index);
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: cardShape(theme),
       child: ListTile(
-        leading: CircleAvatar(
-          child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            name.isEmpty ? '?' : name[0].toUpperCase(),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
-        title: Text(name),
+        title: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
           cv.status == 'failed'
               ? 'Failed: ${cv.error}'
               : score == null
                   ? cv.status
                   : '${(score * 100).round()}% · ${cv.bucket ?? ''}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: score == null
             ? (cv.status == 'failed' ? const Icon(Icons.error_outline) : null)
             : Text(
                 '${(score * 100).round()}',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
       ),
     );
