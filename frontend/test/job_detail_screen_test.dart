@@ -20,17 +20,38 @@ void main() {
     );
   }
 
-  Widget buildApp(Job job) {
+  Widget buildApp(
+    Job job, {
+    List<CandidateResult> cvs = const [],
+    List<CandidateResult> rankings = const [],
+  }) {
     return ProviderScope(
       overrides: [
         jobProvider('job-1').overrideWith((ref) async => job),
-        cvsProvider('job-1').overrideWith((ref) async => []),
+        cvsProvider('job-1').overrideWith((ref) async => cvs),
+        rankingsProvider('job-1').overrideWith((ref) async => rankings),
       ],
       child: const MaterialApp(home: JobDetailScreen(jobId: 'job-1')),
     );
   }
 
-  testWidgets('long description collapses to 3 lines and expands', (
+  CandidateResult buildRankedResult({
+    required String name,
+    required double score,
+    String bucket = 'strong_match',
+  }) {
+    return CandidateResult(
+      cvId: 'cv-$name',
+      fileName: '$name.pdf',
+      status: 'ranked',
+      candidateName: name,
+      overallScore: score,
+      bucket: bucket,
+      source: 'rules',
+    );
+  }
+
+  testWidgets('long description collapses to 10 lines and expands', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 2400);
@@ -64,5 +85,60 @@ void main() {
 
     expect(find.text('Show more'), findsNothing);
     expect(find.text('Short description'), findsOneWidget);
+  });
+
+  testWidgets('shows not-ranked hint when CVs exist but none are ranked', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: [
+          CandidateResult(
+            cvId: 'cv-1',
+            fileName: 'alice.pdf',
+            status: 'uploaded',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Not ranked yet'), findsOneWidget);
+    expect(find.text('Buckets'), findsNothing);
+  });
+
+  testWidgets('shows bucket donut when candidates are ranked', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
+        rankings: [
+          buildRankedResult(name: 'Alice', score: 0.9),
+          buildRankedResult(
+            name: 'Bob',
+            score: 0.55,
+            bucket: 'possible_match',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Not ranked yet'), findsNothing);
+    expect(find.text('Buckets'), findsOneWidget);
+    expect(find.text('View full ranking'), findsOneWidget);
+    expect(find.text('Strong'), findsOneWidget);
+    expect(find.text('Possible'), findsOneWidget);
   });
 }

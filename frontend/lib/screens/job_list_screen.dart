@@ -4,6 +4,24 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../controllers/job_list_controller.dart';
 import '../providers.dart';
 
+const _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/// Formats an ISO-8601 UTC timestamp as `dd MMM yyyy h:mm am/pm` in local time.
+String formatCreatedAt(String? iso) {
+  final date = iso == null ? null : DateTime.tryParse(iso);
+  if (date == null) return '';
+  final local = date.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = _months[local.month - 1];
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour < 12 ? 'am' : 'pm';
+  return '$day $month ${local.year} $hour12:$minute $period';
+}
+
 class JobListScreen extends HookConsumerWidget {
   const JobListScreen({super.key});
 
@@ -58,13 +76,7 @@ class JobListScreen extends HookConsumerWidget {
                 return ListTile(
                   leading: const Icon(Icons.work_outline),
                   title: Text(job.title),
-                  subtitle: Text(
-                    job.description.isEmpty
-                        ? 'No description'
-                        : (job.description.split('\n').first.length > 80
-                            ? '${job.description.split('\n').first.substring(0, 80)}…'
-                            : job.description.split('\n').first),
-                  ),
+                  subtitle: Text(formatCreatedAt(job.createdAt)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       ref.read(navigatorProvider).goToJobDetail(job.id),
@@ -82,9 +94,7 @@ class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorView({required this.message, required this.onRetry});
-
-  @override
+  const _ErrorView({required this.message, required this.onRetry});  @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(

@@ -8,7 +8,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_detail_controller.dart';
 import '../models.dart';
+import '../navigation/app_navigator.dart';
 import '../providers.dart';
+import '../widgets/bucket_donut.dart';
 import '../widgets/loading_overlay.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
@@ -20,6 +22,7 @@ class JobDetailScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final jobAsync = ref.watch(jobProvider(jobId));
     final cvsAsync = ref.watch(cvsProvider(jobId));
+    final rankingsAsync = ref.watch(rankingsProvider(jobId));
 
     final detailState = ref.watch(jobDetailControllerProvider);
     final detailController = ref.read(jobDetailControllerProvider.notifier);
@@ -103,7 +106,7 @@ class JobDetailScreen extends HookConsumerWidget {
                   const Text('No description')
                 else
                   _ExpandableSection(
-                    maxLines: 3,
+                    maxLines: 10,
                     lineHeight: 22,
                     lineSpacing: 0,
                     child: _DescriptionView(description: job.description),
@@ -131,6 +134,49 @@ class JobDetailScreen extends HookConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 24),
+                rankingsAsync.when(
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  error: (e, _) => const SizedBox.shrink(),
+                  data: (ranked) {
+                    if (ranked.isEmpty) {
+                      if (cvs.isEmpty) return const SizedBox.shrink();
+                      return const _NotRankedHint();
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        BucketDonut(buckets: bucketCounts(ranked)),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.center,
+                          child: TextButton.icon(
+                            onPressed: () => ref
+                                .read(navigatorProvider)
+                                .goToRankings(
+                                  RankingsScreenData(
+                                    jobId: jobId,
+                                    jobTitle: job.title,
+                                    source: ranked.first.source ?? 'rules',
+                                  ),
+                                ),
+                            icon: const Icon(Icons.timeline),
+                            label: const Text('View full ranking'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -399,6 +445,40 @@ class _CandidateTile extends StatelessWidget {
                 '${(score * 100).round()}',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
+      ),
+    );
+  }
+}
+
+class _NotRankedHint extends StatelessWidget {
+  const _NotRankedHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.insights, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Not ranked yet', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tap "Rank candidates" to score the CVs and see how they compare.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

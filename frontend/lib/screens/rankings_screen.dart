@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../models.dart';
 import '../providers.dart';
+import '../widgets/rankings_summary.dart';
 
 class RankingsScreen extends HookConsumerWidget {
   final String jobId;
@@ -52,31 +53,30 @@ class RankingsScreen extends HookConsumerWidget {
           if (results.isEmpty) {
             return const Center(child: Text('No candidates ranked yet.'));
           }
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Chip(
-                  avatar: const Icon(Icons.psychology, size: 18),
-                  label: Text(
-                    'Ranking by ${source == 'llm' ? 'AI (LLM)' : 'rule-based engine'}',
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                  itemCount: results.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    return _RankedCard(
-                      candidate: results[index],
-                      rank: index + 1,
-                    );
-                  },
-                ),
-              ),
-            ],
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            itemCount: results.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  children: [
+                    Chip(
+                      avatar: const Icon(Icons.psychology, size: 18),
+                      label: Text(
+                        'Ranking by ${source == 'llm' ? 'AI (LLM)' : 'rule-based engine'}',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    RankingsSummary(results: results),
+                  ],
+                );
+              }
+              return _RankedCard(
+                candidate: results[index - 1],
+                rank: index,
+              );
+            },
           );
         },
       ),
@@ -89,14 +89,6 @@ class _RankedCard extends HookWidget {
   final int rank;
 
   const _RankedCard({required this.candidate, required this.rank});
-
-  Color _scoreColor(double? score) {
-    final s = score ?? 0;
-    if (s >= 0.85) return Colors.green;
-    if (s >= 0.7) return Colors.lightGreen.shade700;
-    if (s >= 0.5) return Colors.orange;
-    return Colors.redAccent;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +106,7 @@ class _RankedCard extends HookWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _scoreColor(score),
+                  backgroundColor: colorForScore(score ?? 0),
                   child: Text('$rank',
                       style: const TextStyle(color: Colors.white)),
                 ),
@@ -136,7 +128,7 @@ class _RankedCard extends HookWidget {
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
-                        ?.copyWith(color: _scoreColor(score)),
+                        ?.copyWith(color: colorForScore(score)),
                   ),
               ],
             ),

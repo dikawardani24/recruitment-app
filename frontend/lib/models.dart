@@ -84,6 +84,7 @@ class CandidateResult {
   final List<String> certifications;
   final String? error;
   final int? rank;
+  final String? source;
 
   const CandidateResult({
     this.cvId,
@@ -102,6 +103,7 @@ class CandidateResult {
     this.certifications = const [],
     this.error,
     this.rank,
+    this.source,
   });
 
   factory CandidateResult.fromJson(Map<String, dynamic> json) {
@@ -122,6 +124,7 @@ class CandidateResult {
       certifications: _stringList(json['certifications']),
       error: json['error'] as String?,
       rank: json['rank'] as int?,
+      source: json['source'] as String?,
     );
   }
 
