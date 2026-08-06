@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../api.dart';
 import '../models.dart';
+import '../providers.dart';
 
-class RankingsScreen extends StatefulWidget {
+class RankingsScreen extends HookConsumerWidget {
   final String jobId;
   final String jobTitle;
   final String source;
@@ -16,20 +18,9 @@ class RankingsScreen extends StatefulWidget {
   });
 
   @override
-  State<RankingsScreen> createState() => _RankingsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rankingsAsync = ref.watch(rankingsProvider(jobId));
 
-class _RankingsScreenState extends State<RankingsScreen> {
-  late Future<List<CandidateResult>> _rankings;
-
-  @override
-  void initState() {
-    super.initState();
-    _rankings = ApiClient.instance.getRankings(widget.jobId);
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -37,7 +28,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
           children: [
             const Text('Ranked candidates'),
             Text(
-              widget.jobTitle,
+              jobTitle,
               style: Theme.of(context).textTheme.bodySmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -45,16 +36,19 @@ class _RankingsScreenState extends State<RankingsScreen> {
           ],
         ),
       ),
-      body: FutureBuilder<List<CandidateResult>>(
-        future: _rankings,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('${snapshot.error}'));
-          }
-          final results = snapshot.data ?? [];
+      body: rankingsAsync.when(
+        loading: () => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading rankings…'),
+            ],
+          ),
+        ),
+        error: (e, _) => Center(child: Text('$e')),
+        data: (results) {
           if (results.isEmpty) {
             return const Center(child: Text('No candidates ranked yet.'));
           }
@@ -65,7 +59,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 child: Chip(
                   avatar: const Icon(Icons.psychology, size: 18),
                   label: Text(
-                    'Ranking by ${widget.source == 'llm' ? 'AI (LLM)' : 'rule-based engine'}',
+                    'Ranking by ${source == 'llm' ? 'AI (LLM)' : 'rule-based engine'}',
                   ),
                 ),
               ),
@@ -90,30 +84,24 @@ class _RankingsScreenState extends State<RankingsScreen> {
   }
 }
 
-class _RankedCard extends StatefulWidget {
+class _RankedCard extends HookWidget {
   final CandidateResult candidate;
   final int rank;
 
   const _RankedCard({required this.candidate, required this.rank});
 
-  @override
-  State<_RankedCard> createState() => _RankedCardState();
-}
-
-class _RankedCardState extends State<_RankedCard> {
-  bool _expanded = false;
-
-  Color get _scoreColor {
-    final score = widget.candidate.overallScore ?? 0;
-    if (score >= 0.85) return Colors.green;
-    if (score >= 0.7) return Colors.lightGreen.shade700;
-    if (score >= 0.5) return Colors.orange;
+  Color _scoreColor(double? score) {
+    final s = score ?? 0;
+    if (s >= 0.85) return Colors.green;
+    if (s >= 0.7) return Colors.lightGreen.shade700;
+    if (s >= 0.5) return Colors.orange;
     return Colors.redAccent;
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.candidate;
+    final expanded = useState(false);
+    final c = candidate;
     final name = c.candidateName ?? c.fileName;
     final score = c.overallScore;
 
@@ -126,8 +114,8 @@ class _RankedCardState extends State<_RankedCard> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _scoreColor,
-                  child: Text('${widget.rank}',
+                  backgroundColor: _scoreColor(score),
+                  child: Text('$rank',
                       style: const TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(width: 12),
@@ -148,7 +136,7 @@ class _RankedCardState extends State<_RankedCard> {
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
-                        ?.copyWith(color: _scoreColor),
+                        ?.copyWith(color: _scoreColor(score)),
                   ),
               ],
             ),
@@ -183,12 +171,15 @@ class _RankedCardState extends State<_RankedCard> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => setState(() => _expanded = !_expanded),
-                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
-                  label: Text(_expanded ? 'Hide reasoning' : 'Show reasoning'),
+                  onPressed: () => expanded.value = !expanded.value,
+                  icon: Icon(expanded.value
+                      ? Icons.expand_less
+                      : Icons.expand_more),
+                  label: Text(
+                      expanded.value ? 'Hide reasoning' : 'Show reasoning'),
                 ),
               ),
-            if (_expanded) ...[
+            if (expanded.value) ...[
               if (c.strengths.isNotEmpty)
                 _BulletList(title: 'Strengths', items: c.strengths),
               if (c.weaknesses.isNotEmpty)

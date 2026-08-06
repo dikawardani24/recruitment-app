@@ -1,74 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../api.dart';
-import '../models.dart';
-import 'job_detail_screen.dart';
-import 'job_form_screen.dart';
+import '../providers.dart';
+import '../router.dart';
 
-class JobListScreen extends StatefulWidget {
+class JobListScreen extends HookConsumerWidget {
   const JobListScreen({super.key});
 
-  @override
-  State<JobListScreen> createState() => _JobListScreenState();
-}
-
-class _JobListScreenState extends State<JobListScreen> {
-  late Future<List<Job>> _jobs;
-
-  @override
-  void initState() {
-    super.initState();
-    _jobs = ApiClient.instance.listJobs();
-  }
-
-  Future<void> _reload() async {
-    setState(() {
-      _jobs = ApiClient.instance.listJobs();
-    });
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.invalidate(jobsProvider);
+    await ref.read(jobsProvider.future);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final jobsAsync = ref.watch(jobsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Jobs'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _reload,
+            onPressed: () => _refresh(ref),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => const JobFormScreen()),
-          );
-          if (created == true) _reload();
-        },
+        onPressed: () => ref.read(navigatorProvider).goToJobForm(),
         icon: const Icon(Icons.add),
         label: const Text('New job'),
       ),
-      body: FutureBuilder<List<Job>>(
-        future: _jobs,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _ErrorView(
-              message: '${snapshot.error}',
-              onRetry: _reload,
-            );
-          }
-          final jobs = snapshot.data ?? [];
+      body: jobsAsync.when(
+        loading: () => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading jobs…'),
+            ],
+          ),
+        ),
+        error: (e, _) => _ErrorView(message: '$e', onRetry: () => _refresh(ref)),
+        data: (jobs) {
           if (jobs.isEmpty) {
             return const Center(
               child: Text('No jobs yet. Tap "New job" to create one.'),
             );
           }
           return RefreshIndicator(
-            onRefresh: _reload,
+            onRefresh: () => _refresh(ref),
             child: ListView.separated(
               itemCount: jobs.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
@@ -85,11 +67,8 @@ class _JobListScreenState extends State<JobListScreen> {
                             : job.description.split('\n').first),
                   ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => JobDetailScreen(jobId: job.id),
-                    ),
-                  ),
+                  onTap: () =>
+                      ref.read(navigatorProvider).goToJobDetail(job.id),
                 );
               },
             ),

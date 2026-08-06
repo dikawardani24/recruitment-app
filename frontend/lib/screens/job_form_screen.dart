@@ -2,136 +2,142 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../api.dart';
+import '../providers.dart';
+import '../router.dart';
+import '../widgets/loading_overlay.dart';
 
-class JobFormScreen extends StatefulWidget {
+class JobFormScreen extends HookConsumerWidget {
   const JobFormScreen({super.key});
 
   @override
-  State<JobFormScreen> createState() => _JobFormScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formKey = useMemoized(() => GlobalKey<FormState>());
+    final titleController = useTextEditingController();
+    final descriptionController = useTextEditingController();
+    final jdFile = useState<File?>(null);
+    final jdFileName = useState<String?>(null);
+    final submitting = useState(false);
+    final loadingMessage = useState<String?>(null);
 
-class _JobFormScreenState extends State<JobFormScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  File? _jdFile;
-  String? _jdFileName;
-  bool _submitting = false;
+    Future<void> pickJdFile() async {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
+      );
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final name = result.files.single.name;
+        final ext = name.split('.').last.toLowerCase();
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
+        jdFile.value = file;
+        jdFileName.value = name;
 
-  Future<void> _pickJdFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
-    );
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final name = result.files.single.name;
-      final ext = name.split('.').last.toLowerCase();
-
-      setState(() {
-        _jdFile = file;
-        _jdFileName = name;
-      });
-
-      // For text/markdown files, extract content and show in description.
-      if (ext == 'txt' || ext == 'md' || ext == 'text') {
-        try {
-          final content = await file.readAsString();
-          if (content.trim().isNotEmpty) {
-            _descriptionController.text = content;
+        // For text/markdown files, extract content and show in description.
+        if (ext == 'txt' || ext == 'md' || ext == 'text') {
+          try {
+            final content = await file.readAsString();
+            if (content.trim().isNotEmpty) {
+              descriptionController.text = content;
+            }
+          } catch (_) {
+            // Ignore read errors — user can still type manually.
           }
-        } catch (_) {
-          // Ignore read errors — user can still type manually.
         }
       }
     }
-  }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _submitting = true);
-    try {
-      final job = await ApiClient.instance.createJob(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        jdFile: _jdFile,
-        jdFileName: _jdFileName,
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Created "${job.title}"')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create job: $e')),
-      );
+    Future<void> submit() async {
+      if (!formKey.currentState!.validate()) return;
+      submitting.value = true;
+      loadingMessage.value = 'Creating job…';
+      try {
+        final job = await ref.read(apiClientProvider).createJob(
+          title: titleController.text.trim(),
+          description: descriptionController.text.trim(),
+          jdFile: jdFile.value,
+          jdFileName: jdFileName.value,
+        );
+        if (!context.mounted) return;
+        final messenger = ScaffoldMessenger.of(context);
+        ref.invalidate(jobsProvider);
+        ref.read(navigatorProvider).pop();
+        messenger.showSnackBar(
+          SnackBar(content: Text('Created "${job.title}"')),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create job: $e')),
+        );
+      } finally {
+        if (context.mounted) {
+          submitting.value = false;
+          loadingMessage.value = null;
+        }
+      }
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('New job')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Job title',
-                hintText: 'e.g. Senior Backend Engineer',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Title is required' : null,
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(title: const Text('New job')),
+          body: Form(
+            key: formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Job title',
+                    hintText: 'e.g. Senior Backend Engineer',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => (value == null || value.trim().isEmpty)
+                      ? 'Title is required'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: descriptionController,
+                  maxLines: 10,
+                  decoration: const InputDecoration(
+                    labelText: 'Job description',
+                    hintText:
+                        'Describe the role, required skills, experience and education…\n\nOr upload a JD file instead.',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: pickJdFile,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(jdFileName.value ?? 'Upload JD file (optional)'),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: submitting.value ? null : submit,
+                  icon: submitting.value
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check),
+                  label:
+                      Text(submitting.value ? 'Creating…' : 'Create job'),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              maxLines: 10,
-              decoration: const InputDecoration(
-                labelText: 'Job description',
-                hintText:
-                    'Describe the role, required skills, experience and education…\n\nOr upload a JD file instead.',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _pickJdFile,
-              icon: const Icon(Icons.upload_file),
-              label: Text(_jdFileName ?? 'Upload JD file (optional)'),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _submitting ? null : _submit,
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.check),
-              label: Text(_submitting ? 'Creating…' : 'Create job'),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (submitting.value)
+          LoadingOverlay(message: loadingMessage.value ?? 'Loading…'),
+      ],
     );
   }
 }

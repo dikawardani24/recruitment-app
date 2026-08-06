@@ -3,52 +3,35 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../api.dart';
 import '../models.dart';
-import 'rankings_screen.dart';
+import '../navigation/app_navigator.dart';
+import '../providers.dart';
+import '../router.dart';
+import '../widgets/loading_overlay.dart';
 
-class JobDetailScreen extends StatefulWidget {
+class JobDetailScreen extends HookConsumerWidget {
   final String jobId;
 
   const JobDetailScreen({super.key, required this.jobId});
 
   @override
-  State<JobDetailScreen> createState() => _JobDetailScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final busy = useState(false);
+    final loadingMessage = useState<String?>(null);
 
-class _JobDetailScreenState extends State<JobDetailScreen> {
-  Job? _job;
-  List<CandidateResult>? _cvs;
-  String? _error;
-  bool _busy = false;
+    final jobAsync = ref.watch(jobProvider(jobId));
+    final cvsAsync = ref.watch(cvsProvider(jobId));
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final job = await ApiClient.instance.getJob(widget.jobId);
-      final cvs = await ApiClient.instance.listCvs(widget.jobId);
-      if (!mounted) return;
-      setState(() {
-        _job = job;
-        _cvs = cvs;
-        _error = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = '$e');
+    Future<void> refreshCvs() async {
+      ref.invalidate(cvsProvider(jobId));
+      await ref.read(cvsProvider(jobId).future);
     }
-  }
 
-  Future<void> _pickCvs() async {
-    setState(() => _busy = true);
-    try {
+    Future<void> pickCvs() async {
       final result = await FilePicker.pickFiles(
         allowMultiple: true,
         type: FileType.custom,
@@ -61,122 +44,146 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           .toList();
       if (files.isEmpty) return;
 
-      final uploaded =
-          await ApiClient.instance.uploadCvs(widget.jobId, files);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Uploaded ${uploaded.length} CV(s)')),
-      );
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      busy.value = true;
+      loadingMessage.value = 'Uploading ${files.length} CV(s)…';
+      try {
+        final uploaded =
+            await ref.read(apiClientProvider).uploadCvs(jobId, files);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Uploaded ${uploaded.length} CV(s)')),
+        );
+        await refreshCvs();
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      } finally {
+        if (context.mounted) {
+          busy.value = false;
+          loadingMessage.value = null;
+        }
+      }
     }
-  }
 
-  Future<void> _rank() async {
-    setState(() => _busy = true);
-    try {
-      final response = await ApiClient.instance.rankJob(widget.jobId);
-      if (!mounted) return;
-      setState(() => _cvs = response.results);
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => RankingsScreen(
-            jobId: widget.jobId,
-            jobTitle: _job?.title ?? 'Job',
-            source: response.source,
+    Future<void> rank() async {
+      busy.value = true;
+      loadingMessage.value = 'Ranking candidates…';
+      try {
+        final response = await ref.read(apiClientProvider).rankJob(jobId);
+        if (!context.mounted) return;
+        busy.value = false;
+        loadingMessage.value = null;
+        await refreshCvs();
+        ref.read(navigatorProvider).goToRankings(
+              RankingsScreenData(
+                jobId: jobId,
+                jobTitle: jobAsync.value?.title ?? 'Job',
+                source: response.source,
+              ),
+            );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ranking failed: $e')),
+        );
+      } finally {
+        if (context.mounted) {
+          busy.value = false;
+          loadingMessage.value = null;
+        }
+      }
+    }
+
+    final job = jobAsync.value;
+    final cvs = cvsAsync.value ?? [];
+
+    if (jobAsync.hasError) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text('${jobAsync.error}')),
+      );
+    }
+    if (job == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading job…'),
+            ],
           ),
         ),
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ranking failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(child: Text(_error!)),
-      );
-    }
-    final job = _job;
-    if (job == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-    final cvs = _cvs ?? [];
-
-    return Scaffold(
-      appBar: AppBar(title: Text(job.title)),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(
-              job.title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 12),
-            if (job.description.isEmpty)
-              const Text('No description')
-            else
-              _DescriptionView(description: job.description),
-            if (job.requirements != null) ...[
-              const SizedBox(height: 16),
-              _RequirementsView(requirements: job.requirements!),
-            ],
-            const SizedBox(height: 24),
-            Row(
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(title: Text(job.title)),
+          body: RefreshIndicator(
+            onRefresh: refreshCvs,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _pickCvs,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Add CVs'),
-                  ),
+                Text(
+                  job.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : _rank,
-                    icon: const Icon(Icons.psychology),
-                    label: const Text('Rank candidates'),
-                  ),
+                const SizedBox(height: 12),
+                if (job.description.isEmpty)
+                  const Text('No description')
+                else
+                  _DescriptionView(description: job.description),
+                if (job.requirements != null) ...[
+                  const SizedBox(height: 16),
+                  _RequirementsView(requirements: job.requirements!),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: busy.value ? null : pickCvs,
+                        icon: const Icon(Icons.upload_file),
+                        label: const Text('Add CVs'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: busy.value ? null : rank,
+                        icon: const Icon(Icons.psychology),
+                        label: const Text('Rank candidates'),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 24),
+                Text(
+                  'Candidates (${cvs.length})',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (cvs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text('No CVs uploaded yet. Tap "Add CVs".'),
+                    ),
+                  )
+                else
+                  ...cvs.map((cv) => _CandidateTile(cv: cv)),
               ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Candidates (${cvs.length})',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (cvs.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text('No CVs uploaded yet. Tap "Add CVs".'),
-                ),
-              )
-            else
-              ...cvs.map((cv) => _CandidateTile(cv: cv)),
-          ],
+          ),
         ),
-      ),
+        if (busy.value)
+          LoadingOverlay(message: loadingMessage.value ?? 'Loading…'),
+      ],
     );
   }
 }
