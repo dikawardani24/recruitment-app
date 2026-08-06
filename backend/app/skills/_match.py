@@ -208,3 +208,23 @@ def find_certifications(text: str) -> list[str]:
                     out.append(canonical)
                 break
     return out
+
+
+def skill_tokens(items: list[str]) -> list[str]:
+    """Reduce a list of strings (possibly full sentences) to canonical skill tokens."""
+    if not items:
+        return []
+    text = " ".join(items)
+    known = find_skills(text, TECH_SKILLS + SOFT_SKILLS)
+    extras = [t for t in skill_like_terms(text) if t not in known]
+    return known + extras
+
+
+def dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out

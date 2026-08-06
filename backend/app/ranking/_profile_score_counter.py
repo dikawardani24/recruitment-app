@@ -2,11 +2,22 @@ from app.extraction import Profile
 from app.ranking._requirements import Requirements, KNOWN_EDUCATION_LEVELS
 
 class ProfileScore:
-    def __init__(self, skill_score: float, experience_score: float, edu_score: float, cert_score: float):
+    def __init__(self, skill_score: float, experience_score: float, edu_score: float, cert_score: float, weights: dict[str, float]):
         self.skill_score = skill_score
         self.experience_score = experience_score
         self.edu_score = edu_score
         self.cert_score = cert_score
+        self.overall = self.__overall(weights)
+
+    def __overall(self, weights: dict[str, float]) -> float:
+        total_w = sum(weights.values()) or 1.0
+        overall = (
+            self.skill_score * weights.get("skill", 0.0)
+            + self.experience_score * weights.get("experience", 0.0)
+            + self.edu_score * weights.get("education", 0.0)
+            + self.cert_score * weights.get("certification", 0.0)
+        ) / total_w
+        return max(0.0, min(1.0, overall))
 
 class ProfileScoreCounter:
     def __init__(self, profile: Profile, requirements: Requirements):
@@ -63,7 +74,7 @@ class ProfileScoreCounter:
             return 0.7 if self.profile.certifications else 0.5
         return len(self.requirement.matched_certs(self.profile)) / len(self.requirement.req_certs)
     
-    def count(self):
+    def count(self, weights: dict[str, float]):
         skill_score= self.__count_skill_score()
         experience_score= self.__count_experience_score()
         edu_score= self.__count_edu_score()
@@ -73,5 +84,6 @@ class ProfileScoreCounter:
             skill_score= skill_score,
             experience_score= experience_score,
             edu_score= edu_score,
-            cert_score= cert_score
+            cert_score= cert_score,
+            weights=weights,
         )

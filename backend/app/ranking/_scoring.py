@@ -21,34 +21,20 @@ BUCKET_RANGES = [
 
 def score_profile(profile: Profile, req_dict: dict, settings: Settings) -> dict:
     requirements = Requirements(requirements=req_dict)
-    score = ProfileScoreCounter(profile=profile, requirements=requirements).count()
-
-    skill_score = score.skill_score
-    experience_score = score.experience_score
-    education_score = score.edu_score
-    certification_score = score.cert_score
-  
     weights = {
         "skill": settings.w_skill,
         "experience": settings.w_experience,
         "education": settings.w_education,
         "certification": settings.w_certification,
     }
-    total_w = sum(weights.values()) or 1.0
-    overall = (
-        skill_score * weights["skill"]
-        + experience_score * weights["experience"]
-        + education_score * weights["education"]
-        + certification_score * weights["certification"]
-    ) / total_w
-    overall = max(0.0, min(1.0, overall))
+    score = ProfileScoreCounter(profile=profile, requirements=requirements).count(weights)
 
     return {
-        "skill_score": round(skill_score, 3),
-        "experience_score": round(experience_score, 3),
-        "education_score": round(education_score, 3),
-        "certification_score": round(certification_score, 3),
-        "overall": round(overall, 3),
+        "skill_score": round(score.skill_score, 3),
+        "experience_score": round(score.experience_score, 3),
+        "education_score": round(score.edu_score, 3),
+        "certification_score": round(score.cert_score, 3),
+        "overall": round(score.overall, 3),
         "matched_required": requirements.matched_req(profile),
         "matched_preferred": requirements.matched_pref(profile),
         "missing_required": requirements.missing_skill(profile),

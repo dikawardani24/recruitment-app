@@ -3,9 +3,11 @@ from app.skills._match import (
     SKILL_MAP,
     SOFT_SKILLS,
     TECH_SKILLS,
+    dedupe,
     find_certifications,
     find_skills,
     skill_like_terms,
+    skill_tokens,
 )
 
 __all__ = [
@@ -13,7 +15,9 @@ __all__ = [
     "SKILL_MAP",
     "SOFT_SKILLS",
     "TECH_SKILLS",
+    "dedupe",
     "find_certifications",
     "find_skills",
     "skill_like_terms",
+    "skill_tokens",
 ]

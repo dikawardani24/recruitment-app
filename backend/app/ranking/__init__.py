@@ -1,5 +1,6 @@
 from app.ranking._llm import LLMReasoning, LLMRankingError, rank_with_llm
 from app.ranking._scoring import bucket_for, rule_reasoning, score_profile
+from app.ranking._service import RankingService
 from app.ranking._profile_score_counter import ProfileScoreCounter, ProfileScore
 from app.ranking._requirements import Requirements, KNOWN_EDUCATION_LEVELS
 
@@ -10,6 +11,7 @@ __all__ = [
     "bucket_for",
     "rule_reasoning",
     "score_profile",
+    "RankingService",
     "ProfileScore",
     "ProfileScoreCounter",
     "Requirements",

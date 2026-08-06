@@ -54,6 +54,17 @@ class Profile:
             "certifications": self.certifications,
         }
 
+    @classmethod
+    def from_cv(cls, cv: dict) -> Profile:
+        return cls(
+            candidate_name=cv.get("candidate_name") or "Unknown Candidate",
+            skills=cv.get("skills") or [],
+            years_experience=cv.get("years_experience") or 0.0,
+            education=cv.get("education"),
+            certifications=cv.get("certifications") or [],
+            profile_text=cv.get("profile_text") or "",
+        )
+
 
 def extract_profile(text: str, file_name: str = "") -> Profile:
     skills = find_skills(text, TECH_SKILLS + SOFT_SKILLS)

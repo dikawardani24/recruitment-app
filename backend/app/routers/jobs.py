@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-import json as _json
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app import db
 from app.config import Settings
 from app.extraction import Profile, extract_profile_text
-from app.jd import structure_jd
+from app.jd import RequirementParser
 from app.parsers import extract_text
-from app.ranking import LLMReasoning, LLMRankingError, bucket_for, rank_with_llm, rule_reasoning, score_profile
-from app.skills import find_skills, skill_like_terms, SOFT_SKILLS, TECH_SKILLS
+from app.ranking import RankingService
 
 router = APIRouter(tags=["jobs"])
 
@@ -44,112 +42,6 @@ def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:
     return str(path)
 
 
-def _dedupe(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for item in items:
-        if item not in seen:
-            seen.add(item)
-            out.append(item)
-    return out
-
-
-def _skill_tokens(items: list[str]) -> list[str]:
-    """Convert a list of strings (possibly full sentences) into canonical skill tokens.
-
-    Uses the same skill dictionary the rule-based engine uses for matching, so
-    "Flutter development" → "flutter", "RESTful APIs" → "rest", etc.
-    """
-    if not items:
-        return []
-    text = " ".join(items)
-    known = find_skills(text, TECH_SKILLS + SOFT_SKILLS)
-    extras = [t for t in skill_like_terms(text) if t not in known]
-    return known + extras
-
-
-def _try_parse_json(text: str) -> dict | None:
-    """Try to parse text as JSON and normalize into the standard requirements format."""
-    text = text.strip()
-    if not text.startswith("{"):
-        return None
-    try:
-        data = _json.loads(text)
-        if not isinstance(data, dict):
-            return None
-    except (_json.JSONDecodeError, ValueError):
-        return None
-
-    # Normalize various JSON field names into the standard schema.
-    def _list(key: str, *alts: str) -> list[str]:
-        for k in (key, *alts):
-            val = data.get(k)
-            if isinstance(val, list):
-                return [str(s).strip() for s in val if str(s).strip()]
-        return []
-
-    def _float(key: str, *alts: str) -> float:
-        for k in (key, *alts):
-            val = data.get(k)
-            if val is not None:
-                try:
-                    return float(val)
-                except (TypeError, ValueError):
-                    pass
-        return 0.0
-
-    def _str(key: str, *alts: str) -> str | None:
-        for k in (key, *alts):
-            val = data.get(k)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
-        return None
-
-    # Merge skill lists from various possible keys.
-    # Full-sentence qualifications (e.g. "Experience building mobile apps...")
-    # are reduced to real skill tokens so the rule engine can match them.
-    required_skills = _skill_tokens(
-        _list("required_skills", "requiredQualifications", "mustHave", "must_have", "requirements")
-    )
-    preferred_skills = _skill_tokens(
-        _list("preferred_skills", "preferredQualifications", "niceToHaveSkills", "niceToHave", "nice_to_have", "bonus")
-    )
-    technical_skills = _skill_tokens(_list("technicalSkills"))
-    soft_skills = _skill_tokens(_list("softSkills"))
-
-    # Combine technical + soft skills into preferred if no explicit lists.
-    if not required_skills and not preferred_skills:
-        required_skills = technical_skills
-        preferred_skills = soft_skills
-    else:
-        required_skills = _dedupe(required_skills + technical_skills)
-        preferred_skills = _dedupe(preferred_skills + soft_skills + technical_skills)
-
-    # Fallback: scan all array values for anything that looks like skill lists.
-    if not required_skills and not preferred_skills:
-        for key, val in data.items():
-            if isinstance(val, list) and all(isinstance(s, str) for s in val):
-                skills = _skill_tokens(val)
-                if skills:
-                    # First array of strings found becomes required skills.
-                    if not required_skills:
-                        required_skills = skills
-                    elif not preferred_skills:
-                        preferred_skills = skills
-                    break
-
-    requirements = {
-        "title": _str("title", "position", "jobTitle", "role", "job_title") or "",
-        "required_skills": required_skills,
-        "preferred_skills": preferred_skills,
-        "min_years": _float("min_years", "minYears", "experience", "years", "yearsNeeded", "years_needed", "minExperience"),
-        "education": _str("education", "educationLevel", "degree"),
-        "certifications": _list("certifications", "certs"),
-        "responsibilities": _list("responsibilities", "duties", "whatYouWillDo"),
-    }
-    return requirements
-
-
 @router.post("/jobs", status_code=201)
 async def create_job(
     title: str = Form(...),
@@ -177,9 +69,8 @@ async def create_job(
     # If description is valid JSON, normalize it into requirements.
     # Otherwise, parse it as plain text with structure_jd().
     # Always keep the original description text for display.
-    requirements = _try_parse_json(description) if description.strip() else None
-    if requirements is None and description.strip():
-        requirements = structure_jd(description)
+    parser = RequirementParser()
+    requirements = parser.parse(description) if description.strip() else None
 
     job = {
         "id": str(uuid4()),
@@ -297,69 +188,9 @@ async def rank_job(job_id: str) -> dict:
     if not parsed:
         return {"job_id": job["id"], "count": 0, "results": []}
 
-    profiles = [_profile_from_cv(cv) for cv in parsed]
     settings = _settings()
-    scores_by_cv = {
-        cv["id"]: score_profile(profiles[i], job["requirements"], settings)
-        for i, cv in enumerate(parsed)
-    }
-
-    llm_rankings = None
-    if settings.llm_enabled:
-        try:
-            llm_rankings = await rank_with_llm(
-                settings,
-                _flatten_requirements(job["requirements"]),
-                [p.as_dict() for p in profiles],
-            )
-        except LLMRankingError:
-            llm_rankings = None
-
-    ranked = []
-    if llm_rankings and len(llm_rankings) == len(parsed):
-        for i, cv in enumerate(parsed):
-            llm = llm_rankings[i]
-            scores = scores_by_cv[cv["id"]]
-            ranked.append(
-                {
-                    **cv,
-                    "overall_score": llm.overall,
-                    "bucket": bucket_for(llm.overall),
-                    "recommendation": llm.recommendation,
-                    "explanation": llm.explanation,
-                    "strengths": llm.strengths,
-                    "weaknesses": llm.weaknesses,
-                    "skill_gaps": scores["missing_required"],
-                    "skill_score": scores["skill_score"],
-                    "experience_score": scores["experience_score"],
-                    "education_score": scores["education_score"],
-                    "certification_score": scores["certification_score"],
-                    "ranked_at": _now(),
-                }
-            )
-        ranked.sort(key=lambda c: c["overall_score"], reverse=True)
-    else:
-        for i, cv in enumerate(parsed):
-            scores = scores_by_cv[cv["id"]]
-            reasoning = rule_reasoning(profiles[i], job["requirements"], scores)
-            ranked.append(
-                {
-                    **cv,
-                    "overall_score": scores["overall"],
-                    "bucket": bucket_for(scores["overall"]),
-                    "recommendation": reasoning["recommendation"],
-                    "explanation": reasoning["explanation"],
-                    "strengths": reasoning["strengths"],
-                    "weaknesses": reasoning["weaknesses"],
-                    "skill_gaps": reasoning["skill_gaps"],
-                    "skill_score": scores["skill_score"],
-                    "experience_score": scores["experience_score"],
-                    "education_score": scores["education_score"],
-                    "certification_score": scores["certification_score"],
-                    "ranked_at": _now(),
-                }
-            )
-        ranked.sort(key=lambda c: c["overall_score"], reverse=True)
+    profiles = [Profile.from_cv(cv) for cv in parsed]
+    ranked, source = await RankingService(settings).rank(job["requirements"], profiles, parsed)
 
     async with db.connect() as conn:
         for i, item in enumerate(ranked):
@@ -391,7 +222,7 @@ async def rank_job(job_id: str) -> dict:
         item["rank"] = i + 1
     return {
         "job_id": job["id"],
-        "source": "llm" if llm_rankings else "rules",
+        "source": source,
         "count": len(ranked),
         "results": [_cv_payload(item) for item in ranked],
     }
@@ -416,17 +247,6 @@ async def _load_cvs(job_id: str) -> list[dict]:
     async with db.connect() as conn:
         rows = await (await conn.execute("SELECT * FROM cvs WHERE job_id = ?", (job_id,))).fetchall()
     return [db.row_to_cv(r) for r in rows]
-
-
-def _profile_from_cv(cv: dict) -> Profile:
-    return Profile(
-        candidate_name=cv.get("candidate_name") or "Unknown Candidate",
-        skills=cv.get("skills") or [],
-        years_experience=cv.get("years_experience") or 0.0,
-        education=cv.get("education"),
-        certifications=cv.get("certifications") or [],
-        profile_text=cv.get("profile_text") or "",
-    )
 
 
 def _job_payload(job: dict, *, jd_key: str | None = None) -> dict:
@@ -461,18 +281,6 @@ def _cv_payload(cv: dict) -> dict:
     payload["error"] = cv.get("error")
     payload["cv_id"] = cv.get("id") or cv.get("cv_id")
     return payload
-
-
-def _flatten_requirements(req: dict) -> dict:
-    return {
-        "title": req.get("title"),
-        "required_skills": req.get("required_skills"),
-        "preferred_skills": req.get("preferred_skills"),
-        "min_years": req.get("min_years"),
-        "education": req.get("education"),
-        "certifications": req.get("certifications"),
-        "responsibilities": req.get("responsibilities"),
-    }
 
 
 def _bucket_from_score(overall: float) -> str:
