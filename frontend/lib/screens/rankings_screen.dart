@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../models.dart';
@@ -79,7 +78,7 @@ class RankingsScreen extends HookConsumerWidget {
   }
 }
 
-class _RankedCard extends HookWidget {
+class _RankedCard extends StatelessWidget {
   final CandidateResult candidate;
   final int rank;
 
@@ -87,16 +86,16 @@ class _RankedCard extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final expanded = useState(false);
     final c = candidate;
     final name = c.candidateName ?? c.fileName;
     final score = c.overallScore;
     final color = scoreColor(score ?? 0);
+    final theme = Theme.of(context);
 
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: cardShape(Theme.of(context)),
+      shape: cardShape(theme),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -115,72 +114,234 @@ class _RankedCard extends HookWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name,
-                          style: Theme.of(context).textTheme.titleMedium),
+                          style: theme.textTheme.titleMedium),
                       Text(c.fileName,
-                          style: Theme.of(context).textTheme.bodySmall),
+                          style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
                 if (score != null) ...[
                   const SizedBox(width: 12),
-                  Text(
-                    '${(score * 100).round()}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(color: color),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${(score * 100).round()}%',
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(color: color),
+                      ),
+                      Text(
+                        'Match Score',
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ],
                   ),
                 ],
               ],
             ),
-            if (c.recommendation != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  c.recommendation!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+            if (c.strengths.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _SectionLabel(
+                icon: Icons.check_circle,
+                label: 'STRENGTHS',
+                color: Colors.green,
               ),
-            if (c.explanation != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(c.explanation!),
-              ),
-            if (c.skillGaps.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: c.skillGaps
-                    .map((gap) => Chip(
-                          label: Text('missing: $gap'),
+                spacing: 6,
+                runSpacing: 6,
+                children: c.strengths
+                    .map((skill) => Chip(
+                          label: Text(skill),
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: Colors.red.shade50,
+                          backgroundColor: Colors.green.shade50,
+                          labelStyle: theme.textTheme.bodySmall
+                              ?.copyWith(color: Colors.green.shade700),
                         ))
                     .toList(),
               ),
             ],
-            if (c.strengths.isNotEmpty || c.weaknesses.isNotEmpty)
+            if (c.skillGaps.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _SectionLabel(
+                icon: Icons.warning,
+                label: 'MISSING SKILLS',
+                color: Colors.red,
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: c.skillGaps
+                    .map((gap) => Chip(
+                          label: Text(gap),
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: Colors.red.shade50,
+                          labelStyle: theme.textTheme.bodySmall
+                              ?.copyWith(color: Colors.red.shade700),
+                        ))
+                    .toList(),
+              ),
+            ],
+            if (c.recommendation != null ||
+                c.explanation != null ||
+                c.weaknesses.isNotEmpty)
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => expanded.value = !expanded.value,
-                  icon: Icon(expanded.value
-                      ? Icons.expand_less
-                      : Icons.expand_more),
-                  label: Text(
-                      expanded.value ? 'Hide reasoning' : 'Show reasoning'),
+                  onPressed: () => _showReasoningDialog(context, c, theme),
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('Show reasoning'),
                 ),
               ),
-            if (expanded.value) ...[
-              if (c.strengths.isNotEmpty)
-                _BulletList(title: 'Strengths', items: c.strengths),
-              if (c.weaknesses.isNotEmpty)
-                _BulletList(title: 'Areas to probe', items: c.weaknesses),
-            ],
           ],
         ),
       ),
+    );
+  }
+
+  void _showReasoningDialog(
+      BuildContext context, CandidateResult c, ThemeData theme) {
+    final score = c.overallScore;
+    final color = scoreColor(score ?? 0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c.candidateName ?? c.fileName,
+                      style: theme.textTheme.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text(c.fileName,
+                      style: theme.textTheme.labelSmall),
+                  const SizedBox(height: 16),
+                  if (score != null) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Match Score',
+                            style: theme.textTheme.labelMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        Text(
+                          '${(score * 100).round()}%',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(color: color),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (c.strengths.isNotEmpty) ...[
+                    _SectionLabel(
+                      icon: Icons.check_circle,
+                      label: 'STRENGTHS',
+                      color: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: c.strengths
+                          .map((skill) => Chip(
+                                label: Text(skill),
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: Colors.green.shade50,
+                                labelStyle: theme.textTheme.bodySmall
+                                    ?.copyWith(color: Colors.green.shade700),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (c.skillGaps.isNotEmpty) ...[
+                    _SectionLabel(
+                      icon: Icons.warning,
+                      label: 'MISSING SKILLS',
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: c.skillGaps
+                          .map((gap) => Chip(
+                                label: Text(gap),
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: Colors.red.shade50,
+                                labelStyle: theme.textTheme.bodySmall
+                                    ?.copyWith(color: Colors.red.shade700),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (c.recommendation != null) ...[
+                    Text('Recommendation',
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(c.recommendation!,
+                        style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 12),
+                  ],
+                  if (c.explanation != null) ...[
+                    Text('Explanation',
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(c.explanation!,
+                        style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 12),
+                  ],
+                  if (c.weaknesses.isNotEmpty)
+                    _BulletList(title: 'Areas to probe', items: c.weaknesses),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SectionLabel({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }

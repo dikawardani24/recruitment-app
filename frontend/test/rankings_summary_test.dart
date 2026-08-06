@@ -67,6 +67,12 @@ void main() {
     expect(find.text('3 candidates'), findsOneWidget);
     expect(find.text('Rust'), findsWidgets);
     expect(find.text('Kafka'), findsOneWidget);
+
+    final progressIndicator = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator).first,
+    );
+    expect(progressIndicator.color, Colors.red.shade300);
+
     expect(tester.takeException(), isNull);
   });
 

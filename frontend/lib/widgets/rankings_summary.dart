@@ -274,6 +274,7 @@ class _MissingSkills extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: e.value / maxCount,
                         minHeight: 6,
+                        color: Colors.red.shade300,
                         backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       ),
                     ),
