@@ -128,6 +128,24 @@ def test_get_rankings_persisted(client, cv_builder):
     assert resp.json()["results"][0]["candidate_name"] == "John Doe"
 
 
+def test_list_jobs_includes_cv_count(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+
+    resp = client.get("/api/jobs")
+    assert resp.status_code == 200
+    assert resp.json()["jobs"][0]["cv_count"] == 0
+
+    name, content, mime = cv_builder("john.txt", SENIOR_BACKEND)
+    client.post(f"/api/jobs/{job_id}/cvs", files=[("files", (name, content, mime))])
+
+    resp = client.get("/api/jobs")
+    assert resp.json()["jobs"][0]["cv_count"] == 1
+
+
 def test_unknown_job_404(client):
     assert client.get("/api/jobs/00000000-0000-0000-0000-000000000000").status_code == 404
     assert client.post("/api/jobs/00000000-0000-0000-0000-000000000000/rank").status_code == 404

@@ -41,6 +41,7 @@ class Job {
   final String description;
   final String status;
   final String createdAt;
+  final int candidateCount;
   final JobRequirements? requirements;
 
   const Job({
@@ -49,6 +50,7 @@ class Job {
     required this.description,
     required this.status,
     required this.createdAt,
+    this.candidateCount = 0,
     this.requirements,
   });
 
@@ -60,6 +62,7 @@ class Job {
       description: (json['description'] as String?) ?? '',
       status: json['status'] as String,
       createdAt: (json['created_at'] as String?) ?? '',
+      candidateCount: (json['cv_count'] as num?)?.toInt() ?? 0,
       requirements: req is Map<String, dynamic>
           ? JobRequirements.fromJson(req)
           : null,

@@ -103,8 +103,16 @@ async def create_job(
 async def list_jobs() -> dict:
     async with db.connect() as conn:
         rows = await (await conn.execute("SELECT * FROM jobs ORDER BY created_at DESC")).fetchall()
-    jobs = [db.row_to_job(r) for r in rows]
-    return {"count": len(jobs), "jobs": [_job_payload(j) for j in jobs]}
+        count_rows = await (
+            await conn.execute("SELECT job_id, COUNT(*) AS c FROM cvs GROUP BY job_id")
+        ).fetchall()
+    counts = {r["job_id"]: r["c"] for r in count_rows}
+    jobs = []
+    for j in (db.row_to_job(r) for r in rows):
+        payload = _job_payload(j)
+        payload["cv_count"] = counts.get(j["id"], 0)
+        jobs.append(payload)
+    return {"count": len(jobs), "jobs": jobs}
 
 
 @router.get("/jobs/{job_id}")
