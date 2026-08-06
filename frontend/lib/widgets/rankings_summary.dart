@@ -3,13 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import 'bucket_donut.dart';
-
-Color colorForScore(double score) {
-  if (score >= 0.85) return Colors.green;
-  if (score >= 0.70) return Colors.lightGreen.shade700;
-  if (score >= 0.50) return Colors.orange;
-  return Colors.redAccent;
-}
+import 'score_color.dart';
 
 class RankingsSummary extends StatelessWidget {
   const RankingsSummary({super.key, required this.results});
@@ -213,7 +207,7 @@ class _ScoreBars extends StatelessWidget {
                           BarChartRodData(
                             toY: results[i].overallScore!,
                             width: 16,
-                            color: colorForScore(results[i].overallScore!),
+                            color: scoreColor(results[i].overallScore!),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ],

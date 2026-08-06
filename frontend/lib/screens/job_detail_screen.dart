@@ -13,6 +13,7 @@ import '../providers.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
+import '../widgets/score_color.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
   final String jobId;
@@ -217,7 +218,10 @@ class JobDetailScreen extends HookConsumerWidget {
                   )
                 else
                   ...cvs.asMap().entries.map(
-                        (e) => _CandidateTile(cv: e.value, index: e.key),
+                        (e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _CandidateTile(cv: e.value),
+                        ),
                       ),
               ],
             ),
@@ -447,16 +451,17 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
 
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
-  final int index;
 
-  const _CandidateTile({required this.cv, required this.index});
+  const _CandidateTile({required this.cv});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = cv.candidateName ?? cv.fileName;
     final score = cv.overallScore;
-    final color = avatarColor(index);
+    final color = score == null
+        ? candidateColor(cv.cvId ?? name)
+        : scoreColor(score);
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,

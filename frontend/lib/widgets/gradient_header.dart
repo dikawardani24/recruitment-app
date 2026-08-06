@@ -10,6 +10,16 @@ const _avatarPalette = [
 
 Color avatarColor(int index) => _avatarPalette[index % _avatarPalette.length];
 
+/// A stable palette color for a candidate, derived from their id so the same
+/// candidate keeps the same color across screens and charts.
+Color candidateColor(String id) {
+  var h = 0;
+  for (final c in id.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return avatarColor(h);
+}
+
 ShapeBorder cardShape(ThemeData theme, {double radius = 16}) =>
     RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),

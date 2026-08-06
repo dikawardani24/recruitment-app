@@ -17,9 +17,9 @@ const _bucketLabels = {
 };
 const _bucketColors = {
   'strong_match': Colors.green,
-  'good_match': Colors.lightGreen,
-  'possible_match': Colors.orange,
-  'weak_match': Colors.redAccent,
+  'good_match': Colors.orange,
+  'possible_match': Colors.red,
+  'weak_match': Colors.red,
 };
 
 /// Counts ranked results per recommendation bucket, in canonical order,

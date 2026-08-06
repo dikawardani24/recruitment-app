@@ -6,6 +6,7 @@ import '../models.dart';
 import '../providers.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rankings_summary.dart';
+import '../widgets/score_color.dart';
 
 class RankingsScreen extends HookConsumerWidget {
   final String jobId;
@@ -90,6 +91,7 @@ class _RankedCard extends HookWidget {
     final c = candidate;
     final name = c.candidateName ?? c.fileName;
     final score = c.overallScore;
+    final color = scoreColor(score ?? 0);
 
     return Card(
       elevation: 0,
@@ -103,7 +105,7 @@ class _RankedCard extends HookWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: colorForScore(score ?? 0),
+                  backgroundColor: color,
                   child: Text('$rank',
                       style: const TextStyle(color: Colors.white)),
                 ),
@@ -119,14 +121,16 @@ class _RankedCard extends HookWidget {
                     ],
                   ),
                 ),
-                if (score != null)
+                if (score != null) ...[
+                  const SizedBox(width: 12),
                   Text(
                     '${(score * 100).round()}%',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
-                        ?.copyWith(color: colorForScore(score)),
+                        ?.copyWith(color: color),
                   ),
+                ],
               ],
             ),
             if (c.recommendation != null)
