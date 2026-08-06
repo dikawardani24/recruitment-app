@@ -1,9 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'navigation/app_navigator.dart';
 import 'navigation/app_route.dart';
-import 'navigation/go_router_navigator.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
@@ -49,14 +47,3 @@ class AppRouter {
   }
 }
 
-/// The app's single [GoRouter] instance. Overridden in `main()` so the same
-/// instance is shared by the widget tree and [navigatorProvider].
-final goRouterProvider = Provider<GoRouter>(
-  (ref) => throw UnimplementedError('goRouterProvider must be overridden'),
-);
-
-/// [AppNavigator] implementation exposed to the widget tree. Screens read
-/// this provider and never touch go_router directly.
-final navigatorProvider = Provider<AppNavigator>(
-  (ref) => GoRouterNavigator(ref.watch(goRouterProvider)),
-);

@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/job_list_controller.dart';
 import '../providers.dart';
-import '../router.dart';
 
 class JobListScreen extends HookConsumerWidget {
   const JobListScreen({super.key});
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(jobsProvider);
-    await ref.read(jobsProvider.future);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final jobsAsync = ref.watch(jobsProvider);
+    final jobListController = ref.read(jobListControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -22,7 +18,7 @@ class JobListScreen extends HookConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => _refresh(ref),
+            onPressed: jobListController.refresh,
           ),
         ],
       ),
@@ -42,7 +38,10 @@ class JobListScreen extends HookConsumerWidget {
             ],
           ),
         ),
-        error: (e, _) => _ErrorView(message: '$e', onRetry: () => _refresh(ref)),
+        error: (e, _) => _ErrorView(
+          message: '$e',
+          onRetry: jobListController.refresh,
+        ),
         data: (jobs) {
           if (jobs.isEmpty) {
             return const Center(
@@ -50,7 +49,7 @@ class JobListScreen extends HookConsumerWidget {
             );
           }
           return RefreshIndicator(
-            onRefresh: () => _refresh(ref),
+            onRefresh: jobListController.refresh,
             child: ListView.separated(
               itemCount: jobs.length,
               separatorBuilder: (_, _) => const Divider(height: 1),

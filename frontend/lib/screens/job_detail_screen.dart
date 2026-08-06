@@ -3,14 +3,12 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/job_detail_controller.dart';
 import '../models.dart';
-import '../navigation/app_navigator.dart';
 import '../providers.dart';
-import '../router.dart';
 import '../widgets/loading_overlay.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
@@ -20,18 +18,14 @@ class JobDetailScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final busy = useState(false);
-    final loadingMessage = useState<String?>(null);
-
     final jobAsync = ref.watch(jobProvider(jobId));
     final cvsAsync = ref.watch(cvsProvider(jobId));
 
-    Future<void> refreshCvs() async {
-      ref.invalidate(cvsProvider(jobId));
-      await ref.read(cvsProvider(jobId).future);
-    }
+    final detailState = ref.watch(jobDetailControllerProvider);
+    final detailController = ref.read(jobDetailControllerProvider.notifier);
 
     Future<void> pickCvs() async {
+      final messenger = ScaffoldMessenger.of(context);
       final result = await FilePicker.pickFiles(
         allowMultiple: true,
         type: FileType.custom,
@@ -44,55 +38,26 @@ class JobDetailScreen extends HookConsumerWidget {
           .toList();
       if (files.isEmpty) return;
 
-      busy.value = true;
-      loadingMessage.value = 'Uploading ${files.length} CV(s)…';
       try {
-        final uploaded =
-            await ref.read(apiClientProvider).uploadCvs(jobId, files);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Uploaded ${uploaded.length} CV(s)')),
+        final uploaded = await detailController.uploadCvs(jobId, files);
+        messenger.showSnackBar(
+          SnackBar(content: Text('Uploaded $uploaded CV(s)')),
         );
-        await refreshCvs();
       } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Upload failed: $e')),
         );
-      } finally {
-        if (context.mounted) {
-          busy.value = false;
-          loadingMessage.value = null;
-        }
       }
     }
 
     Future<void> rank() async {
-      busy.value = true;
-      loadingMessage.value = 'Ranking candidates…';
+      final messenger = ScaffoldMessenger.of(context);
       try {
-        final response = await ref.read(apiClientProvider).rankJob(jobId);
-        if (!context.mounted) return;
-        busy.value = false;
-        loadingMessage.value = null;
-        await refreshCvs();
-        ref.read(navigatorProvider).goToRankings(
-              RankingsScreenData(
-                jobId: jobId,
-                jobTitle: jobAsync.value?.title ?? 'Job',
-                source: response.source,
-              ),
-            );
+        await detailController.rank(jobId);
       } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Ranking failed: $e')),
         );
-      } finally {
-        if (context.mounted) {
-          busy.value = false;
-          loadingMessage.value = null;
-        }
       }
     }
 
@@ -125,7 +90,7 @@ class JobDetailScreen extends HookConsumerWidget {
         Scaffold(
           appBar: AppBar(title: Text(job.title)),
           body: RefreshIndicator(
-            onRefresh: refreshCvs,
+            onRefresh: () => detailController.refreshCvs(jobId),
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -137,7 +102,12 @@ class JobDetailScreen extends HookConsumerWidget {
                 if (job.description.isEmpty)
                   const Text('No description')
                 else
-                  _DescriptionView(description: job.description),
+                  _ExpandableSection(
+                    maxLines: 3,
+                    lineHeight: 22,
+                    lineSpacing: 0,
+                    child: _DescriptionView(description: job.description),
+                  ),
                 if (job.requirements != null) ...[
                   const SizedBox(height: 16),
                   _RequirementsView(requirements: job.requirements!),
@@ -147,7 +117,7 @@ class JobDetailScreen extends HookConsumerWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: busy.value ? null : pickCvs,
+                        onPressed: detailState.busy ? null : pickCvs,
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Add CVs'),
                       ),
@@ -155,7 +125,7 @@ class JobDetailScreen extends HookConsumerWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: busy.value ? null : rank,
+                        onPressed: detailState.busy ? null : rank,
                         icon: const Icon(Icons.psychology),
                         label: const Text('Rank candidates'),
                       ),
@@ -181,8 +151,8 @@ class JobDetailScreen extends HookConsumerWidget {
             ),
           ),
         ),
-        if (busy.value)
-          LoadingOverlay(message: loadingMessage.value ?? 'Loading…'),
+        if (detailState.busy)
+          LoadingOverlay(message: detailState.loadingMessage ?? 'Loading…'),
       ],
     );
   }
@@ -305,22 +275,98 @@ class _RequirementsView extends StatelessWidget {
       );
     }
 
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        section('Required skills', requirements.requiredSkills),
+        section('Preferred skills', requirements.preferredSkills),
+        if (requirements.minYears > 0)
+          Text('Min ${requirements.minYears.round()} years experience'),
+        if (requirements.education != null)
+          Text('Education: ${requirements.education}'),
+        section('Certifications', requirements.certifications),
+      ],
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            section('Required skills', requirements.requiredSkills),
-            section('Preferred skills', requirements.preferredSkills),
-            if (requirements.minYears > 0)
-              Text('Min ${requirements.minYears.round()} years experience'),
-            if (requirements.education != null)
-              Text('Education: ${requirements.education}'),
-            section('Certifications', requirements.certifications),
-          ],
-        ),
+        child: content,
       ),
+    );
+  }
+}
+
+class _ExpandableSection extends StatefulWidget {
+  final Widget child;
+  final int maxLines;
+  final double lineHeight;
+  final double lineSpacing;
+
+  const _ExpandableSection({
+    required this.child,
+    this.maxLines = 3,
+    this.lineHeight = 30,
+    this.lineSpacing = 6,
+  });
+
+  @override
+  State<_ExpandableSection> createState() => _ExpandableSectionState();
+}
+
+class _ExpandableSectionState extends State<_ExpandableSection> {
+  final GlobalKey _contentKey = GlobalKey();
+
+  bool _expanded = false;
+  bool _canExpand = false;
+
+  double get _collapsedHeight =>
+      widget.maxLines * widget.lineHeight +
+      (widget.maxLines - 1) * widget.lineSpacing;
+
+  void _checkOverflow() {
+    final size = _contentKey.currentContext?.size;
+    if (size == null) return;
+    final can = size.height > _collapsedHeight + 0.5;
+    if (can != _canExpand && mounted) {
+      setState(() => _canExpand = can);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOverflow());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: _expanded ? double.infinity : _collapsedHeight,
+          ),
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            clipBehavior: Clip.hardEdge,
+            child: KeyedSubtree(
+              key: _contentKey,
+              child: widget.child,
+            ),
+          ),
+        ),
+        if (_canExpand || _expanded)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(_expanded ? 'Show less' : 'Show more'),
+            ),
+          ),
+      ],
     );
   }
 }

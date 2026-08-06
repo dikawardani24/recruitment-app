@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../providers.dart';
-import '../router.dart';
+import '../controllers/job_form_controller.dart';
 import '../widgets/loading_overlay.dart';
 
 class JobFormScreen extends HookConsumerWidget {
@@ -19,8 +18,9 @@ class JobFormScreen extends HookConsumerWidget {
     final descriptionController = useTextEditingController();
     final jdFile = useState<File?>(null);
     final jdFileName = useState<String?>(null);
-    final submitting = useState(false);
-    final loadingMessage = useState<String?>(null);
+
+    final formState = ref.watch(jobFormControllerProvider);
+    final formController = ref.read(jobFormControllerProvider.notifier);
 
     Future<void> pickJdFile() async {
       final result = await FilePicker.pickFiles(
@@ -51,32 +51,21 @@ class JobFormScreen extends HookConsumerWidget {
 
     Future<void> submit() async {
       if (!formKey.currentState!.validate()) return;
-      submitting.value = true;
-      loadingMessage.value = 'Creating job…';
+      final messenger = ScaffoldMessenger.of(context);
       try {
-        final job = await ref.read(apiClientProvider).createJob(
+        final job = await formController.createJob(
           title: titleController.text.trim(),
           description: descriptionController.text.trim(),
           jdFile: jdFile.value,
           jdFileName: jdFileName.value,
         );
-        if (!context.mounted) return;
-        final messenger = ScaffoldMessenger.of(context);
-        ref.invalidate(jobsProvider);
-        ref.read(navigatorProvider).pop();
         messenger.showSnackBar(
           SnackBar(content: Text('Created "${job.title}"')),
         );
       } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Failed to create job: $e')),
         );
-      } finally {
-        if (context.mounted) {
-          submitting.value = false;
-          loadingMessage.value = null;
-        }
       }
     }
 
@@ -120,8 +109,8 @@ class JobFormScreen extends HookConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: submitting.value ? null : submit,
-                  icon: submitting.value
+                  onPressed: formState.submitting ? null : submit,
+                  icon: formState.submitting
                       ? const SizedBox(
                           width: 18,
                           height: 18,
@@ -129,14 +118,14 @@ class JobFormScreen extends HookConsumerWidget {
                         )
                       : const Icon(Icons.check),
                   label:
-                      Text(submitting.value ? 'Creating…' : 'Create job'),
+                      Text(formState.submitting ? 'Creating…' : 'Create job'),
                 ),
               ],
             ),
           ),
         ),
-        if (submitting.value)
-          LoadingOverlay(message: loadingMessage.value ?? 'Loading…'),
+        if (formState.submitting)
+          LoadingOverlay(message: formState.loadingMessage ?? 'Loading…'),
       ],
     );
   }
