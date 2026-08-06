@@ -22,12 +22,12 @@ BUCKET_RANGES = [
 
 def score_profile(profile: Profile, req_dict: dict, settings: Settings) -> dict:
     requirements = Requirements(requirements=req_dict)
-    score_counter = ProfileScoreCounter(profile=profile, requirements=requirements, settings=settings)
+    score = ProfileScoreCounter(profile=profile, requirements=requirements, settings=settings).count()
     
-    skill_score = score_counter.count_skill_score()
-    experience_score = score_counter.count_experience_score()
-    education_score = score_counter.count_edu_score()
-    certification_score = score_counter.count_cert_score()
+    skill_score = score.skill_score
+    experience_score = score.experience_score
+    education_score = score.edu_score
+    certification_score = score.cert_score
   
     weights = {
         "skill": settings.w_skill,
