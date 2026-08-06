@@ -488,19 +488,25 @@ class _CandidateTile extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          cv.status == 'failed'
-              ? 'Failed: ${cv.error}'
-              : score == null
-                  ? cv.status
-                  : '${(score * 100).round()}% · ${cv.bucket ?? ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        subtitle: score == null
+            ? Text(
+                cv.status == 'failed' ? 'Failed: ${cv.error}' : cv.status,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : Text(
+                formatBucket(cv.bucket ?? 'weak_match'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: getBucketColor(cv.bucket ?? 'weak_match'),
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         trailing: score == null
             ? (cv.status == 'failed' ? const Icon(Icons.error_outline) : null)
             : Text(
-                '${(score * 100).round()}',
+                '${(score * 100).round()}%',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: color,
                       fontWeight: FontWeight.w600,

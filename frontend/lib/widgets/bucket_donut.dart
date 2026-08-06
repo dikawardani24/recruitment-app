@@ -10,10 +10,10 @@ const _bucketOrder = [
   'weak_match',
 ];
 const _bucketLabels = {
-  'strong_match': 'Strong',
-  'good_match': 'Good',
-  'possible_match': 'Possible',
-  'weak_match': 'Weak',
+  'strong_match': 'Strong Match',
+  'good_match': 'Good Match',
+  'possible_match': 'Possible Match',
+  'weak_match': 'Weak Match',
 };
 const _bucketColors = {
   'strong_match': Colors.green,
@@ -21,6 +21,16 @@ const _bucketColors = {
   'possible_match': Colors.red,
   'weak_match': Colors.red,
 };
+
+/// Formats a bucket key to a human-readable label.
+String formatBucket(String bucket) {
+  return _bucketLabels[bucket] ?? bucket.replaceAll('_', ' ');
+}
+
+/// Gets the color for a bucket.
+Color getBucketColor(String bucket) {
+  return _bucketColors[bucket] ?? Colors.grey;
+}
 
 /// Counts ranked results per recommendation bucket, in canonical order,
 /// omitting buckets with no candidates.

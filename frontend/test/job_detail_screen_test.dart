@@ -138,7 +138,7 @@ void main() {
     expect(find.text('Not ranked yet'), findsNothing);
     expect(find.text('Buckets'), findsOneWidget);
     expect(find.text('View full ranking'), findsOneWidget);
-    expect(find.text('Strong'), findsOneWidget);
-    expect(find.text('Possible'), findsOneWidget);
+    expect(find.text('Strong Match'), findsWidgets);
+    expect(find.text('Possible Match'), findsWidgets);
   });
 }

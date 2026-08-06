@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../models.dart';
 import '../providers.dart';
+import '../widgets/bucket_donut.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
@@ -185,7 +186,8 @@ class _RankedCard extends StatelessWidget {
             ],
             if (c.recommendation != null ||
                 c.explanation != null ||
-                c.weaknesses.isNotEmpty)
+                c.weaknesses.isNotEmpty) ...[
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -194,6 +196,7 @@ class _RankedCard extends StatelessWidget {
                   label: const Text('Show reasoning'),
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -238,6 +241,22 @@ class _RankedCard extends StatelessWidget {
                           '${(score * 100).round()}%',
                           style: theme.textTheme.titleMedium
                               ?.copyWith(color: color),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Recommendation',
+                            style: theme.textTheme.labelMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        Text(
+                          formatBucket(c.bucket ?? 'weak_match'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: getBucketColor(c.bucket ?? 'weak_match'),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
