@@ -5,7 +5,6 @@ from app.extraction import Profile
 from app.ranking._profile_score_counter import ProfileScoreCounter
 from app.ranking._requirements import Requirements
 
-EDUCATION_LEVELS = {"": 0, "diploma": 1, "bsc": 2, "msc": 3, "phd": 4}
 RECOMMENDATIONS = {
     "strong_match": "Strong match — prioritize for interview",
     "good_match": "Good match — worth interviewing",
@@ -22,8 +21,8 @@ BUCKET_RANGES = [
 
 def score_profile(profile: Profile, req_dict: dict, settings: Settings) -> dict:
     requirements = Requirements(requirements=req_dict)
-    score = ProfileScoreCounter(profile=profile, requirements=requirements, settings=settings).count()
-    
+    score = ProfileScoreCounter(profile=profile, requirements=requirements).count()
+
     skill_score = score.skill_score
     experience_score = score.experience_score
     education_score = score.edu_score

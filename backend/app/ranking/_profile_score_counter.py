@@ -1,4 +1,3 @@
-from app.config import Settings
 from app.extraction import Profile
 from app.ranking._requirements import Requirements, KNOWN_EDUCATION_LEVELS
 
@@ -8,19 +7,18 @@ class ProfileScore:
         self.experience_score = experience_score
         self.edu_score = edu_score
         self.cert_score = cert_score
-        pass
+
 class ProfileScoreCounter:
-    def __init__(self, profile: Profile, requirements: Requirements, settings: Settings):
+    def __init__(self, profile: Profile, requirements: Requirements):
         self.profile = profile
         self.requirement = requirements
-        self.settings = settings
 
-    def __score_req_skills(self, total_matched_req: int, total_req: int, total_matched_pref: int,  total_pref: list):
+    def __score_req_skills(self, total_matched_req: int, total_req: int, total_matched_pref: int, total_pref: int):
         score_req = 0.7 * (total_matched_req / total_req)
         score_pref = 0.3 * (total_matched_pref / total_pref if total_pref > 0 else 0.0)
         return score_req + score_pref
     
-    def __score_pref_skills(self, total_matched_pref: int, total_pref: list):
+    def __score_pref_skills(self, total_matched_pref: int, total_pref: int):
         return 0.5 + 0.5 * (total_matched_pref / total_pref)
         
     def __count_skill_score(self):
@@ -61,14 +59,9 @@ class ProfileScoreCounter:
         return 0.8 if self.profile.education else 0.5
     
     def __count_cert_score(self):
-        req_certs = self.requirement.req_certs or []
-        certifications = self.profile.certifications
-        profile_certs = {c.lower() for c in certifications}
-        matched_certs = [c for c in req_certs if c.lower() in profile_certs]
-
-        if req_certs:
-            return len(matched_certs) / len(req_certs)
-        return 0.7 if certifications else 0.5
+        if not self.requirement.req_certs:
+            return 0.7 if self.profile.certifications else 0.5
+        return len(self.requirement.matched_certs(self.profile)) / len(self.requirement.req_certs)
     
     def count(self):
         skill_score= self.__count_skill_score()

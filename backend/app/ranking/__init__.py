@@ -11,7 +11,7 @@ __all__ = [
     "rule_reasoning",
     "score_profile",
     "ProfileScore",
-     "ProfileScoreCounter",
+    "ProfileScoreCounter",
     "Requirements",
     "KNOWN_EDUCATION_LEVELS",
 ]

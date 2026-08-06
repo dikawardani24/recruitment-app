@@ -1,4 +1,3 @@
-from app.config import Settings
 from app.extraction import Profile
 
 KNOWN_EDUCATION_LEVELS = {"": 0, "diploma": 1, "bsc": 2, "msc": 3, "phd": 4}
@@ -10,7 +9,7 @@ class Requirements:
         self.min_years = float(requirements.get("min_years") or 0.0)
         self.req_edu = requirements.get("education")
         self.req_certs = requirements.get("certifications") or []
-        pass
+
     
     def __profile_skills(self, profile: Profile):
         return {s.lower() for s in profile.skills}
