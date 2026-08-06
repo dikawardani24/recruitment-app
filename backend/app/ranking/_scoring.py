@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from app.config import Settings
 from app.extraction import Profile
+from app.ranking._profile_score_counter import ProfileScoreCounter
+from app.ranking._requirements import Requirements
 
 EDUCATION_LEVELS = {"": 0, "diploma": 1, "bsc": 2, "msc": 3, "phd": 4}
 RECOMMENDATIONS = {
@@ -18,48 +20,15 @@ BUCKET_RANGES = [
 ]
 
 
-def score_profile(profile: Profile, requirements: dict, settings: Settings) -> dict:
-    req_skills = requirements.get("required_skills") or []
-    pref_skills = requirements.get("preferred_skills") or []
-    min_years = float(requirements.get("min_years") or 0.0)
-    req_edu = requirements.get("education")
-    req_certs = requirements.get("certifications") or []
-
-    # Case-insensitive matching: canonical skills are lowercase; LLM skills may be capitalized.
-    profile_skills = {s.lower() for s in profile.skills}
-    profile_certs = {c.lower() for c in profile.certifications}
-
-    matched_req = [s for s in req_skills if s.lower() in profile_skills]
-    matched_pref = [s for s in pref_skills if s.lower() in profile_skills]
-    matched_certs = [c for c in req_certs if c.lower() in profile_certs]
-
-    if req_skills:
-        skill_score = 0.7 * (len(matched_req) / len(req_skills)) + 0.3 * (
-            len(matched_pref) / len(pref_skills) if pref_skills else 0.0
-        )
-    elif pref_skills:
-        skill_score = 0.5 + 0.5 * (len(matched_pref) / len(pref_skills))
-    else:
-        skill_score = 0.5 if profile.skills else 0.2
-
-    if min_years > 0:
-        experience_score = min(1.0, profile.years_experience / min_years)
-    else:
-        experience_score = 0.7 if profile.years_experience > 0 else 0.4
-
-    if req_edu:
-        requirement_level = EDUCATION_LEVELS.get(req_edu, 0)
-        education_score = min(
-            1.0, EDUCATION_LEVELS.get(profile.education or "", 0) / max(1, requirement_level)
-        )
-    else:
-        education_score = 0.8 if profile.education else 0.5
-
-    if req_certs:
-        certification_score = len(matched_certs) / len(req_certs)
-    else:
-        certification_score = 0.7 if profile.certifications else 0.5
-
+def score_profile(profile: Profile, req_dict: dict, settings: Settings) -> dict:
+    requirements = Requirements(requirements=req_dict)
+    score_counter = ProfileScoreCounter(profile=profile, requirements=requirements, settings=settings)
+    
+    skill_score = score_counter.count_skill_score()
+    experience_score = score_counter.count_experience_score()
+    education_score = score_counter.count_edu_score()
+    certification_score = score_counter.count_cert_score()
+  
     weights = {
         "skill": settings.w_skill,
         "experience": settings.w_experience,
@@ -81,10 +50,10 @@ def score_profile(profile: Profile, requirements: dict, settings: Settings) -> d
         "education_score": round(education_score, 3),
         "certification_score": round(certification_score, 3),
         "overall": round(overall, 3),
-        "matched_required": matched_req,
-        "matched_preferred": matched_pref,
-        "missing_required": [s for s in req_skills if s.lower() not in profile_skills],
-        "matched_certs": matched_certs,
+        "matched_required": requirements.matched_req(profile),
+        "matched_preferred": requirements.matched_pref(profile),
+        "missing_required": requirements.missing_skill(profile),
+        "matched_certs": requirements.matched_certs(profile),
     }
 
 
