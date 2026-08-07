@@ -30,7 +30,7 @@ class Job:
         self.jd_file_path = jd_file_path
 
     def is_data_valid(self):
-        return (
+        return not (
             is_empty_string(self.title)
             or is_empty_string(self.desc)
             or is_empty_string(self.req)
@@ -38,8 +38,8 @@ class Job:
         )
 
     @classmethod
-    def from_entity(entity: JobEntity) -> Job:
-        return Job(
+    def from_entity(cls, entity: JobEntity) -> Job:
+        return cls(
             id= entity.id,
             title= entity.title,
             desc=entity.desc,

@@ -8,7 +8,7 @@ class GetJobByPage:
             pass
 
     async def execute(self, page: int, page_size: int) -> Page[Job]:
-        await self.repo.get_job(
+        return await self.repo.get_job(
             page = page,
             page_size= page_size
         )

@@ -32,10 +32,10 @@ class JobEntity:
         return cls(
             id=row["id"],
             title=row["title"],
-            description=row["description"],
-            requirements=row["requirements"],
+            desc=row["description"],
+            req=row["requirements"],
             status=row["status"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
-            jd_file=row["jd_file"],
+            jd_file_path=row["jd_file"],
         )

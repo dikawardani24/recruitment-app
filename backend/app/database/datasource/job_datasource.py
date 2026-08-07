@@ -94,7 +94,7 @@ class JobDatasource:
 
     async def find_by_limit_and_offset(self, limit: int, offset: int)-> list[JobEntity]:
         query = """
-        SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?
         """
-        list_data = await self.db.execute(query, (limit, offset))
+        list_data = await self.db.fetchall(query, (limit, offset))
         return [JobEntity.from_row(row) for row in list_data]
