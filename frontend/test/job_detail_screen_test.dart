@@ -353,6 +353,37 @@ void main() {
       expect(find.text('Alice'), findsOneWidget);
     });
 
+    testWidgets('ranked candidate can be re-ranked from the sheet', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [ranked('cv-1', 'Alice')];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Re-rank CV'), findsOneWidget);
+
+      await tester.tap(find.text('Re-rank CV'));
+      await tester.pumpAndSettle();
+
+      expect(controller.rankedCvs, ['cv-1']);
+      expect(find.text('Re-rank CV'), findsNothing);
+    });
+
   group('candidate deletion', () {
     testWidgets('swipe reveals confirmation with candidate details', (
       tester,

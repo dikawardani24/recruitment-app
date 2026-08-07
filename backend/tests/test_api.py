@@ -169,6 +169,25 @@ def test_rank_single_cv_unknown_404(client, cv_builder):
     assert resp.status_code == 404
 
 
+def test_bulk_rank_skips_already_ranked_cvs(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
+    _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+
+    client.post(f"/api/jobs/{job_id}/cvs/{cv_id}/rank")
+
+    resp = client.post(f"/api/jobs/{job_id}/rank")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["count"] == 1  # only the unranked alice
+
+    ranked = client.get(f"/api/jobs/{job_id}/rankings").json()["results"]
+    assert len(ranked) == 2  # both now ranked
+
+
 def test_list_jobs_includes_cv_count(client, cv_builder):
     resp = client.post(
         "/api/jobs",

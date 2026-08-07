@@ -261,7 +261,9 @@ async def rank_job(job_id: str) -> dict:
         raise HTTPException(status_code=422, detail="job_missing_description")
 
     cvs = await _load_cvs(job_id)
-    parsed = [cv for cv in cvs if cv["status"] in ("parsed", "ranked")]
+    # Only score candidates that have not been ranked yet. Already-ranked CVs
+    # are re-scored individually (see rank_cv) rather than on the bulk action.
+    parsed = [cv for cv in cvs if cv["status"] == "parsed"]
     if not parsed:
         return {"job_id": job["id"], "count": 0, "results": []}
 

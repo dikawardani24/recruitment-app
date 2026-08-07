@@ -123,37 +123,27 @@ void showCandidateDetailSheet(
                         ),
                       ],
                     ),
-                    if (onRank != null && c.status != 'failed') ...[
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: ranking
-                            ? null
-                            : () async {
-                                setState(() => ranking = true);
-                                try {
-                                  await onRank();
-                                  if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                  }
-                                } finally {
-                                  if (context.mounted) {
-                                    setState(() => ranking = false);
-                                  }
-                                }
-                              },
-                        icon: ranking
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.auto_awesome),
-                        label: Text(ranking ? 'Ranking…' : 'Rank this CV'),
-                      ),
-                    ],
                     const SizedBox(height: 16),
+                  ],
+                  if (onRank != null && c.status != 'failed') ...[
+                    const SizedBox(height: 12),
+                    _RankCvButton(
+                      label: score == null ? 'Rank this CV' : 'Re-rank CV',
+                      busy: ranking,
+                      onPressed: () async {
+                        setState(() => ranking = true);
+                        try {
+                          await onRank();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        } finally {
+                          if (context.mounted) {
+                            setState(() => ranking = false);
+                          }
+                        }
+                      },
+                    ),
                   ],
                   if (c.skills.isNotEmpty) ...[
                     const CandidateSectionLabel(
@@ -313,6 +303,33 @@ void showCandidateDetailSheet(
       ),
     ),
   );
+}
+
+class _RankCvButton extends StatelessWidget {
+  final String label;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  const _RankCvButton({
+    required this.label,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: busy ? null : onPressed,
+      icon: busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.auto_awesome),
+      label: Text(busy ? 'Ranking…' : label),
+    );
+  }
 }
 
 class CandidateSectionLabel extends StatelessWidget {

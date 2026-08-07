@@ -52,9 +52,7 @@ class JobDetailScreen extends HookConsumerWidget {
           SnackBar(content: Text('Uploaded $uploaded CV(s)')),
         );
       } catch (e) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text('Upload failed: $e')));
       }
     }
 
@@ -63,9 +61,7 @@ class JobDetailScreen extends HookConsumerWidget {
       try {
         await detailController.rank(jobId);
       } catch (e) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Ranking failed: $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text('Ranking failed: $e')));
       }
     }
 
@@ -77,8 +73,8 @@ class JobDetailScreen extends HookConsumerWidget {
         message: candidates.isEmpty
             ? 'This job has no candidates. It will be permanently removed.'
             : 'This job and its ${candidates.length} '
-                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                'will be permanently removed.',
+                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                  'will be permanently removed.',
         details: [jobDeleteDetails(jobAsync.value!, candidates)],
         confirmLabel: 'Delete job',
       );
@@ -90,7 +86,8 @@ class JobDetailScreen extends HookConsumerWidget {
           context,
           success: true,
           title: 'Job deleted',
-          message: "'${jobAsync.value?.title ?? 'Job'}' was permanently removed.",
+          message:
+              "'${jobAsync.value?.title ?? 'Job'}' was permanently removed.",
         );
       } catch (e) {
         if (!context.mounted) return;
@@ -198,9 +195,7 @@ class JobDetailScreen extends HookConsumerWidget {
                       children: [
                         Text(
                           'Description',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
@@ -301,25 +296,24 @@ class JobDetailScreen extends HookConsumerWidget {
                   )
                 else
                   ...cvs.map(
-                        (cv) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Dismissible(
-                            key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (_) => confirmDeleteCv(cv),
-                            background: _DeleteBackground(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            child: _CandidateTile(
-                              cv: cv,
-                              onRank: cv.cvId == null || cv.status == 'failed'
-                                  ? null
-                                  : () =>
-                                      detailController.rankCv(jobId, cv.cvId!),
-                            ),
-                          ),
+                    (cv) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Dismissible(
+                        key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (_) => confirmDeleteCv(cv),
+                        background: _DeleteBackground(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        child: _CandidateTile(
+                          cv: cv,
+                          onRank: cv.cvId == null || cv.status == 'failed'
+                              ? null
+                              : () => detailController.rankCv(jobId, cv.cvId!),
                         ),
                       ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -359,14 +353,19 @@ class _DescriptionView extends StatelessWidget {
           (m) => '${m[1]} ${m[2]}',
         )
         .split(RegExp(r'_|\-'))
-        .map((w) => w.isEmpty
-            ? w
-            : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+        .map(
+          (w) => w.isEmpty
+              ? w
+              : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}',
+        )
         .join(' ');
   }
 
-  void _appendMap(StringBuffer buffer, Map<dynamic, dynamic> map,
-      {required int level}) {
+  void _appendMap(
+    StringBuffer buffer,
+    Map<dynamic, dynamic> map, {
+    required int level,
+  }) {
     final header = level == 1 ? '### ' : '#### ';
     bool firstSection = level == 1;
     for (final entry in map.entries) {
@@ -407,10 +406,7 @@ class _DescriptionView extends StatelessWidget {
   Widget build(BuildContext context) {
     final md = _jsonToMarkdown(description);
     if (md != null) {
-      return MarkdownBody(
-        data: md,
-        selectable: true,
-      );
+      return MarkdownBody(data: md, selectable: true);
     }
     return MarkdownBody(data: description);
   }
@@ -430,17 +426,18 @@ class _RequirementsView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: items
-                  .map((s) => Chip(
-                        label: Text(s),
-                        visualDensity: VisualDensity.compact,
-                      ))
+                  .map(
+                    (s) => Chip(
+                      label: Text(s),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
                   .toList(),
             ),
           ],
@@ -464,10 +461,7 @@ class _RequirementsView extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: cardShape(Theme.of(context)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: content,
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: content),
     );
   }
 }
@@ -522,10 +516,7 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
           child: SingleChildScrollView(
             physics: const NeverScrollableScrollPhysics(),
             clipBehavior: Clip.hardEdge,
-            child: KeyedSubtree(
-              key: _contentKey,
-              child: widget.child,
-            ),
+            child: KeyedSubtree(key: _contentKey, child: widget.child),
           ),
         ),
         if (_canExpand || _expanded)
@@ -583,11 +574,7 @@ class _CandidateTile extends StatelessWidget {
             ),
           ),
         ),
-        title: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: score == null
             ? Text(
                 cv.status == 'failed' ? 'Failed: ${cv.error}' : cv.status,
@@ -608,9 +595,9 @@ class _CandidateTile extends StatelessWidget {
             : Text(
                 '${(score * 100).round()}%',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
       ),
     );
