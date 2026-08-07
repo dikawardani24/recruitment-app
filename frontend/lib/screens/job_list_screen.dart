@@ -54,12 +54,6 @@ class JobListScreen extends HookConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Jobs'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: jobListController.refresh,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => ref.read(navigatorProvider).goToJobForm(),
@@ -89,6 +83,7 @@ class JobListScreen extends HookConsumerWidget {
             onRefresh: jobListController.refresh,
             child: ListView(
               controller: scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               children: [
                 GradientHeader(

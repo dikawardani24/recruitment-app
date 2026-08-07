@@ -146,7 +146,7 @@ void main() {
     expect(find.byType(Shimmer), findsNothing);
   });
 
-  testWidgets('refresh button shows the shimmer while reloading', (
+  testWidgets('pull to refresh shows the shimmer while reloading', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1600);
@@ -167,8 +167,14 @@ void main() {
     expect(find.text('Backend Engineer'), findsOneWidget);
     expect(find.byType(Shimmer), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.fling(
+      find.text('Backend Engineer'),
+      const Offset(0, 600),
+      1000,
+    );
     await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.byType(Shimmer), findsNWidgets(5));
     expect(find.text('Backend Engineer'), findsNothing);
