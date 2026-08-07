@@ -32,7 +32,7 @@ class Settings:
     # (e.g. Google Gemini at https://generativelanguage.googleapis.com/v1beta/openai/).
     llm_api_key: str | None = os.getenv("ATS_LLM__API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
     llm_base_url: str | None = os.getenv("ATS_LLM__BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-    llm_model: str = os.getenv("ATS_LLM__MODEL", "gemini-1.5-flash")
+    llm_model: str = os.getenv("ATS_LLM__MODEL", "gemini-flash-latest")
     llm_timeout_ms: int = int(os.getenv("ATS_LLM__TIMEOUT_MS", "20000"))
 
     # Local BERT resume-NER (optional; overrides LLM extraction when enabled).
