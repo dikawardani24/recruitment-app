@@ -98,6 +98,24 @@ void showCandidateDetailSheet(
                         ),
                       ],
                     ),
+                    if (c.rankedBy != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Ranked by',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            _rankedByLabel(c.rankedBy!),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 16),
                   ] else ...[
                     Row(
@@ -303,6 +321,10 @@ void showCandidateDetailSheet(
       ),
     ),
   );
+}
+
+String _rankedByLabel(String source) {
+  return source == 'llm' ? 'AI (LLM)' : 'rule-based engine';
 }
 
 class _RankCvButton extends StatelessWidget {

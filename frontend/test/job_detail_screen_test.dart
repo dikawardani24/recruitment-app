@@ -244,6 +244,7 @@ void main() {
         recommendation: 'Strong hire',
         strengths: const ['Dart', 'Flutter'],
         explanation: 'Matches all required skills.',
+        rankedBy: 'llm',
       );
       await tester.pumpWidget(
         buildApp(
@@ -260,6 +261,8 @@ void main() {
       expect(find.text('Match Score'), findsOneWidget);
       expect(find.text('90%'), findsWidgets);
       expect(find.text('Strong Match'), findsWidgets);
+      expect(find.text('Ranked by'), findsOneWidget);
+      expect(find.text('AI (LLM)'), findsOneWidget);
       expect(find.text('STRENGTHS'), findsOneWidget);
       expect(find.text('Dart'), findsWidgets);
       expect(find.text('Explanation'), findsOneWidget);

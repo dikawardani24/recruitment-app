@@ -148,10 +148,12 @@ def test_rank_single_cv_persists_rank(client, cv_builder):
     assert result["cv_id"] == cv_id
     assert result["overall_score"] is not None
     assert result["explanation"]
+    assert result["ranked_by"] == "rules"
 
     ranked = client.get(f"/api/jobs/{job_id}/rankings").json()["results"]
     assert len(ranked) == 1
     assert ranked[0]["cv_id"] == cv_id
+    assert ranked[0]["ranked_by"] == "rules"
 
 
 def test_rank_single_cv_unknown_404(client, cv_builder):

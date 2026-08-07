@@ -89,6 +89,7 @@ class CandidateResult {
   final String? error;
   final int? rank;
   final String? source;
+  final String? rankedBy;
 
   const CandidateResult({
     this.cvId,
@@ -109,6 +110,7 @@ class CandidateResult {
     this.error,
     this.rank,
     this.source,
+    this.rankedBy,
   });
 
   factory CandidateResult.fromJson(Map<String, dynamic> json) {
@@ -131,6 +133,7 @@ class CandidateResult {
       error: json['error'] as String?,
       rank: json['rank'] as int?,
       source: json['source'] as String?,
+      rankedBy: json['ranked_by'] as String?,
     );
   }
 

@@ -272,7 +272,7 @@ async def rank_job(job_id: str) -> dict:
     ranked, source = await RankingService(settings).rank(job["requirements"], profiles, parsed)
 
     async with db.connect() as conn:
-        await _persist_ranked(conn, ranked)
+        await _persist_ranked(conn, ranked, source)
         await conn.commit()
 
     for i, item in enumerate(ranked):
@@ -311,7 +311,7 @@ async def rank_cv(job_id: str, cv_id: str) -> dict:
     )
     item = ranked[0]
     async with db.connect() as conn:
-        await _persist_ranked(conn, ranked)
+        await _persist_ranked(conn, ranked, source)
         await conn.commit()
     item["rank"] = 1
     return {
@@ -343,14 +343,16 @@ async def _load_cvs(job_id: str) -> list[dict]:
     return [db.row_to_cv(r) for r in rows]
 
 
-async def _persist_ranked(conn, ranked: list[dict]) -> None:
+async def _persist_ranked(conn, ranked: list[dict], source: str) -> None:
     for item in ranked:
         item["status"] = "ranked"
+        item["ranked_by"] = source
         await conn.execute(
             "UPDATE cvs SET status = 'ranked', overall_score = ?, bucket = ?,"
             " recommendation = ?, explanation = ?, strengths = ?, weaknesses = ?,"
             " skill_gaps = ?, skill_score = ?, experience_score = ?,"
-            " education_score = ?, certification_score = ?, ranked_at = ?"
+            " education_score = ?, certification_score = ?, ranked_at = ?,"
+            " ranked_by = ?"
             " WHERE id = ?",
             (
                 item["overall_score"],
@@ -365,6 +367,7 @@ async def _persist_ranked(conn, ranked: list[dict]) -> None:
                 item["education_score"],
                 item["certification_score"],
                 item["ranked_at"],
+                item["ranked_by"],
                 item["id"],
             ),
         )
@@ -392,7 +395,7 @@ def _cv_payload(cv: dict) -> dict:
         "overall_score", "bucket", "recommendation", "explanation",
         "strengths", "weaknesses", "skill_gaps", "interview_questions",
         "skill_score", "experience_score", "education_score", "certification_score",
-        "ranked_at", "rank",
+        "ranked_at", "ranked_by", "rank",
     ]
     payload = {k: cv.get(k) for k in keys}
     payload["source"] = cv.get("source")

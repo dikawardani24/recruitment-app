@@ -56,13 +56,6 @@ class RankingsScreen extends HookConsumerWidget {
                       subtitle: jobTitle,
                     ),
                     const SizedBox(height: 12),
-                    Chip(
-                      avatar: const Icon(Icons.psychology, size: 18),
-                      label: Text(
-                        'Ranking by ${source == 'llm' ? 'AI (LLM)' : 'rule-based engine'}',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     RankingsSummary(results: results),
                   ],
                 );
