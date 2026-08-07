@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'api.dart';
-import 'models.dart';
+import 'di.dart';
+import 'domain/models.dart';
+import 'domain/usecases/get_job.dart';
+import 'domain/usecases/get_rankings.dart';
+import 'domain/usecases/list_cvs.dart';
+import 'domain/usecases/list_jobs.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/go_router_navigator.dart';
-
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient.instance);
 
 /// Paginated job list state. [jobs] accumulates across pages as the user
 /// scrolls; [hasMore] indicates whether another page is available.
@@ -45,7 +47,7 @@ class JobListNotifier extends AsyncNotifier<JobListState> {
   Future<JobListState> build() => _loadFirstPage();
 
   Future<JobListState> _loadFirstPage() async {
-    final page = await ref.read(apiClientProvider).listJobs(page: 1);
+    final page = await getIt<ListJobs>()(page: 1);
     return JobListState(
       jobs: page.jobs,
       page: 1,
@@ -61,9 +63,7 @@ class JobListNotifier extends AsyncNotifier<JobListState> {
 
     state = AsyncValue.data(current.copyWith(isLoadingMore: true));
     try {
-      final next = await ref
-          .read(apiClientProvider)
-          .listJobs(page: current.page + 1);
+      final next = await getIt<ListJobs>().call(page: current.page + 1);
       state = AsyncValue.data(
         current.copyWith(
           jobs: [...current.jobs, ...next.jobs],
@@ -93,15 +93,17 @@ final jobsProvider =
     AsyncNotifierProvider<JobListNotifier, JobListState>(JobListNotifier.new);
 
 final jobProvider = FutureProvider.family<Job, String>((ref, jobId) {
-  return ref.read(apiClientProvider).getJob(jobId);
+  return getIt<GetJob>()(jobId);
 });
 
-final cvsProvider = FutureProvider.family<List<CandidateResult>, String>((ref, jobId) {
-  return ref.read(apiClientProvider).listCvs(jobId);
+final cvsProvider =
+    FutureProvider.family<List<CandidateResult>, String>((ref, jobId) {
+  return getIt<ListCvs>()(jobId);
 });
 
-final rankingsProvider = FutureProvider.family<List<CandidateResult>, String>((ref, jobId) {
-  return ref.read(apiClientProvider).getRankings(jobId);
+final rankingsProvider =
+    FutureProvider.family<List<CandidateResult>, String>((ref, jobId) {
+  return getIt<GetRankings>()(jobId);
 });
 
 /// The app's single [GoRouter] instance. Overridden in `main()` so the same

@@ -7,7 +7,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_detail_controller.dart';
-import '../models.dart';
+import '../domain/models.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';

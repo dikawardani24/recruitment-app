@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models.dart';
+import '../domain/models.dart';
 import 'bucket_donut.dart';
 import 'score_color.dart';
 

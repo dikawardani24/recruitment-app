@@ -1,10 +1,10 @@
-import 'package:ai_ats/models.dart';
+import 'package:ai_ats/data/api/mappers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('Job.fromJson', () {
+  group('JobResponseMapper.fromJson', () {
     test('parses requirements', () {
-      final job = Job.fromJson({
+      final job = JobResponseMapper.fromJson({
         'job_id': 'abc',
         'title': 'Backend Engineer',
         'description': 'Build things',
@@ -26,7 +26,7 @@ void main() {
     });
 
     test('handles missing requirements', () {
-      final job = Job.fromJson({
+      final job = JobResponseMapper.fromJson({
         'job_id': 'abc',
         'title': 'Backend Engineer',
         'description': '',
@@ -37,9 +37,9 @@ void main() {
     });
   });
 
-  group('CandidateResult.fromJson', () {
+  group('CandidateResponseMapper.fromJson', () {
     test('parses ranking payload', () {
-      final result = CandidateResult.fromJson({
+      final result = CandidateResponseMapper.fromJson({
         'cv_id': '1',
         'file_name': 'john.txt',
         'status': 'ranked',
@@ -59,6 +59,32 @@ void main() {
       expect(result.bucket, 'strong_match');
       expect(result.skillGaps, ['Kubernetes']);
       expect(result.rank, 1);
+    });
+  });
+
+  group('JobPageResponseMapper.fromJson', () {
+    test('parses envelope with meta', () {
+      final page = JobPageResponseMapper.fromJson({
+        'jobs': [
+          {'job_id': 'abc', 'title': 'Backend Engineer', 'status': 'open'},
+        ],
+        'meta': {'page': 2, 'has_more': true},
+      }, fallbackPage: 1, fallbackLimit: 20);
+      expect(page.jobs, hasLength(1));
+      expect(page.page, 2);
+      expect(page.hasMore, isTrue);
+    });
+  });
+
+  group('RankResponseMapper.fromJson', () {
+    test('defaults source to rules', () {
+      final rank = RankResponseMapper.fromJson({
+        'results': [
+          {'file_name': 'john.txt', 'status': 'ranked'},
+        ],
+      });
+      expect(rank.source, 'rules');
+      expect(rank.results, hasLength(1));
     });
   });
 }

@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models.dart';
+import '../di.dart';
+import '../domain/models.dart';
+import '../domain/usecases/create_job.dart';
 import '../providers.dart';
 
 /// UI-busy state for the job form screen.
@@ -31,12 +33,12 @@ class JobFormController extends Notifier<JobFormState> {
       loadingMessage: 'Creating job…',
     );
     try {
-      final job = await ref.read(apiClientProvider).createJob(
-            title: title,
-            description: description,
-            jdFile: jdFile,
-            jdFileName: jdFileName,
-          );
+      final job = await getIt<CreateJob>()(
+        title: title,
+        description: description,
+        jdFile: jdFile,
+        jdFileName: jdFileName,
+      );
       ref.invalidate(jobsProvider);
       ref.read(navigatorProvider).pop();
       return job;

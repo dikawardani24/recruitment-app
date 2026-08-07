@@ -1,7 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
-import '../models.dart';
+import '../domain/models.dart';
 
 const _bucketOrder = [
   'strong_match',

@@ -3,7 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_list_controller.dart';
-import '../models.dart';
+import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/shimmer.dart';

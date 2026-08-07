@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:ai_ats/di.dart';
 import 'package:ai_ats/main.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/router.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
 
 void main() {
+  setupDependencies();
+
   Widget buildApp() {
     final router = AppRouter.create();
     return ProviderScope(

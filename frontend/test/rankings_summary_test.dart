@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_ats/models.dart';
+import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/widgets/rankings_summary.dart';
 
 void main() {

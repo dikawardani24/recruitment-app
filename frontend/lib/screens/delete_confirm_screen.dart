@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models.dart';
+import '../domain/models.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/gradient_header.dart';
 import 'job_list_screen.dart' show formatCreatedAt;

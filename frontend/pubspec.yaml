@@ -19,11 +19,15 @@ dependencies:
   flutter_hooks: ^0.21.3+1
   go_router: ^17.4.0
   fl_chart: ^1.2.0
+  get_it: ^9.2.1
+  injectable: ^3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  injectable_generator: ^3.0.2
+  build_runner: ^2.15.1
 
 flutter:
   uses-material-design: true

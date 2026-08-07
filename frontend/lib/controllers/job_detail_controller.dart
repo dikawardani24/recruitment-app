@@ -2,6 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../di.dart';
+import '../domain/usecases/delete_candidate.dart';
+import '../domain/usecases/delete_job.dart';
+import '../domain/usecases/rank_cv.dart';
+import '../domain/usecases/rank_job.dart';
+import '../domain/usecases/upload_cvs.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 
@@ -34,8 +40,7 @@ class JobDetailController extends Notifier<JobDetailState> {
   Future<int> uploadCvs(String jobId, List<File> files) async {
     _start('Uploading ${files.length} CV(s)…');
     try {
-      final uploaded =
-          await ref.read(apiClientProvider).uploadCvs(jobId, files);
+      final uploaded = await getIt<UploadCvs>()(jobId, files);
       await refreshCvs(jobId);
       return uploaded.length;
     } finally {
@@ -46,7 +51,7 @@ class JobDetailController extends Notifier<JobDetailState> {
   Future<void> rank(String jobId) async {
     _start('Ranking candidates…');
     try {
-      final response = await ref.read(apiClientProvider).rankJob(jobId);
+      final response = await getIt<RankJob>()(jobId);
       await refreshCvs(jobId);
       final title = ref.read(jobProvider(jobId)).value?.title ?? 'Job';
       ref.read(navigatorProvider).goToRankings(
@@ -64,7 +69,7 @@ class JobDetailController extends Notifier<JobDetailState> {
   /// Ranks a single CV and refreshes the CV list and rankings. The sheet that
   /// triggers this closes itself on success.
   Future<void> rankCv(String jobId, String cvId) async {
-    await ref.read(apiClientProvider).rankCv(jobId, cvId);
+    await getIt<RankCv>()(jobId, cvId);
     ref.invalidate(cvsProvider(jobId));
     ref.invalidate(rankingsProvider(jobId));
     await ref.read(cvsProvider(jobId).future);
@@ -72,7 +77,7 @@ class JobDetailController extends Notifier<JobDetailState> {
 
   /// Deletes a single candidate and refreshes the CV list and rankings.
   Future<void> deleteCv(String jobId, String cvId) async {
-    await ref.read(apiClientProvider).deleteCandidate(jobId, cvId);
+    await getIt<DeleteCandidate>()(jobId, cvId);
     ref.invalidate(cvsProvider(jobId));
     ref.invalidate(rankingsProvider(jobId));
     await ref.read(cvsProvider(jobId).future);
@@ -83,7 +88,7 @@ class JobDetailController extends Notifier<JobDetailState> {
   Future<void> deleteJob(String jobId) async {
     _start('Deleting job…');
     try {
-      await ref.read(apiClientProvider).deleteJob(jobId);
+      await getIt<DeleteJob>()(jobId);
       await ref.read(jobsProvider.notifier).refresh();
     } finally {
       _stop();

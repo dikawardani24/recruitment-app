@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models.dart';
+import '../di.dart';
+import '../domain/models.dart';
+import '../domain/usecases/delete_job.dart';
 import '../providers.dart';
 
 /// Owns the job list actions. The list has no busy/loading UI state, so this
@@ -26,7 +28,7 @@ class JobListController {
 
   /// Deletes the job server-side, then reloads the list from page 1.
   Future<void> deleteJob(String jobId) async {
-    await _ref.read(apiClientProvider).deleteJob(jobId);
+    await getIt<DeleteJob>()(jobId);
     await refresh();
   }
 }

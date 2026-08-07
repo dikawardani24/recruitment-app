@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_ats/controllers/job_detail_controller.dart';
-import 'package:ai_ats/models.dart';
+import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_detail_screen.dart';

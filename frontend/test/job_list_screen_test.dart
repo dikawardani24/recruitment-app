@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_ats/controllers/job_list_controller.dart';
-import 'package:ai_ats/models.dart';
+import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
 import 'package:ai_ats/widgets/shimmer.dart';

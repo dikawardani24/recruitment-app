@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../models.dart';
+import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
