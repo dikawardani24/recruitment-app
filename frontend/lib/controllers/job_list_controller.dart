@@ -9,9 +9,12 @@ class JobListController {
 
   final Ref _ref;
 
-  Future<void> refresh() async {
-    _ref.invalidate(jobsProvider);
-    await _ref.read(jobsProvider.future);
+  Future<void> refresh() {
+    return _ref.read(jobsProvider.notifier).refresh();
+  }
+
+  Future<void> loadMore() {
+    return _ref.read(jobsProvider.notifier).loadMore();
   }
 }
 

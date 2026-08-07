@@ -149,3 +149,64 @@ def test_list_jobs_includes_cv_count(client, cv_builder):
 def test_unknown_job_404(client):
     assert client.get("/api/jobs/00000000-0000-0000-0000-000000000000").status_code == 404
     assert client.post("/api/jobs/00000000-0000-0000-0000-000000000000/rank").status_code == 404
+
+
+def _create_jobs(client, count: int) -> list[str]:
+    ids = []
+    for i in range(count):
+        resp = client.post(
+            "/api/jobs",
+            data={"title": f"Job {i}", "description": BACKEND_JD},
+        )
+        ids.append(resp.json()["job"]["job_id"])
+    return ids
+
+
+def test_list_jobs_default_page_and_meta(client):
+    _create_jobs(client, 3)
+
+    resp = client.get("/api/jobs")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["jobs"]) == 3
+    assert body["count"] == 3
+    assert body["meta"] == {"page": 1, "limit": 20, "has_more": False}
+
+
+def test_list_jobs_paginates_and_reports_has_more(client):
+    _create_jobs(client, 5)
+
+    first = client.get("/api/jobs", params={"page": 1, "limit": 2})
+    assert first.status_code == 200
+    assert len(first.json()["jobs"]) == 2
+    assert first.json()["meta"] == {"page": 1, "limit": 2, "has_more": True}
+
+    last = client.get("/api/jobs", params={"page": 3, "limit": 2})
+    assert last.status_code == 200
+    assert len(last.json()["jobs"]) == 1
+    assert last.json()["meta"] == {"page": 3, "limit": 2, "has_more": False}
+
+
+def test_list_jobs_page_beyond_end_returns_empty(client):
+    _create_jobs(client, 2)
+
+    resp = client.get("/api/jobs", params={"page": 5, "limit": 2})
+    assert resp.status_code == 200
+    assert resp.json()["jobs"] == []
+    assert resp.json()["meta"] == {"page": 5, "limit": 2, "has_more": False}
+
+
+def test_list_jobs_orders_newest_first_across_pages(client):
+    ids = _create_jobs(client, 3)
+
+    page = client.get("/api/jobs", params={"limit": 2}).json()["jobs"]
+    assert [j["job_id"] for j in page] == [ids[2], ids[1]]
+
+    next_page = client.get("/api/jobs", params={"page": 2, "limit": 2}).json()["jobs"]
+    assert [j["job_id"] for j in next_page] == [ids[0]]
+
+
+def test_list_jobs_invalid_pagination_params(client):
+    assert client.get("/api/jobs", params={"page": 0}).status_code == 422
+    assert client.get("/api/jobs", params={"limit": 0}).status_code == 422
+    assert client.get("/api/jobs", params={"limit": 101}).status_code == 422

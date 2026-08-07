@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_list_controller.dart';
@@ -27,10 +28,27 @@ String formatCreatedAt(String? iso) {
 class JobListScreen extends HookConsumerWidget {
   const JobListScreen({super.key});
 
+  static const _loadMoreThreshold = 300.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final jobsAsync = ref.watch(jobsProvider);
     final jobListController = ref.read(jobListControllerProvider);
+    final scrollController = useScrollController();
+
+    useEffect(() {
+      void onScroll() {
+        if (!scrollController.hasClients) return;
+        final position = scrollController.position;
+        if (position.maxScrollExtent > 0 &&
+            position.pixels >= position.maxScrollExtent - _loadMoreThreshold) {
+          jobListController.loadMore();
+        }
+      }
+
+      scrollController.addListener(onScroll);
+      return () => scrollController.removeListener(onScroll);
+    }, [scrollController]);
 
     return Scaffold(
       appBar: AppBar(
@@ -62,7 +80,8 @@ class JobListScreen extends HookConsumerWidget {
           message: '$e',
           onRetry: jobListController.refresh,
         ),
-        data: (jobs) {
+        data: (state) {
+          final jobs = state.jobs;
           if (jobs.isEmpty) return const _EmptyView();
           final totalCandidates = jobs.fold<int>(
             0,
@@ -71,6 +90,7 @@ class JobListScreen extends HookConsumerWidget {
           return RefreshIndicator(
             onRefresh: jobListController.refresh,
             child: ListView(
+              controller: scrollController,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               children: [
                 GradientHeader(
@@ -90,12 +110,52 @@ class JobListScreen extends HookConsumerWidget {
                           .goToJobDetail(entry.value.id),
                     ),
                   ),
+                _ListFooter(state: state),
               ],
             ),
           );
         },
       ),
     );
+  }
+}
+
+/// Bottom-of-list indicator: a spinner while the next page is being fetched,
+/// and a "no more data" message once the backend has nothing left to return.
+class _ListFooter extends StatelessWidget {
+  final JobListState state;
+
+  const _ListFooter({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      );
+    }
+    if (!state.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            'No more jobs',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

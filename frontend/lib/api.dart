@@ -19,13 +19,22 @@ class ApiClient {
     ),
   );
 
-  Future<List<Job>> listJobs() async {
-    final resp = await _dio.get('/jobs');
+  Future<JobPage> listJobs({int page = 1, int limit = 20}) async {
+    final resp = await _dio.get(
+      '/jobs',
+      queryParameters: {'page': page, 'limit': limit},
+    );
     final data = resp.data as Map<String, dynamic>;
-    final jobs = (data['jobs'] as List?) ?? [];
-    return jobs
+    final jobs = ((data['jobs'] as List?) ?? [])
         .map((e) => Job.fromJson(e as Map<String, dynamic>))
         .toList();
+    final meta = data['meta'] as Map<String, dynamic>? ?? const {};
+    final hasMore = (meta['has_more'] as bool?) ?? jobs.length >= limit;
+    return JobPage(
+      jobs: jobs,
+      page: (meta['page'] as num?)?.toInt() ?? page,
+      hasMore: hasMore && jobs.isNotEmpty,
+    );
   }
 
   Future<Job> createJob({
@@ -116,4 +125,17 @@ class RankResponse {
   final List<CandidateResult> results;
 
   const RankResponse({required this.source, required this.results});
+}
+
+/// One page of jobs returned by [ApiClient.listJobs].
+class JobPage {
+  final List<Job> jobs;
+  final int page;
+  final bool hasMore;
+
+  const JobPage({
+    required this.jobs,
+    required this.page,
+    required this.hasMore,
+  });
 }

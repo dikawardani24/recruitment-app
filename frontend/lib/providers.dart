@@ -8,9 +8,82 @@ import 'navigation/go_router_navigator.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient.instance);
 
-final jobsProvider = FutureProvider<List<Job>>((ref) {
-  return ref.read(apiClientProvider).listJobs();
-});
+/// Paginated job list state. [jobs] accumulates across pages as the user
+/// scrolls; [hasMore] indicates whether another page is available.
+class JobListState {
+  final List<Job> jobs;
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
+
+  const JobListState({
+    this.jobs = const [],
+    this.page = 1,
+    this.hasMore = true,
+    this.isLoadingMore = false,
+  });
+
+  JobListState copyWith({
+    List<Job>? jobs,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
+  }) {
+    return JobListState(
+      jobs: jobs ?? this.jobs,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+}
+
+class JobListNotifier extends AsyncNotifier<JobListState> {
+  static const int pageSize = 20;
+
+  @override
+  Future<JobListState> build() async {
+    final page = await ref.read(apiClientProvider).listJobs(page: 1);
+    return JobListState(
+      jobs: page.jobs,
+      page: 1,
+      hasMore: page.hasMore,
+    );
+  }
+
+  /// Fetches the next page and appends it to [JobListState.jobs]. No-op while
+  /// a page is already loading or when there is nothing left to load.
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
+    try {
+      final next = await ref
+          .read(apiClientProvider)
+          .listJobs(page: current.page + 1);
+      state = AsyncValue.data(
+        current.copyWith(
+          jobs: [...current.jobs, ...next.jobs],
+          page: next.page,
+          hasMore: next.hasMore,
+          isLoadingMore: false,
+        ),
+      );
+    } catch (_) {
+      state = AsyncValue.data(current.copyWith(isLoadingMore: false));
+    }
+  }
+
+  /// Reloads from page 1, dropping any previously loaded pages.
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+final jobsProvider =
+    AsyncNotifierProvider<JobListNotifier, JobListState>(JobListNotifier.new);
 
 final jobProvider = FutureProvider.family<Job, String>((ref, jobId) {
   return ref.read(apiClientProvider).getJob(jobId);

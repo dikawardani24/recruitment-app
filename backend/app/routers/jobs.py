@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app import db
 from app.config import Settings
@@ -100,19 +100,41 @@ async def create_job(
 
 
 @router.get("/jobs")
-async def list_jobs() -> dict:
+async def list_jobs(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+) -> dict:
+    offset = (page - 1) * limit
     async with db.connect() as conn:
-        rows = await (await conn.execute("SELECT * FROM jobs ORDER BY created_at DESC")).fetchall()
-        count_rows = await (
-            await conn.execute("SELECT job_id, COUNT(*) AS c FROM cvs GROUP BY job_id")
+        rows = await (
+            await conn.execute(
+                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit + 1, offset),
+            )
         ).fetchall()
+        page_rows = rows[:limit]
+        has_more = len(rows) > limit
+        if page_rows:
+            placeholders = ",".join("?" for _ in page_rows)
+            count_rows = await (
+                await conn.execute(
+                    f"SELECT job_id, COUNT(*) AS c FROM cvs WHERE job_id IN ({placeholders}) GROUP BY job_id",
+                    tuple(j["id"] for j in page_rows),
+                )
+            ).fetchall()
+        else:
+            count_rows = []
     counts = {r["job_id"]: r["c"] for r in count_rows}
     jobs = []
-    for j in (db.row_to_job(r) for r in rows):
+    for j in (db.row_to_job(r) for r in page_rows):
         payload = _job_payload(j)
         payload["cv_count"] = counts.get(j["id"], 0)
         jobs.append(payload)
-    return {"count": len(jobs), "jobs": jobs}
+    return {
+        "count": len(jobs),
+        "jobs": jobs,
+        "meta": {"page": page, "limit": limit, "has_more": has_more},
+    }
 
 
 @router.get("/jobs/{job_id}")
