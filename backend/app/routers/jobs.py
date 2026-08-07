@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,9 +8,9 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from app import db
 from app.config import Settings
 from app.extraction import Profile, extract_profile_text
-from app.jd import RequirementParser
 from app.parsers import extract_text
 from app.ranking import RankingService
+from app.di.injection import saveJobUseCase
 
 router = APIRouter(tags=["jobs"])
 
@@ -20,10 +19,6 @@ def _settings() -> Settings:
     from app.config import settings
 
     return settings
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 async def _require_job(job_id: str) -> dict:
@@ -58,55 +53,14 @@ async def create_job(
     jd_file: UploadFile | None = File(None),
 ) -> dict:
     """Create a vacancy from pasted text and/or an uploaded JD file (PDF/DOCX/TXT)."""
-    title = title.strip()
-    if not title:
-        raise HTTPException(status_code=422, detail="job_title_required")
-
-    settings = _settings()
-    jd_bytes = await jd_file.read() if jd_file else None
-    jd_key = None
-    if jd_bytes:
-        try:
-            jd_text = await extract_text(jd_file.filename or "job.txt", jd_bytes)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        if not description.strip():
-            description = jd_text
-        suffix = Path(jd_file.filename or "job.txt").suffix.lower()
-        jd_key = _save_file(settings.upload_dir / "jd", suffix, jd_bytes)
-
-    # If description is valid JSON, normalize it into requirements.
-    # Otherwise, parse it as plain text with structure_jd().
-    # Always keep the original description text for display.
-    parser = RequirementParser()
-    requirements = parser.parse(description) if description.strip() else None
-
-    job = {
-        "id": str(uuid4()),
-        "title": title,
-        "description": description.strip(),
-        "requirements": requirements,
-        "status": "open",
-        "created_at": _now(),
-        "updated_at": _now(),
-    }
-    async with db.connect() as conn:
-        await conn.execute(
-            "INSERT INTO jobs (id, title, description, requirements, status, created_at, updated_at, jd_file)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                job["id"],
-                job["title"],
-                job["description"],
-                _json_dumps(job["requirements"]),
-                job["status"],
-                job["created_at"],
-                job["updated_at"],
-                jd_key,
-            ),
+    try:
+        return await saveJobUseCase().execute(
+            title=title,
+            description=description,
+            jd_file=jd_file,
         )
-        await conn.commit()
-    return {"job": _job_payload(job, jd_key=jd_key)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/jobs")
