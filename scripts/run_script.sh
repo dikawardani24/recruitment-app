@@ -5,10 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # ── load env ────────────────────────────────────────────────────────────────
-if [[ -f "$ROOT_DIR/.env" ]]; then
+if [[ -f "$ROOT_DIR/backend/.env" ]]; then
     set -a
     # shellcheck disable=SC1091
-    source "$ROOT_DIR/.env"
+    source "$ROOT_DIR/backend/.env"
     set +a
 fi
 
@@ -23,7 +23,7 @@ print_menu() {
     echo "=== $label — AVAILABLE COMMANDS ==="
     echo ""
     local idx=1
-    local dir="$SCRIPT_DIR/$project"
+    local dir="$ROOT_DIR/$project/scripts"
     for file in "$dir"/*.sh; do
         [[ -f "$file" ]] || continue
         local name desc
@@ -37,7 +37,7 @@ print_menu() {
 
 get_script_by_index() {
     local project="$1" idx="$2"
-    local dir="$SCRIPT_DIR/$project"
+    local dir="$ROOT_DIR/$project/scripts"
     local count=0
     for file in "$dir"/*.sh; do
         [[ -f "$file" ]] || continue
@@ -51,7 +51,7 @@ get_script_by_index() {
 }
 
 script_count() {
-    local dir="$SCRIPT_DIR/$1"
+    local dir="$ROOT_DIR/$1/scripts"
     ls "$dir"/*.sh 2>/dev/null | wc -l | tr -d ' '
 }
 
@@ -59,7 +59,7 @@ run_script() {
     local project="$1" script="$2"
     shift 2
     cd "$ROOT_DIR/$project"
-    bash "$SCRIPT_DIR/$project/$script.sh" "$@"
+    bash "$ROOT_DIR/$project/scripts/$script.sh" "$@"
 }
 
 # ── interactive menu ────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ if [[ $# -gt 0 ]]; then
     else
         RESOLVED=""
         for project in backend frontend; do
-            if [[ -f "$SCRIPT_DIR/$project/$SCRIPT_NAME.sh" ]]; then
+            if [[ -f "$ROOT_DIR/$project/scripts/$SCRIPT_NAME.sh" ]]; then
                 RESOLVED="$project"
                 break
             fi
@@ -138,13 +138,13 @@ if [[ $# -gt 0 ]]; then
         PROJECT="$RESOLVED"
     fi
 
-    if [[ ! -f "$SCRIPT_DIR/$PROJECT/$SCRIPT_NAME.sh" ]]; then
+    if [[ ! -f "$ROOT_DIR/$PROJECT/scripts/$SCRIPT_NAME.sh" ]]; then
         echo "Unknown script '$PROJECT/$SCRIPT_NAME'." >&2
         exit 1
     fi
 
     cd "$ROOT_DIR/$PROJECT"
-    bash "$SCRIPT_DIR/$PROJECT/$SCRIPT_NAME.sh" "$@"
+    bash "$ROOT_DIR/$PROJECT/scripts/$SCRIPT_NAME.sh" "$@"
     exit 0
 fi
 

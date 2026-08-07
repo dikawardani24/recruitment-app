@@ -33,7 +33,7 @@ python3 -m venv .venv
 ### Configure environment (optional)
 
 ```bash
-cp ../.env.example .env
+cp .env.example .env
 ```
 
 Nothing needs to be set to run. To enable **AI reasoning** during ranking, set an

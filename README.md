@@ -81,8 +81,8 @@ make lint           # compileall + flutter analyze
 
 ## Scripts
 
-One-off bash scripts live in `scripts/<project>/*.sh`. They run with their
-project directory as the working directory and load the repo-root `.env` file.
+One-off bash scripts live in `<project>/scripts/*.sh`. They run with their
+project directory as the working directory and load the backend `.env` file.
 
 ```bash
 ./scripts/run_script.sh                          # list all scripts
@@ -92,7 +92,7 @@ project directory as the working directory and load the repo-root `.env` file.
 ```
 
 Or via Make: `make backend-script SCRIPT=seed`.
-New scripts are discovered automatically by filename in `scripts/<project>/`.
+New scripts are discovered automatically by filename in `<project>/scripts/`.
 
 ## API
 
