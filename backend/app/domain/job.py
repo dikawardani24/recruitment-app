@@ -46,6 +46,9 @@ class Job:
             or is_empty_string(self.status)
         )
 
+    def requirements(self) -> dict | None:
+        return _loads(self.req)
+
     @classmethod
     def from_entity(cls, entity: JobEntity) -> Job:
         return cls(

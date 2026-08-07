@@ -13,3 +13,9 @@ class JobRepository(Protocol):
 
     async def get_job(self, page: int, page_size: int)-> Page[Job]:
         ...
+
+    async def get_by_id(self, job_id: str) -> Job | None:
+        ...
+
+    async def delete(self, job_id: str):
+        ...

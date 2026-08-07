@@ -19,11 +19,21 @@ class JobRepositoryImpl:
             offset= offset
         )
 
-        domains = [Job.from_entity(row) for row in entities]
+        has_more = len(entities) > page_size
+        domains = [Job.from_entity(row) for row in entities[:page_size]]
         return Page(
             page=page,
             page_size=page_size,
             data=domains,
-            last_page=len(domains) <= page_size
+            last_page=not has_more
         )
+
+    async def get_by_id(self, job_id: str) -> Job | None:
+        entity = await self.datasource.find_by_id(job_id)
+        if entity:
+            return Job.from_entity(entity)
+        return None
+
+    async def delete(self, job_id: str):
+        await self.datasource.delete(job_id)
         
