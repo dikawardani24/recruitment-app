@@ -2,9 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_ats/controllers/job_detail_controller.dart';
 import 'package:ai_ats/models.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_detail_screen.dart';
+
+/// Controller that records deletes and mirrors the real [JobDetailController]
+/// behaviour of refreshing the CV list after a candidate is removed.
+class _FakeDetailController extends JobDetailController {
+  final List<CandidateResult> cvs;
+  final deletedCvs = <String>[];
+  final deletedJobs = <String>[];
+
+  _FakeDetailController(this.cvs);
+
+  @override
+  JobDetailState build() => const JobDetailState();
+
+  @override
+  Future<void> deleteCv(String jobId, String cvId) async {
+    deletedCvs.add(cvId);
+    cvs.removeWhere((c) => c.cvId == cvId);
+    ref.invalidate(cvsProvider(jobId));
+    await ref.read(cvsProvider(jobId).future);
+  }
+
+  @override
+  Future<void> deleteJob(String jobId) async {
+    deletedJobs.add(jobId);
+  }
+}
 
 void main() {
   Job buildJob({required String description}) {
@@ -24,12 +51,15 @@ void main() {
     Job job, {
     List<CandidateResult> cvs = const [],
     List<CandidateResult> rankings = const [],
+    _FakeDetailController? detailController,
   }) {
     return ProviderScope(
       overrides: [
         jobProvider('job-1').overrideWith((ref) async => job),
         cvsProvider('job-1').overrideWith((ref) async => cvs),
         rankingsProvider('job-1').overrideWith((ref) async => rankings),
+        if (detailController != null)
+          jobDetailControllerProvider.overrideWith(() => detailController),
       ],
       child: const MaterialApp(home: JobDetailScreen(jobId: 'job-1')),
     );
@@ -48,6 +78,18 @@ void main() {
       overallScore: score,
       bucket: bucket,
       source: 'rules',
+    );
+  }
+
+  CandidateResult ranked(String id, String name) {
+    return CandidateResult(
+      cvId: id,
+      fileName: '$name.pdf',
+      candidateName: name,
+      status: 'ranked',
+      overallScore: 0.9,
+      bucket: 'strong_match',
+      skills: const ['Dart', 'Flutter'],
     );
   }
 
@@ -140,5 +182,150 @@ void main() {
     expect(find.text('View full ranking'), findsOneWidget);
     expect(find.text('Strong Match'), findsWidgets);
     expect(find.text('Possible Match'), findsWidgets);
+  });
+
+  group('candidate deletion', () {
+    testWidgets('swipe reveals confirmation with candidate details', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        ranked('cv-1', 'Alice'),
+        CandidateResult(cvId: 'cv-2', fileName: 'bob.pdf', status: 'uploaded'),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.fling(find.text('Alice'), const Offset(-500, 0), 1000);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete this candidate?'), findsOneWidget);
+      expect(find.text('Delete candidate'), findsOneWidget);
+      expect(find.text('Alice'), findsWidgets);
+      expect(find.text('Alice.pdf'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+    });
+
+    testWidgets('confirming removes the candidate from the list', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        ranked('cv-1', 'Alice'),
+        CandidateResult(
+          cvId: 'cv-2',
+          fileName: 'bob.pdf',
+          candidateName: 'Bob',
+          status: 'uploaded',
+        ),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.fling(find.text('Alice'), const Offset(-500, 0), 1000);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Delete candidate'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(controller.deletedCvs, ['cv-1']);
+      expect(find.text('Alice'), findsNothing);
+      expect(find.text('Bob'), findsOneWidget);
+      expect(find.text('Candidate deleted'), findsOneWidget);
+    });
+  });
+
+  group('job deletion from AppBar', () {
+    testWidgets('delete action shows confirmation and deletes the job', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [ranked('cv-1', 'Alice')];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete this job?'), findsOneWidget);
+      expect(find.text('Alice'), findsWidgets);
+      expect(
+        find.text('This job and its 1 candidate will be permanently removed.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Delete job'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(controller.deletedJobs, ['job-1']);
+      expect(find.text('Job deleted'), findsOneWidget);
+    });
+
+    testWidgets('cancelling from the confirm screen deletes nothing', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [ranked('cv-1', 'Alice')];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(controller.deletedJobs, isEmpty);
+      expect(find.text('Delete this job?'), findsNothing);
+      expect(find.text('Backend Engineer'), findsNWidgets(2));
+    });
   });
 }

@@ -68,6 +68,14 @@ class ApiClient {
     return Job.fromJson(job as Map<String, dynamic>);
   }
 
+  Future<void> deleteJob(String jobId) async {
+    await _dio.delete('/jobs/$jobId');
+  }
+
+  Future<void> deleteCandidate(String jobId, String cvId) async {
+    await _dio.delete('/jobs/$jobId/cvs/$cvId');
+  }
+
   Future<List<CandidateResult>> uploadCvs(
     String jobId,
     List<File> files,

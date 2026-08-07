@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models.dart';
 import '../providers.dart';
 
 /// Owns the job list actions. The list has no busy/loading UI state, so this
@@ -15,6 +16,18 @@ class JobListController {
 
   Future<void> loadMore() {
     return _ref.read(jobsProvider.notifier).loadMore();
+  }
+
+  /// Candidates of [jobId], fetched on demand so a delete confirmation can
+  /// preview exactly what will be removed.
+  Future<List<CandidateResult>> candidatesFor(String jobId) {
+    return _ref.read(cvsProvider(jobId).future);
+  }
+
+  /// Deletes the job server-side, then reloads the list from page 1.
+  Future<void> deleteJob(String jobId) async {
+    await _ref.read(apiClientProvider).deleteJob(jobId);
+    await refresh();
   }
 }
 

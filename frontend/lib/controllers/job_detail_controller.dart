@@ -60,6 +60,26 @@ class JobDetailController extends Notifier<JobDetailState> {
       _stop();
     }
   }
+
+  /// Deletes a single candidate and refreshes the CV list and rankings.
+  Future<void> deleteCv(String jobId, String cvId) async {
+    await ref.read(apiClientProvider).deleteCandidate(jobId, cvId);
+    ref.invalidate(cvsProvider(jobId));
+    ref.invalidate(rankingsProvider(jobId));
+    await ref.read(cvsProvider(jobId).future);
+  }
+
+  /// Deletes the whole job, reloads the job list, and returns to it.
+  Future<void> deleteJob(String jobId) async {
+    _start('Deleting job…');
+    try {
+      await ref.read(apiClientProvider).deleteJob(jobId);
+      await ref.read(jobsProvider.notifier).refresh();
+      ref.read(navigatorProvider).goToJobs();
+    } finally {
+      _stop();
+    }
+  }
 }
 
 final jobDetailControllerProvider =

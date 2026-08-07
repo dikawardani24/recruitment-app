@@ -7,6 +7,7 @@ import '../models.dart';
 import '../providers.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/shimmer.dart';
+import 'delete_confirm_screen.dart';
 
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -75,6 +76,7 @@ class JobListScreen extends HookConsumerWidget {
         data: (state) {
           final jobs = state.jobs;
           if (jobs.isEmpty) return const _EmptyView();
+          final theme = Theme.of(context);
           final totalCandidates = jobs.fold<int>(
             0,
             (sum, j) => sum + j.candidateCount,
@@ -95,12 +97,21 @@ class JobListScreen extends HookConsumerWidget {
                 for (final entry in jobs.asMap().entries)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _JobCard(
-                      job: entry.value,
-                      index: entry.key,
-                      onTap: () => ref
-                          .read(navigatorProvider)
-                          .goToJobDetail(entry.value.id),
+                    child: Dismissible(
+                      key: ValueKey('job-${entry.value.id}'),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) =>
+                          _confirmDeleteJob(context, ref, entry.value),
+                      background: _DeleteBackground(
+                        color: theme.colorScheme.error,
+                      ),
+                      child: _JobCard(
+                        job: entry.value,
+                        index: entry.key,
+                        onTap: () => ref
+                            .read(navigatorProvider)
+                            .goToJobDetail(entry.value.id),
+                      ),
                     ),
                   ),
                 _ListFooter(state: state),
@@ -109,6 +120,64 @@ class JobListScreen extends HookConsumerWidget {
           );
         },
       ),
+    );
+  }
+
+  Future<bool> _confirmDeleteJob(
+    BuildContext context,
+    WidgetRef ref,
+    Job job,
+  ) async {
+    final controller = ref.read(jobListControllerProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    List<CandidateResult> candidates;
+    try {
+      candidates = await controller.candidatesFor(job.id);
+    } catch (_) {
+      candidates = const [];
+    }
+    if (!context.mounted) return false;
+
+    final confirmed = await showDeleteConfirm(
+      context,
+      title: 'Delete this job?',
+      message: candidates.isEmpty
+          ? 'This job has no candidates. It will be permanently removed.'
+          : 'This job and its ${candidates.length} '
+              '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+              'will be permanently removed.',
+      details: [jobDeleteDetails(job, candidates)],
+      confirmLabel: 'Delete job',
+    );
+    if (!confirmed) return false;
+
+    try {
+      await controller.deleteJob(job.id);
+      messenger.showSnackBar(const SnackBar(content: Text('Job deleted')));
+      return true;
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      return false;
+    }
+  }
+}
+
+/// Red swipe-reveal background shown behind a job card during a swipe.
+class _DeleteBackground extends StatelessWidget {
+  final Color color;
+
+  const _DeleteBackground({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_ats/controllers/job_list_controller.dart';
 import 'package:ai_ats/models.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
@@ -94,6 +95,50 @@ Job _job(String id, String title, {int candidates = 0}) {
     createdAt: '2026-08-06T14:05:00',
     candidateCount: candidates,
   );
+}
+
+/// Notifier whose job list can have jobs removed so a delete can be reflected
+/// after the list is reloaded.
+class _DeletableJobListNotifier extends JobListNotifier {
+  _DeletableJobListNotifier(this._jobs);
+
+  final List<Job> _jobs;
+
+  @override
+  Future<JobListState> build() async {
+    return JobListState(jobs: List.of(_jobs), page: 1, hasMore: false);
+  }
+
+  @override
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = AsyncValue.data(await build());
+  }
+
+  void removeById(String jobId) {
+    _jobs.removeWhere((j) => j.id == jobId);
+  }
+}
+
+/// Controller that records deletes and removes the job from the notifier,
+/// mimicking a successful server-side delete followed by a refresh.
+class _FakeJobListController extends JobListController {
+  _FakeJobListController(super.ref, this._notifier, this.candidates);
+
+  final _DeletableJobListNotifier _notifier;
+  final List<CandidateResult> candidates;
+  final deletedJobs = <String>[];
+
+  @override
+  Future<List<CandidateResult>> candidatesFor(String jobId) async =>
+      candidates;
+
+  @override
+  Future<void> deleteJob(String jobId) async {
+    deletedJobs.add(jobId);
+    _notifier.removeById(jobId);
+    await refresh();
+  }
 }
 
 void main() {
@@ -310,5 +355,127 @@ void main() {
 
     expect(find.text('Job 39'), findsOneWidget);
     expect(find.text('No more jobs'), findsOneWidget);
+  });
+
+  group('job deletion', () {
+    CandidateResult candidate(String id, String name) {
+      return CandidateResult(
+        cvId: id,
+        fileName: '$id.pdf',
+        candidateName: name,
+        status: 'ranked',
+        overallScore: 0.9,
+        bucket: 'strong_match',
+      );
+    }
+
+    Future<_FakeJobListController> pumpList(
+      WidgetTester tester, {
+      required _DeletableJobListNotifier notifier,
+      required List<CandidateResult> candidates,
+    }) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      late final _FakeJobListController controller;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            jobsProvider.overrideWith(() => notifier),
+            jobListControllerProvider.overrideWith(
+              (ref) => controller =
+                  _FakeJobListController(ref, notifier, candidates),
+            ),
+          ],
+          child: const MaterialApp(home: JobListScreen()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      return controller;
+    }
+
+    testWidgets('swipe reveals confirmation with affected candidates', (
+      tester,
+    ) async {
+      final notifier = _DeletableJobListNotifier([
+        _job('j1', 'Backend Engineer', candidates: 1),
+        _job('j2', 'Mobile Dev', candidates: 0),
+      ]);
+      await pumpList(tester, notifier: notifier, candidates: [
+        candidate('c1', 'John Doe'),
+      ]);
+
+      await tester.fling(
+        find.text('Backend Engineer'),
+        const Offset(-500, 0),
+        1000,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete this job?'), findsOneWidget);
+      expect(
+        find.text('This job and its 1 candidate will be permanently removed.'),
+        findsOneWidget,
+      );
+      expect(find.text('John Doe'), findsOneWidget);
+      expect(find.text('Delete job'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+    });
+
+    testWidgets('cancelling restores the card and deletes nothing', (
+      tester,
+    ) async {
+      final notifier = _DeletableJobListNotifier([
+        _job('j1', 'Backend Engineer', candidates: 1),
+        _job('j2', 'Mobile Dev', candidates: 0),
+      ]);
+      final controller = await pumpList(tester, notifier: notifier, candidates: [
+        candidate('c1', 'John Doe'),
+      ]);
+
+      await tester.fling(
+        find.text('Backend Engineer'),
+        const Offset(-500, 0),
+        1000,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Backend Engineer'), findsOneWidget);
+      expect(controller.deletedJobs, isEmpty);
+    });
+
+    testWidgets('confirming deletes the job and refreshes the list', (
+      tester,
+    ) async {
+      final notifier = _DeletableJobListNotifier([
+        _job('j1', 'Backend Engineer', candidates: 1),
+        _job('j2', 'Mobile Dev', candidates: 0),
+      ]);
+      final controller = await pumpList(tester, notifier: notifier, candidates: [
+        candidate('c1', 'John Doe'),
+      ]);
+
+      await tester.fling(
+        find.text('Backend Engineer'),
+        const Offset(-500, 0),
+        1000,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Delete job'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(controller.deletedJobs, ['j1']);
+      expect(find.text('Backend Engineer'), findsNothing);
+      expect(find.text('Mobile Dev'), findsOneWidget);
+      expect(find.text('Job deleted'), findsOneWidget);
+    });
   });
 }

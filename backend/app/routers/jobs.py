@@ -42,6 +42,15 @@ def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:
     return str(path)
 
 
+def _delete_storage_file(path: str | None) -> None:
+    if not path:
+        return
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 @router.post("/jobs", status_code=201)
 async def create_job(
     title: str = Form(...),
@@ -83,8 +92,8 @@ async def create_job(
     }
     async with db.connect() as conn:
         await conn.execute(
-            "INSERT INTO jobs (id, title, description, requirements, status, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO jobs (id, title, description, requirements, status, created_at, updated_at, jd_file)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 job["id"],
                 job["title"],
@@ -93,6 +102,7 @@ async def create_job(
                 job["status"],
                 job["created_at"],
                 job["updated_at"],
+                jd_key,
             ),
         )
         await conn.commit()
@@ -141,6 +151,43 @@ async def list_jobs(
 async def get_job(job_id: str) -> dict:
     job = await _require_job(job_id)
     return {"job": _job_payload(job)}
+
+
+@router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str) -> dict:
+    """Delete a job and everything attached to it: CVs, uploaded files, and JD."""
+    job = await _require_job(job_id)
+    cvs = await _load_cvs(job_id)
+    for cv in cvs:
+        _delete_storage_file(cv.get("storage_path"))
+    if job.get("jd_file"):
+        _delete_storage_file(job["jd_file"])
+    async with db.connect() as conn:
+        await conn.execute("DELETE FROM cvs WHERE job_id = ?", (job["id"],))
+        await conn.execute("DELETE FROM jobs WHERE id = ?", (job["id"],))
+        await conn.commit()
+    return {"job_id": job["id"], "deleted": True}
+
+
+@router.delete("/jobs/{job_id}/cvs/{cv_id}")
+async def delete_cv(job_id: str, cv_id: str) -> dict:
+    """Delete a single candidate/CV from a job."""
+    job = await _require_job(job_id)
+    async with db.connect() as conn:
+        row = await conn.execute(
+            "SELECT * FROM cvs WHERE id = ? AND job_id = ?",
+            (str(cv_id), job["id"]),
+        )
+        cv = await row.fetchone()
+        if cv is None:
+            raise HTTPException(status_code=404, detail="cv_not_found")
+        _delete_storage_file(cv["storage_path"])
+        await conn.execute(
+            "DELETE FROM cvs WHERE id = ? AND job_id = ?",
+            (str(cv_id), job["id"]),
+        )
+        await conn.commit()
+    return {"job_id": job["id"], "cv_id": str(cv_id), "deleted": True}
 
 
 @router.post("/jobs/{job_id}/cvs", status_code=201)
@@ -289,8 +336,9 @@ def _job_payload(job: dict, *, jd_key: str | None = None) -> dict:
         "updated_at": job["updated_at"],
         "requirements": job["requirements"],
     }
-    if jd_key:
-        payload["jd_file"] = jd_key
+    jd = jd_key or job.get("jd_file")
+    if jd:
+        payload["jd_file"] = jd
     return payload
 
 

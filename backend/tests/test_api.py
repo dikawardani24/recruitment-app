@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
+from app.config import settings
 from tests.conftest import (
     BACKEND_JD,
     FRONTEND_ONLY,
@@ -210,3 +213,74 @@ def test_list_jobs_invalid_pagination_params(client):
     assert client.get("/api/jobs", params={"page": 0}).status_code == 422
     assert client.get("/api/jobs", params={"limit": 0}).status_code == 422
     assert client.get("/api/jobs", params={"limit": 101}).status_code == 422
+
+
+def _upload_cv(client, job_id, cv_builder, name, body):
+    file_name, content, mime = cv_builder(name, body)
+    up = client.post(
+        f"/api/jobs/{job_id}/cvs",
+        files=[("files", (file_name, content, mime))],
+    )
+    return up.json()["results"][0]["cv_id"]
+
+
+def test_delete_cv_removes_row_and_file(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
+
+    assert len(list(settings.upload_dir.glob("*"))) == 1
+
+    resp = client.delete(f"/api/jobs/{job_id}/cvs/{cv_id}")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] is True
+
+    assert list(settings.upload_dir.glob("*")) == []
+    assert client.get(f"/api/jobs/{job_id}/cvs").json()["results"] == []
+
+
+def test_delete_cv_unknown_404(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
+
+    assert client.delete(f"/api/jobs/{job_id}/cvs/{uuid4()}").status_code == 404
+    assert client.delete(f"/api/jobs/{job_id}/cvs/{cv_id}").status_code == 200
+    assert client.delete(f"/api/jobs/{job_id}/cvs/{cv_id}").status_code == 404
+    assert (
+        client.delete("/api/jobs/00000000-0000-0000-0000-000000000000/cvs/x").status_code
+        == 404
+    )
+
+
+def test_delete_job_cascades_cvs_and_files(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
+    _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+    assert len(list(settings.upload_dir.glob("*"))) == 2
+
+    resp = client.delete(f"/api/jobs/{job_id}")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] is True
+
+    assert list(settings.upload_dir.glob("*")) == []
+    assert client.get(f"/api/jobs/{job_id}").status_code == 404
+    jobs = client.get("/api/jobs").json()["jobs"]
+    assert all(j["job_id"] != job_id for j in jobs)
+
+
+def test_delete_job_unknown_404(client):
+    assert (
+        client.delete("/api/jobs/00000000-0000-0000-0000-000000000000").status_code
+        == 404
+    )

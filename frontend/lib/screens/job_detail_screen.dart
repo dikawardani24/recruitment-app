@@ -14,6 +14,7 @@ import '../widgets/bucket_donut.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/score_color.dart';
+import 'delete_confirm_screen.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
   final String jobId;
@@ -66,6 +67,57 @@ class JobDetailScreen extends HookConsumerWidget {
       }
     }
 
+    Future<void> deleteJob() async {
+      final messenger = ScaffoldMessenger.of(context);
+      final candidates = cvsAsync.value ?? [];
+      final confirmed = await showDeleteConfirm(
+        context,
+        title: 'Delete this job?',
+        message: candidates.isEmpty
+            ? 'This job has no candidates. It will be permanently removed.'
+            : 'This job and its ${candidates.length} '
+                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                'will be permanently removed.',
+        details: [jobDeleteDetails(jobAsync.value!, candidates)],
+        confirmLabel: 'Delete job',
+      );
+      if (!confirmed) return;
+      try {
+        await detailController.deleteJob(jobId);
+        messenger.showSnackBar(const SnackBar(content: Text('Job deleted')));
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+      }
+    }
+
+    Future<bool> confirmDeleteCv(CandidateResult cv) async {
+      final messenger = ScaffoldMessenger.of(context);
+      final cvId = cv.cvId;
+      if (cvId == null) return false;
+      final confirmed = await showDeleteConfirm(
+        context,
+        title: 'Delete this candidate?',
+        message: 'This candidate and their CV will be permanently removed.',
+        details: [candidateDeleteDetails(cv)],
+        confirmLabel: 'Delete candidate',
+      );
+      if (!confirmed) return false;
+      try {
+        await detailController.deleteCv(jobId, cvId);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Candidate deleted')),
+        );
+        return true;
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+        return false;
+      }
+    }
+
     final job = jobAsync.value;
     final cvs = cvsAsync.value ?? [];
 
@@ -93,7 +145,16 @@ class JobDetailScreen extends HookConsumerWidget {
     return Stack(
       children: [
         Scaffold(
-          appBar: AppBar(title: Text(job.title)),
+          appBar: AppBar(
+            title: Text(job.title),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete job',
+                onPressed: detailState.busy ? null : deleteJob,
+              ),
+            ],
+          ),
           body: RefreshIndicator(
             onRefresh: () => detailController.refreshCvs(jobId),
             child: ListView(
@@ -217,10 +278,18 @@ class JobDetailScreen extends HookConsumerWidget {
                     ),
                   )
                 else
-                  ...cvs.asMap().entries.map(
-                        (e) => Padding(
+                  ...cvs.map(
+                        (cv) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: _CandidateTile(cv: e.value),
+                          child: Dismissible(
+                            key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (_) => confirmDeleteCv(cv),
+                            background: _DeleteBackground(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            child: _CandidateTile(cv: cv),
+                          ),
                         ),
                       ),
               ],
@@ -547,6 +616,26 @@ class _NotRankedHint extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Red swipe-reveal background shown behind a candidate tile during a swipe.
+class _DeleteBackground extends StatelessWidget {
+  final Color color;
+
+  const _DeleteBackground({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 }

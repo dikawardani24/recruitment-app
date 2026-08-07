@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     requirements  TEXT,
     status        TEXT NOT NULL DEFAULT 'draft',
     created_at    TEXT NOT NULL,
-    updated_at    TEXT NOT NULL
+    updated_at    TEXT NOT NULL,
+    jd_file       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS cvs (
@@ -59,6 +60,10 @@ async def init_db() -> None:
         await db.executescript(SCHEMA)
         try:
             await db.execute("ALTER TABLE cvs ADD COLUMN source TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE jobs ADD COLUMN jd_file TEXT")
         except sqlite3.OperationalError:
             pass  # column already exists
         await db.commit()
