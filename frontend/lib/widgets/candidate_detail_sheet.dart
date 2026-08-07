@@ -324,7 +324,7 @@ void showCandidateDetailSheet(
 }
 
 String _rankedByLabel(String source) {
-  return source == 'llm' ? 'AI (LLM)' : 'rule-based engine';
+  return source == 'llm' ? 'AI' : 'In-App';
 }
 
 class _RankCvButton extends StatelessWidget {

@@ -255,7 +255,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('LLM'), findsOneWidget);
+      expect(find.text('AI'), findsOneWidget);
 
       await tester.tap(find.text('Alice'));
       await tester.pumpAndSettle();
@@ -264,7 +264,7 @@ void main() {
       expect(find.text('90%'), findsWidgets);
       expect(find.text('Strong Match'), findsWidgets);
       expect(find.text('Ranked by'), findsOneWidget);
-      expect(find.text('AI (LLM)'), findsOneWidget);
+      expect(find.text('AI'), findsWidgets);
       expect(find.text('STRENGTHS'), findsOneWidget);
       expect(find.text('Dart'), findsWidgets);
       expect(find.text('Explanation'), findsOneWidget);

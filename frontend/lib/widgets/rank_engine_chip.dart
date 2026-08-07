@@ -31,11 +31,11 @@ class RankEngineChip extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            isLlm ? 'LLM' : 'Rules',
+            isLlm ? 'AI' : 'In-App',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
