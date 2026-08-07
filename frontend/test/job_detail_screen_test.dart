@@ -245,7 +245,7 @@ void main() {
       expect(find.text('Explanation'), findsOneWidget);
     });
 
-    testWidgets('tapping an unranked candidate shows status and hint', (
+    testWidgets('tapping an unranked candidate shows status, hint, and profile', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(800, 2400);
@@ -261,6 +261,10 @@ void main() {
               fileName: 'alice.pdf',
               candidateName: 'Alice',
               status: 'uploaded',
+              skills: const ['Dart', 'Flutter'],
+              yearsExperience: 5,
+              education: 'Bachelor of Science',
+              certifications: const ['AWS Certified'],
             ),
           ],
         ),
@@ -279,6 +283,15 @@ void main() {
       );
       expect(find.text('Match Score'), findsNothing);
       expect(find.text('STRENGTHS'), findsNothing);
+
+      expect(find.text('SKILLS'), findsOneWidget);
+      expect(find.text('Dart'), findsWidgets);
+      expect(find.text('EXPERIENCE'), findsOneWidget);
+      expect(find.text('5 years'), findsOneWidget);
+      expect(find.text('EDUCATION'), findsOneWidget);
+      expect(find.text('Bachelor of Science'), findsOneWidget);
+      expect(find.text('CERTIFICATIONS'), findsOneWidget);
+      expect(find.text('AWS Certified'), findsOneWidget);
     });
 
   group('candidate deletion', () {

@@ -116,6 +116,75 @@ void showCandidateDetailSheet(BuildContext context, CandidateResult c) {
                   ),
                   const SizedBox(height: 16),
                 ],
+                if (c.skills.isNotEmpty) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.bolt,
+                    label: 'SKILLS',
+                    color: Colors.indigo,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: c.skills
+                        .map((skill) => Chip(
+                              label: Text(skill),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.indigo.shade50,
+                              labelStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.indigo.shade700,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (c.yearsExperience != null && c.yearsExperience! > 0) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.work_history,
+                    label: 'EXPERIENCE',
+                    color: Colors.blueGrey,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatYears(c.yearsExperience!),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (c.education != null && c.education!.isNotEmpty) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.school,
+                    label: 'EDUCATION',
+                    color: Colors.teal,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(c.education!, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 16),
+                ],
+                if (c.certifications.isNotEmpty) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.workspace_premium,
+                    label: 'CERTIFICATIONS',
+                    color: Colors.deepPurple,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: c.certifications
+                        .map((cert) => Chip(
+                              label: Text(cert),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.deepPurple.shade50,
+                              labelStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.deepPurple.shade700,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (c.strengths.isNotEmpty) ...[
                   const CandidateSectionLabel(
                     icon: Icons.check_circle,
@@ -226,6 +295,13 @@ class CandidateSectionLabel extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatYears(double years) {
+  final rounded = years.roundToDouble();
+  final isWhole = (years - rounded).abs() < 0.05;
+  final text = isWhole ? rounded.toStringAsFixed(0) : years.toStringAsFixed(1);
+  return '$text year${years == 1 ? '' : 's'}';
 }
 
 class CandidateBulletList extends StatelessWidget {

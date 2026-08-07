@@ -83,6 +83,7 @@ class CandidateResult {
   final List<String> weaknesses;
   final List<String> skillGaps;
   final List<String> skills;
+  final double? yearsExperience;
   final String? education;
   final List<String> certifications;
   final String? error;
@@ -102,6 +103,7 @@ class CandidateResult {
     this.weaknesses = const [],
     this.skillGaps = const [],
     this.skills = const [],
+    this.yearsExperience,
     this.education,
     this.certifications = const [],
     this.error,
@@ -123,6 +125,7 @@ class CandidateResult {
       weaknesses: _stringList(json['weaknesses']),
       skillGaps: _stringList(json['skill_gaps']),
       skills: _stringList(json['skills']),
+      yearsExperience: (json['years_experience'] as num?)?.toDouble(),
       education: json['education'] as String?,
       certifications: _stringList(json['certifications']),
       error: json['error'] as String?,
