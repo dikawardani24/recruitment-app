@@ -310,7 +310,13 @@ class JobDetailScreen extends HookConsumerWidget {
                             background: _DeleteBackground(
                               color: Theme.of(context).colorScheme.error,
                             ),
-                            child: _CandidateTile(cv: cv),
+                            child: _CandidateTile(
+                              cv: cv,
+                              onRank: cv.cvId == null || cv.status == 'failed'
+                                  ? null
+                                  : () =>
+                                      detailController.rankCv(jobId, cv.cvId!),
+                            ),
                           ),
                         ),
                       ),
@@ -542,8 +548,9 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
 
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
+  final Future<void> Function()? onRank;
 
-  const _CandidateTile({required this.cv});
+  const _CandidateTile({required this.cv, this.onRank});
 
   @override
   Widget build(BuildContext context) {
@@ -559,7 +566,7 @@ class _CandidateTile extends StatelessWidget {
       shape: cardShape(theme),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        onTap: () => showCandidateDetailSheet(context, cv),
+        onTap: () => showCandidateDetailSheet(context, cv, onRank: onRank),
         leading: Container(
           width: 44,
           height: 44,

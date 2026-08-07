@@ -119,6 +119,12 @@ class ApiClient {
     );
   }
 
+  Future<CandidateResult> rankCv(String jobId, String cvId) async {
+    final resp = await _dio.post('/jobs/$jobId/cvs/$cvId/rank');
+    final data = resp.data as Map<String, dynamic>;
+    return CandidateResult.fromJson(data['result'] as Map<String, dynamic>);
+  }
+
   Future<List<CandidateResult>> getRankings(String jobId) async {
     final resp = await _dio.get('/jobs/$jobId/rankings');
     final results = (resp.data as Map<String, dynamic>)['results'] as List;

@@ -270,29 +270,7 @@ async def rank_job(job_id: str) -> dict:
     ranked, source = await RankingService(settings).rank(job["requirements"], profiles, parsed)
 
     async with db.connect() as conn:
-        for i, item in enumerate(ranked):
-            await conn.execute(
-                "UPDATE cvs SET status = 'ranked', overall_score = ?, bucket = ?,"
-                " recommendation = ?, explanation = ?, strengths = ?, weaknesses = ?,"
-                " skill_gaps = ?, skill_score = ?, experience_score = ?,"
-                " education_score = ?, certification_score = ?, ranked_at = ?"
-                " WHERE id = ?",
-                (
-                    item["overall_score"],
-                    item["bucket"],
-                    item["recommendation"],
-                    item["explanation"],
-                    _json_dumps(item["strengths"]),
-                    _json_dumps(item["weaknesses"]),
-                    _json_dumps(item["skill_gaps"]),
-                    item["skill_score"],
-                    item["experience_score"],
-                    item["education_score"],
-                    item["certification_score"],
-                    item["ranked_at"],
-                    item["id"],
-                ),
-            )
+        await _persist_ranked(conn, ranked)
         await conn.commit()
 
     for i, item in enumerate(ranked):
@@ -302,6 +280,43 @@ async def rank_job(job_id: str) -> dict:
         "source": source,
         "count": len(ranked),
         "results": [_cv_payload(item) for item in ranked],
+    }
+
+
+@router.post("/jobs/{job_id}/cvs/{cv_id}/rank")
+async def rank_cv(job_id: str, cv_id: str) -> dict:
+    """Score + rank a single CV against the job's requirements."""
+    job = await _require_job(job_id)
+    if not job.get("requirements"):
+        raise HTTPException(status_code=422, detail="job_missing_description")
+
+    async with db.connect() as conn:
+        row = await conn.execute(
+            "SELECT * FROM cvs WHERE id = ? AND job_id = ?",
+            (str(cv_id), job["id"]),
+        )
+        cv_row = await row.fetchone()
+    if cv_row is None:
+        raise HTTPException(status_code=404, detail="cv_not_found")
+    cv = db.row_to_cv(cv_row)
+    if cv["status"] == "failed":
+        raise HTTPException(status_code=422, detail="cv_parse_failed")
+
+    settings = _settings()
+    profile = Profile.from_cv(cv)
+    ranked, source = await RankingService(settings).rank(
+        job["requirements"], [profile], [cv]
+    )
+    item = ranked[0]
+    async with db.connect() as conn:
+        await _persist_ranked(conn, ranked)
+        await conn.commit()
+    item["rank"] = 1
+    return {
+        "job_id": job["id"],
+        "cv_id": str(cv_id),
+        "source": source,
+        "result": _cv_payload(item),
     }
 
 
@@ -324,6 +339,33 @@ async def _load_cvs(job_id: str) -> list[dict]:
     async with db.connect() as conn:
         rows = await (await conn.execute("SELECT * FROM cvs WHERE job_id = ?", (job_id,))).fetchall()
     return [db.row_to_cv(r) for r in rows]
+
+
+async def _persist_ranked(conn, ranked: list[dict]) -> None:
+    for item in ranked:
+        item["status"] = "ranked"
+        await conn.execute(
+            "UPDATE cvs SET status = 'ranked', overall_score = ?, bucket = ?,"
+            " recommendation = ?, explanation = ?, strengths = ?, weaknesses = ?,"
+            " skill_gaps = ?, skill_score = ?, experience_score = ?,"
+            " education_score = ?, certification_score = ?, ranked_at = ?"
+            " WHERE id = ?",
+            (
+                item["overall_score"],
+                item["bucket"],
+                item["recommendation"],
+                item["explanation"],
+                _json_dumps(item["strengths"]),
+                _json_dumps(item["weaknesses"]),
+                _json_dumps(item["skill_gaps"]),
+                item["skill_score"],
+                item["experience_score"],
+                item["education_score"],
+                item["certification_score"],
+                item["ranked_at"],
+                item["id"],
+            ),
+        )
 
 
 def _job_payload(job: dict, *, jd_key: str | None = None) -> dict:

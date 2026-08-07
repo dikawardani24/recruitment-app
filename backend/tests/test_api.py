@@ -131,6 +131,44 @@ def test_get_rankings_persisted(client, cv_builder):
     assert resp.json()["results"][0]["candidate_name"] == "John Doe"
 
 
+def test_rank_single_cv_persists_rank(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
+
+    resp = client.post(f"/api/jobs/{job_id}/cvs/{cv_id}/rank")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["source"] == "rules"
+    result = body["result"]
+    assert result["status"] == "ranked"
+    assert result["cv_id"] == cv_id
+    assert result["overall_score"] is not None
+    assert result["explanation"]
+
+    ranked = client.get(f"/api/jobs/{job_id}/rankings").json()["results"]
+    assert len(ranked) == 1
+    assert ranked[0]["cv_id"] == cv_id
+
+
+def test_rank_single_cv_unknown_404(client, cv_builder):
+    resp = client.post(
+        "/api/jobs",
+        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+    )
+    job_id = resp.json()["job"]["job_id"]
+    resp = client.post(f"/api/jobs/{job_id}/cvs/{uuid4()}/rank")
+    assert resp.status_code == 404
+
+    resp = client.post(
+        f"/api/jobs/00000000-0000-0000-0000-000000000000/cvs/{uuid4()}/rank"
+    )
+    assert resp.status_code == 404
+
+
 def test_list_jobs_includes_cv_count(client, cv_builder):
     resp = client.post(
         "/api/jobs",

@@ -34,6 +34,7 @@ class _FakeDetailController extends JobDetailController {
   final List<CandidateResult> cvs;
   final deletedCvs = <String>[];
   final deletedJobs = <String>[];
+  final rankedCvs = <String>[];
 
   _FakeDetailController(this.cvs);
 
@@ -51,6 +52,25 @@ class _FakeDetailController extends JobDetailController {
   @override
   Future<void> deleteJob(String jobId) async {
     deletedJobs.add(jobId);
+  }
+
+  @override
+  Future<void> rankCv(String jobId, String cvId) async {
+    rankedCvs.add(cvId);
+    final index = cvs.indexWhere((c) => c.cvId == cvId);
+    if (index >= 0) {
+      cvs[index] = CandidateResult(
+        cvId: cvId,
+        fileName: cvs[index].fileName,
+        candidateName: cvs[index].candidateName,
+        status: 'ranked',
+        overallScore: 0.9,
+        bucket: 'strong_match',
+      );
+    }
+    ref.invalidate(cvsProvider(jobId));
+    ref.invalidate(rankingsProvider(jobId));
+    await ref.read(cvsProvider(jobId).future);
   }
 }
 
@@ -292,6 +312,45 @@ void main() {
       expect(find.text('Bachelor of Science'), findsOneWidget);
       expect(find.text('CERTIFICATIONS'), findsOneWidget);
       expect(find.text('AWS Certified'), findsOneWidget);
+    });
+
+    testWidgets('ranking an unranked candidate from the sheet ranks and closes', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        CandidateResult(
+          cvId: 'cv-1',
+          fileName: 'alice.pdf',
+          candidateName: 'Alice',
+          status: 'uploaded',
+        ),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rank this CV'), findsOneWidget);
+
+      await tester.tap(find.text('Rank this CV'));
+      await tester.pumpAndSettle();
+
+      expect(controller.rankedCvs, ['cv-1']);
+      expect(find.text('Rank this CV'), findsNothing);
+      expect(find.text('Alice'), findsOneWidget);
     });
 
   group('candidate deletion', () {

@@ -61,6 +61,15 @@ class JobDetailController extends Notifier<JobDetailState> {
     }
   }
 
+  /// Ranks a single CV and refreshes the CV list and rankings. The sheet that
+  /// triggers this closes itself on success.
+  Future<void> rankCv(String jobId, String cvId) async {
+    await ref.read(apiClientProvider).rankCv(jobId, cvId);
+    ref.invalidate(cvsProvider(jobId));
+    ref.invalidate(rankingsProvider(jobId));
+    await ref.read(cvsProvider(jobId).future);
+  }
+
   /// Deletes a single candidate and refreshes the CV list and rankings.
   Future<void> deleteCv(String jobId, String cvId) async {
     await ref.read(apiClientProvider).deleteCandidate(jobId, cvId);
