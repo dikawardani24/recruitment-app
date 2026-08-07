@@ -7,6 +7,7 @@ import '../models.dart';
 import '../providers.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/shimmer.dart';
+import 'action_result_screen.dart';
 import 'delete_confirm_screen.dart';
 
 const _months = [
@@ -129,7 +130,6 @@ class JobListScreen extends HookConsumerWidget {
     Job job,
   ) async {
     final controller = ref.read(jobListControllerProvider);
-    final messenger = ScaffoldMessenger.of(context);
     List<CandidateResult> candidates;
     try {
       candidates = await controller.candidatesFor(job.id);
@@ -153,10 +153,22 @@ class JobListScreen extends HookConsumerWidget {
 
     try {
       await controller.deleteJob(job.id);
-      messenger.showSnackBar(const SnackBar(content: Text('Job deleted')));
+      if (!context.mounted) return false;
+      await showActionResult(
+        context,
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      );
       return true;
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      if (!context.mounted) return false;
+      await showActionResult(
+        context,
+        success: false,
+        title: 'Delete failed',
+        message: '$e',
+      );
       return false;
     }
   }

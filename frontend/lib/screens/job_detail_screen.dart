@@ -14,6 +14,7 @@ import '../widgets/bucket_donut.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/score_color.dart';
+import 'action_result_screen.dart';
 import 'delete_confirm_screen.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
@@ -68,7 +69,6 @@ class JobDetailScreen extends HookConsumerWidget {
     }
 
     Future<void> deleteJob() async {
-      final messenger = ScaffoldMessenger.of(context);
       final candidates = cvsAsync.value ?? [];
       final confirmed = await showDeleteConfirm(
         context,
@@ -84,18 +84,31 @@ class JobDetailScreen extends HookConsumerWidget {
       if (!confirmed) return;
       try {
         await detailController.deleteJob(jobId);
-        messenger.showSnackBar(const SnackBar(content: Text('Job deleted')));
-      } catch (e) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
+        if (!context.mounted) return;
+        await showActionResult(
+          context,
+          success: true,
+          title: 'Job deleted',
+          message: "'${jobAsync.value?.title ?? 'Job'}' was permanently removed.",
         );
+      } catch (e) {
+        if (!context.mounted) return;
+        await showActionResult(
+          context,
+          success: false,
+          title: 'Delete failed',
+          message: '$e',
+        );
+        return;
       }
+      if (!context.mounted) return;
+      ref.read(navigatorProvider).goToJobs();
     }
 
     Future<bool> confirmDeleteCv(CandidateResult cv) async {
-      final messenger = ScaffoldMessenger.of(context);
       final cvId = cv.cvId;
       if (cvId == null) return false;
+      final name = cv.candidateName ?? cv.fileName;
       final confirmed = await showDeleteConfirm(
         context,
         title: 'Delete this candidate?',
@@ -106,13 +119,21 @@ class JobDetailScreen extends HookConsumerWidget {
       if (!confirmed) return false;
       try {
         await detailController.deleteCv(jobId, cvId);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Candidate deleted')),
+        if (!context.mounted) return false;
+        await showActionResult(
+          context,
+          success: true,
+          title: 'Candidate deleted',
+          message: "'$name' and their CV were permanently removed.",
         );
         return true;
       } catch (e) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
+        if (!context.mounted) return false;
+        await showActionResult(
+          context,
+          success: false,
+          title: 'Delete failed',
+          message: '$e',
         );
         return false;
       }

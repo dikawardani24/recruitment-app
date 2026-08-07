@@ -4,8 +4,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_ats/controllers/job_detail_controller.dart';
 import 'package:ai_ats/models.dart';
+import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_detail_screen.dart';
+
+/// Navigator that records navigation calls instead of touching go_router.
+class _FakeNavigator implements AppNavigator {
+  final wentToJobs = <String>[];
+
+  @override
+  void goToJobs() => wentToJobs.add('goToJobs');
+
+  @override
+  void goToJobForm() {}
+
+  @override
+  void goToJobDetail(String jobId) {}
+
+  @override
+  void goToRankings(RankingsScreenData data) {}
+
+  @override
+  void pop() {}
+}
 
 /// Controller that records deletes and mirrors the real [JobDetailController]
 /// behaviour of refreshing the CV list after a candidate is removed.
@@ -52,6 +73,7 @@ void main() {
     List<CandidateResult> cvs = const [],
     List<CandidateResult> rankings = const [],
     _FakeDetailController? detailController,
+    _FakeNavigator? navigator,
   }) {
     return ProviderScope(
       overrides: [
@@ -60,6 +82,7 @@ void main() {
         rankingsProvider('job-1').overrideWith((ref) async => rankings),
         if (detailController != null)
           jobDetailControllerProvider.overrideWith(() => detailController),
+        navigatorProvider.overrideWithValue(navigator ?? _FakeNavigator()),
       ],
       child: const MaterialApp(home: JobDetailScreen(jobId: 'job-1')),
     );
@@ -248,15 +271,17 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Delete candidate'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
 
       expect(controller.deletedCvs, ['cv-1']);
+      expect(find.text('Candidate deleted'), findsOneWidget);
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Alice'), findsNothing);
       expect(find.text('Bob'), findsOneWidget);
-      expect(find.text('Candidate deleted'), findsOneWidget);
+      expect(find.text('Candidate deleted'), findsNothing);
     });
   });
 
@@ -270,11 +295,13 @@ void main() {
 
       final cvs = [ranked('cv-1', 'Alice')];
       final controller = _FakeDetailController(cvs);
+      final navigator = _FakeNavigator();
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
           detailController: controller,
+          navigator: navigator,
         ),
       );
       await tester.pump();
@@ -291,11 +318,15 @@ void main() {
       );
 
       await tester.tap(find.text('Delete job'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
 
       expect(controller.deletedJobs, ['job-1']);
       expect(find.text('Job deleted'), findsOneWidget);
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      expect(navigator.wentToJobs, ['goToJobs']);
     });
 
     testWidgets('cancelling from the confirm screen deletes nothing', (

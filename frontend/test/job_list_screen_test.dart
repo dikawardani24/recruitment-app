@@ -467,15 +467,21 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Delete job'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
 
       expect(controller.deletedJobs, ['j1']);
+      expect(find.text('Job deleted'), findsOneWidget);
+      expect(
+        find.text("'Backend Engineer' was permanently removed."),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Backend Engineer'), findsNothing);
       expect(find.text('Mobile Dev'), findsOneWidget);
-      expect(find.text('Job deleted'), findsOneWidget);
+      expect(find.text('Job deleted'), findsNothing);
     });
   });
 }

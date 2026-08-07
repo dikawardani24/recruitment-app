@@ -69,13 +69,13 @@ class JobDetailController extends Notifier<JobDetailState> {
     await ref.read(cvsProvider(jobId).future);
   }
 
-  /// Deletes the whole job, reloads the job list, and returns to it.
+  /// Deletes the whole job and reloads the job list. Navigation back to the
+  /// list is left to the caller so a result page can be shown first.
   Future<void> deleteJob(String jobId) async {
     _start('Deleting job…');
     try {
       await ref.read(apiClientProvider).deleteJob(jobId);
       await ref.read(jobsProvider.notifier).refresh();
-      ref.read(navigatorProvider).goToJobs();
     } finally {
       _stop();
     }
