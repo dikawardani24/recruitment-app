@@ -1,0 +1,266 @@
+import 'package:flutter/material.dart';
+
+import '../models.dart';
+import 'bucket_donut.dart';
+import 'score_color.dart';
+
+/// Modal bottom sheet with a candidate's ranking details, matching the one
+/// used on the rankings screen. Safe to open for candidates that have not
+/// been ranked yet — ranking-only sections are hidden and the status is shown
+/// instead.
+void showCandidateDetailSheet(BuildContext context, CandidateResult c) {
+  final theme = Theme.of(context);
+  final score = c.overallScore;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          controller: scrollController,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c.candidateName ?? c.fileName,
+                  style: theme.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(c.fileName, style: theme.textTheme.labelSmall),
+                const SizedBox(height: 16),
+                if (score != null) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Match Score',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${(score * 100).round()}%',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: scoreColor(score),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Recommendation',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        formatBucket(c.bucket ?? 'weak_match'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: getBucketColor(c.bucket ?? 'weak_match'),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Status',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        c.status.isEmpty ? 'uploaded' : c.status,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                  if (c.status == 'failed' && c.error != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Error', style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    )),
+                    const SizedBox(height: 4),
+                    Text(c.error!, style: theme.textTheme.bodySmall),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.insights,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This candidate has not been ranked yet.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (c.strengths.isNotEmpty) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.check_circle,
+                    label: 'STRENGTHS',
+                    color: Colors.green,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: c.strengths
+                        .map((skill) => Chip(
+                              label: Text(skill),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.green.shade50,
+                              labelStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.green.shade700,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (c.skillGaps.isNotEmpty) ...[
+                  const CandidateSectionLabel(
+                    icon: Icons.warning,
+                    label: 'MISSING SKILLS',
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: c.skillGaps
+                        .map((gap) => Chip(
+                              label: Text(gap),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.red.shade50,
+                              labelStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.red.shade700,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (c.recommendation != null) ...[
+                  Text(
+                    'Recommendation',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(c.recommendation!, style: theme.textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                ],
+                if (c.explanation != null) ...[
+                  Text(
+                    'Explanation',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(c.explanation!, style: theme.textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                ],
+                if (c.weaknesses.isNotEmpty)
+                  CandidateBulletList(
+                    title: 'Areas to probe',
+                    items: c.weaknesses,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class CandidateSectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const CandidateSectionLabel({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+}
+
+class CandidateBulletList extends StatelessWidget {
+  final String title;
+  final List<String> items;
+
+  const CandidateBulletList({
+    super.key,
+    required this.title,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(left: 8, bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• '),
+                  Expanded(child: Text(item)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

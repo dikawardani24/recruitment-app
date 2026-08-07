@@ -3,7 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../models.dart';
 import '../providers.dart';
-import '../widgets/bucket_donut.dart';
+import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
@@ -142,7 +142,7 @@ class _RankedCard extends StatelessWidget {
             ),
             if (c.strengths.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _SectionLabel(
+              CandidateSectionLabel(
                 icon: Icons.check_circle,
                 label: 'STRENGTHS',
                 color: Colors.green,
@@ -164,7 +164,7 @@ class _RankedCard extends StatelessWidget {
             ],
             if (c.skillGaps.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _SectionLabel(
+              CandidateSectionLabel(
                 icon: Icons.warning,
                 label: 'MISSING SKILLS',
                 color: Colors.red,
@@ -191,7 +191,7 @@ class _RankedCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => _showReasoningDialog(context, c, theme),
+                  onPressed: () => showCandidateDetailSheet(context, c),
                   icon: const Icon(Icons.info_outline),
                   label: const Text('Show reasoning'),
                 ),
@@ -202,198 +202,5 @@ class _RankedCard extends StatelessWidget {
       ),
     );
   }
-
-  void _showReasoningDialog(
-      BuildContext context, CandidateResult c, ThemeData theme) {
-    final score = c.overallScore;
-    final color = scoreColor(score ?? 0);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(16),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(c.candidateName ?? c.fileName,
-                      style: theme.textTheme.headlineSmall),
-                  const SizedBox(height: 4),
-                  Text(c.fileName,
-                      style: theme.textTheme.labelSmall),
-                  const SizedBox(height: 16),
-                  if (score != null) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Match Score',
-                            style: theme.textTheme.labelMedium
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        Text(
-                          '${(score * 100).round()}%',
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(color: color),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Recommendation',
-                            style: theme.textTheme.labelMedium
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        Text(
-                          formatBucket(c.bucket ?? 'weak_match'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: getBucketColor(c.bucket ?? 'weak_match'),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (c.strengths.isNotEmpty) ...[
-                    _SectionLabel(
-                      icon: Icons.check_circle,
-                      label: 'STRENGTHS',
-                      color: Colors.green,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: c.strengths
-                          .map((skill) => Chip(
-                                label: Text(skill),
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: Colors.green.shade50,
-                                labelStyle: theme.textTheme.bodySmall
-                                    ?.copyWith(color: Colors.green.shade700),
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (c.skillGaps.isNotEmpty) ...[
-                    _SectionLabel(
-                      icon: Icons.warning,
-                      label: 'MISSING SKILLS',
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: c.skillGaps
-                          .map((gap) => Chip(
-                                label: Text(gap),
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: Colors.red.shade50,
-                                labelStyle: theme.textTheme.bodySmall
-                                    ?.copyWith(color: Colors.red.shade700),
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (c.recommendation != null) ...[
-                    Text('Recommendation',
-                        style: theme.textTheme.labelMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(c.recommendation!,
-                        style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 12),
-                  ],
-                  if (c.explanation != null) ...[
-                    Text('Explanation',
-                        style: theme.textTheme.labelMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(c.explanation!,
-                        style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 12),
-                  ],
-                  if (c.weaknesses.isNotEmpty)
-                    _BulletList(title: 'Areas to probe', items: c.weaknesses),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _SectionLabel({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: theme.textTheme.labelMedium
-              ?.copyWith(color: color, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-}
-
-class _BulletList extends StatelessWidget {
-  final String title;
-  final List<String> items;
-
-  const _BulletList({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(left: 8, bottom: 2),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('• '),
-                  Expanded(child: Text(item)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

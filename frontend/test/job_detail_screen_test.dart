@@ -178,34 +178,108 @@ void main() {
     expect(find.text('Buckets'), findsNothing);
   });
 
-  testWidgets('shows bucket donut when candidates are ranked', (tester) async {
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+    testWidgets('shows bucket donut when candidates are ranked', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(
-      buildApp(
-        buildJob(description: 'Short description'),
-        cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
-        rankings: [
-          buildRankedResult(name: 'Alice', score: 0.9),
-          buildRankedResult(
-            name: 'Bob',
-            score: 0.55,
-            bucket: 'possible_match',
-          ),
-        ],
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
+          rankings: [
+            buildRankedResult(name: 'Alice', score: 0.9),
+            buildRankedResult(
+              name: 'Bob',
+              score: 0.55,
+              bucket: 'possible_match',
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Not ranked yet'), findsNothing);
-    expect(find.text('Buckets'), findsOneWidget);
-    expect(find.text('View full ranking'), findsOneWidget);
-    expect(find.text('Strong Match'), findsWidgets);
-    expect(find.text('Possible Match'), findsWidgets);
-  });
+      expect(find.text('Not ranked yet'), findsNothing);
+      expect(find.text('Buckets'), findsOneWidget);
+      expect(find.text('View full ranking'), findsOneWidget);
+      expect(find.text('Strong Match'), findsWidgets);
+      expect(find.text('Possible Match'), findsWidgets);
+    });
+
+    testWidgets('tapping a ranked candidate opens the detail sheet', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final alice = CandidateResult(
+        cvId: 'cv-1',
+        fileName: 'alice.pdf',
+        candidateName: 'Alice',
+        status: 'ranked',
+        overallScore: 0.9,
+        bucket: 'strong_match',
+        recommendation: 'Strong hire',
+        strengths: const ['Dart', 'Flutter'],
+        explanation: 'Matches all required skills.',
+      );
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: [alice],
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Match Score'), findsOneWidget);
+      expect(find.text('90%'), findsWidgets);
+      expect(find.text('Strong Match'), findsWidgets);
+      expect(find.text('STRENGTHS'), findsOneWidget);
+      expect(find.text('Dart'), findsWidgets);
+      expect(find.text('Explanation'), findsOneWidget);
+    });
+
+    testWidgets('tapping an unranked candidate shows status and hint', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: [
+            CandidateResult(
+              cvId: 'cv-1',
+              fileName: 'alice.pdf',
+              candidateName: 'Alice',
+              status: 'uploaded',
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Status'), findsOneWidget);
+      expect(find.text('uploaded'), findsWidgets);
+      expect(
+        find.text('This candidate has not been ranked yet.'),
+        findsOneWidget,
+      );
+      expect(find.text('Match Score'), findsNothing);
+      expect(find.text('STRENGTHS'), findsNothing);
+    });
 
   group('candidate deletion', () {
     testWidgets('swipe reveals confirmation with candidate details', (

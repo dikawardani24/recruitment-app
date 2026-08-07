@@ -11,6 +11,7 @@ import '../models.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
+import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/score_color.dart';
@@ -556,7 +557,9 @@ class _CandidateTile extends StatelessWidget {
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: cardShape(theme),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
+        onTap: () => showCandidateDetailSheet(context, cv),
         leading: Container(
           width: 44,
           height: 44,
