@@ -14,6 +14,7 @@ import '../widgets/bucket_donut.dart';
 import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
+import '../widgets/rank_engine_chip.dart';
 import '../widgets/score_color.dart';
 import 'action_result_screen.dart';
 import 'delete_confirm_screen.dart';
@@ -581,14 +582,22 @@ class _CandidateTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               )
-            : Text(
-                formatBucket(cv.bucket ?? 'weak_match'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: getBucketColor(cv.bucket ?? 'weak_match'),
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            : Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      formatBucket(cv.bucket ?? 'weak_match'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: getBucketColor(cv.bucket ?? 'weak_match'),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  RankEngineChip(rankedBy: cv.rankedBy),
+                ],
               ),
         trailing: score == null
             ? (cv.status == 'failed' ? const Icon(Icons.error_outline) : null)

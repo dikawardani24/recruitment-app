@@ -255,6 +255,8 @@ void main() {
       await tester.pump();
       await tester.pump();
 
+      expect(find.text('LLM'), findsOneWidget);
+
       await tester.tap(find.text('Alice'));
       await tester.pumpAndSettle();
 

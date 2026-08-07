@@ -5,6 +5,7 @@ import '../models.dart';
 import '../providers.dart';
 import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
+import '../widgets/rank_engine_chip.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
 
@@ -60,10 +61,7 @@ class RankingsScreen extends HookConsumerWidget {
                   ],
                 );
               }
-              return _RankedCard(
-                candidate: results[index - 1],
-                rank: index,
-              );
+              return _RankedCard(candidate: results[index - 1], rank: index);
             },
           );
         },
@@ -99,18 +97,22 @@ class _RankedCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   backgroundColor: color,
-                  child: Text('$rank',
-                      style: const TextStyle(color: Colors.white)),
+                  child: Text(
+                    '$rank',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name,
-                          style: theme.textTheme.titleMedium),
-                      Text(c.fileName,
-                          style: theme.textTheme.bodySmall),
+                      Text(name, style: theme.textTheme.titleMedium),
+                      Text(c.fileName, style: theme.textTheme.bodySmall),
+                      if (c.rankedBy != null) ...[
+                        const SizedBox(height: 6),
+                        RankEngineChip(rankedBy: c.rankedBy),
+                      ],
                     ],
                   ),
                 ),
@@ -121,13 +123,11 @@ class _RankedCard extends StatelessWidget {
                     children: [
                       Text(
                         '${(score * 100).round()}%',
-                        style: theme.textTheme.titleLarge
-                            ?.copyWith(color: color),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: color,
+                        ),
                       ),
-                      Text(
-                        'Match Score',
-                        style: theme.textTheme.labelSmall,
-                      ),
+                      Text('Match Score', style: theme.textTheme.labelSmall),
                     ],
                   ),
                 ],
@@ -145,13 +145,16 @@ class _RankedCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: c.strengths
-                    .map((skill) => Chip(
-                          label: Text(skill),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: Colors.green.shade50,
-                          labelStyle: theme.textTheme.bodySmall
-                              ?.copyWith(color: Colors.green.shade700),
-                        ))
+                    .map(
+                      (skill) => Chip(
+                        label: Text(skill),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: Colors.green.shade50,
+                        labelStyle: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -167,13 +170,16 @@ class _RankedCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: c.skillGaps
-                    .map((gap) => Chip(
-                          label: Text(gap),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: Colors.red.shade50,
-                          labelStyle: theme.textTheme.bodySmall
-                              ?.copyWith(color: Colors.red.shade700),
-                        ))
+                    .map(
+                      (gap) => Chip(
+                        label: Text(gap),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: Colors.red.shade50,
+                        labelStyle: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -196,4 +202,3 @@ class _RankedCard extends StatelessWidget {
     );
   }
 }
-
