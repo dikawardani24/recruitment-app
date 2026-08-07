@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.database.db_client import DbClient
 from app.database.entities.job_entity import JobEntity
 
@@ -59,23 +61,28 @@ class JobDatasource:
             ),
         )
 
-    async def find_by_id(self, job_id: str):
+    async def find_by_id(self, job_id: str) -> JobEntity | None:
         query = """
         SELECT *
         FROM jobs
         WHERE id = ?
         """
 
-        return await self.db.fetchone(query, (job_id,))
+        data = await self.db.fetchone(query, (job_id,))
+        if data:
+            return JobEntity.from_row(data)
+        return None
+        
 
-    async def find_all(self):
+    async def find_all(self) -> list[JobEntity]:
         query = """
         SELECT *
         FROM jobs
         ORDER BY created_at DESC
         """
 
-        return await self.db.fetchall(query)
+        list_data = await self.db.fetchall(query)
+        return [JobEntity.from_row(row) for row in list_data]
 
     async def delete(self, job_id: str):
         query = """
@@ -84,3 +91,10 @@ class JobDatasource:
         """
 
         await self.db.execute(query, (job_id,))
+
+    async def find_by_limit_and_offset(self, limit: int, offset: int)-> list[JobEntity]:
+        query = """
+        SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        """
+        list_data = await self.db.execute(query, (limit, offset))
+        return [JobEntity.from_row(row) for row in list_data]

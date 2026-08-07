@@ -112,18 +112,18 @@ async def create_job(
 @router.get("/jobs")
 async def list_jobs(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=100),
 ) -> dict:
-    offset = (page - 1) * limit
+    offset = (page - 1) * page_size
     async with db.connect() as conn:
         rows = await (
             await conn.execute(
                 "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit + 1, offset),
+                (page_size + 1, offset),
             )
         ).fetchall()
-        page_rows = rows[:limit]
-        has_more = len(rows) > limit
+        page_rows = rows[:page_size]
+        has_more = len(rows) > page_size
         if page_rows:
             placeholders = ",".join("?" for _ in page_rows)
             count_rows = await (
@@ -143,7 +143,7 @@ async def list_jobs(
     return {
         "count": len(jobs),
         "jobs": jobs,
-        "meta": {"page": page, "limit": limit, "has_more": has_more},
+        "meta": {"page": page, "limit": page_size, "has_more": has_more},
     }
 
 

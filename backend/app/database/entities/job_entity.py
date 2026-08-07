@@ -1,5 +1,11 @@
-from uuid import uuid4
+from __future__ import annotations
 
+from uuid import uuid4
+from dataclasses import dataclass
+
+import sqlite3
+
+@dataclass
 class JobEntity:
     def __init__(
         self,
@@ -20,4 +26,16 @@ class JobEntity:
         self.created_at = created_at
         self.updated_at = updated_at
         self.jd_file_path = jd_file_path
-        pass
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> JobEntity:
+        return cls(
+            id=row["id"],
+            title=row["title"],
+            description=row["description"],
+            requirements=row["requirements"],
+            status=row["status"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            jd_file=row["jd_file"],
+        )
