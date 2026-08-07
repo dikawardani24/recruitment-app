@@ -28,7 +28,8 @@ class JobDatasource:
             entity.req,
             entity.status,
             entity.created_at,
-            entity.updated_at
+            entity.updated_at,
+            entity.jd_file_path
         )
         await self.db.execute(query, parameters=param)
 
@@ -49,11 +50,11 @@ class JobDatasource:
             query,
             (
                 entity.title,
-                entity.description,
-                entity.requirements,
+                entity.desc,
+                entity.req,
                 entity.status,
                 entity.updated_at,
-                entity.jd_file,
+                entity.jd_file_path,
                 entity.id,
             ),
         )

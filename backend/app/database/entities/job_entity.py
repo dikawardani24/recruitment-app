@@ -10,6 +10,7 @@ class JobEntity:
         created_at: str,
         updated_at: str,
         id: str = str(uuid4()),
+        jd_file_path = None
     ):
         self.id = id
         self.title = title
@@ -18,4 +19,5 @@ class JobEntity:
         self.status = status
         self.created_at = created_at
         self.updated_at = updated_at
+        self.jd_file_path = jd_file_path
         pass
