@@ -41,6 +41,26 @@ void showCandidateDetailSheet(
                   const SizedBox(height: 4),
                   Text(c.fileName, style: theme.textTheme.labelSmall),
                   const SizedBox(height: 16),
+                  if (onRank != null && c.status != 'failed') ...[
+                    _RankCvButton(
+                      label: score == null ? 'Rank this CV' : 'Re-rank CV',
+                      busy: ranking,
+                      onPressed: () async {
+                        setState(() => ranking = true);
+                        try {
+                          await onRank();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        } finally {
+                          if (context.mounted) {
+                            setState(() => ranking = false);
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (score != null) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -124,26 +144,6 @@ void showCandidateDetailSheet(
                       ],
                     ),
                     const SizedBox(height: 16),
-                  ],
-                  if (onRank != null && c.status != 'failed') ...[
-                    const SizedBox(height: 12),
-                    _RankCvButton(
-                      label: score == null ? 'Rank this CV' : 'Re-rank CV',
-                      busy: ranking,
-                      onPressed: () async {
-                        setState(() => ranking = true);
-                        try {
-                          await onRank();
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        } finally {
-                          if (context.mounted) {
-                            setState(() => ranking = false);
-                          }
-                        }
-                      },
-                    ),
                   ],
                   if (c.skills.isNotEmpty) ...[
                     const CandidateSectionLabel(
