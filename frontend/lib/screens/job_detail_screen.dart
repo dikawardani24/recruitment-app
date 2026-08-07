@@ -223,26 +223,6 @@ class JobDetailScreen extends HookConsumerWidget {
                   _RequirementsView(requirements: job.requirements!),
                 ],
                 const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: detailState.busy ? null : pickCvs,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Add CVs'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: detailState.busy ? null : rank,
-                        icon: const Icon(Icons.psychology),
-                        label: const Text('Rank candidates'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
                 rankingsAsync.when(
                   loading: () => const Center(
                     child: Padding(
@@ -290,7 +270,27 @@ class JobDetailScreen extends HookConsumerWidget {
                   'Candidates (${cvs.length})',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: detailState.busy ? null : pickCvs,
+                        icon: const Icon(Icons.upload_file),
+                        label: const Text('Add CVs'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: detailState.busy ? null : rank,
+                        icon: const Icon(Icons.psychology),
+                        label: const Text('Rank CVs'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 if (cvs.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
@@ -628,7 +628,7 @@ class _NotRankedHint extends StatelessWidget {
                   Text('Not ranked yet', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 2),
                   Text(
-                    'Tap "Rank candidates" to score the CVs and see how they compare.',
+                    'Tap "Rank CVs" to score the candidates and see how they compare.',
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
