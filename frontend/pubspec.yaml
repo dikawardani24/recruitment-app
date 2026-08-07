@@ -21,6 +21,7 @@ dependencies:
   fl_chart: ^1.2.0
   get_it: ^9.2.1
   injectable: ^3.0.0
+  chucker_flutter: ^1.9.2
 
 dev_dependencies:
   flutter_test:

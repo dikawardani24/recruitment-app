@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -14,7 +15,7 @@ class ApiClient {
         defaultValue: _defaultBase,
       ),
     ),
-  );
+  )..interceptors.add(ChuckerDioInterceptor());
 
   Future<T> get<T>(
     String path, {
