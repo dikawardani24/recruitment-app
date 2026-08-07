@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_ats/models.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
+import 'package:ai_ats/widgets/shimmer.dart';
+
+/// Notifier whose refresh stays pending until the test completes it, so the
+/// shimmer can be asserted while reloading.
+class _RefreshableNotifier extends JobListNotifier {
+  _RefreshableNotifier(this._jobs);
+
+  final List<Job> _jobs;
+  Completer<JobListState>? pending;
+
+  @override
+  Future<JobListState> build() async {
+    return JobListState(jobs: _jobs, page: 1, hasMore: false);
+  }
+
+  @override
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    pending = Completer<JobListState>();
+    state = AsyncValue.data(await pending!.future);
+  }
+}
+
+/// Notifier whose build stays pending until a [Completer] resolves, used to
+/// keep the list in its initial loading state for tests.
+class _PendingJobListNotifier extends JobListNotifier {
+  _PendingJobListNotifier(this._completer);
+
+  final Completer<JobListState> _completer;
+
+  @override
+  Future<JobListState> build() => _completer.future;
+}
 
 /// Notifier whose pages are provided in-memory so widget tests never hit the
 /// real API client.
@@ -22,6 +57,12 @@ class _FakeJobListNotifier extends JobListNotifier {
       page: 1,
       hasMore: _pages.length > 1,
     );
+  }
+
+  @override
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = AsyncValue.data(await build());
   }
 
   @override
@@ -74,6 +115,71 @@ void main() {
   test('formatCreatedAt returns empty for missing input', () {
     expect(formatCreatedAt(null), '');
     expect(formatCreatedAt('not-a-date'), '');
+  });
+
+  testWidgets('shows shimmer skeletons while the initial list loads', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final completer = Completer<JobListState>();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          jobsProvider.overrideWith(
+            () => _PendingJobListNotifier(completer),
+          ),
+        ],
+        child: const MaterialApp(home: JobListScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(Shimmer), findsNWidgets(5));
+
+    completer.complete(JobListState(jobs: [], hasMore: false));
+    await tester.pump();
+
+    expect(find.byType(Shimmer), findsNothing);
+  });
+
+  testWidgets('refresh button shows the shimmer while reloading', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final notifier = _RefreshableNotifier([_job('j1', 'Backend Engineer')]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [jobsProvider.overrideWith(() => notifier)],
+        child: const MaterialApp(home: JobListScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Backend Engineer'), findsOneWidget);
+    expect(find.byType(Shimmer), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+
+    expect(find.byType(Shimmer), findsNWidgets(5));
+    expect(find.text('Backend Engineer'), findsNothing);
+
+    notifier.pending?.complete(
+      JobListState(jobs: [_job('j1', 'Backend Engineer')], hasMore: false),
+    );
+    await tester.pump();
+
+    expect(find.text('Backend Engineer'), findsOneWidget);
+    expect(find.byType(Shimmer), findsNothing);
   });
 
   testWidgets('job cards show candidate counts and header totals', (

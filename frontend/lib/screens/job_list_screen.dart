@@ -6,6 +6,7 @@ import '../controllers/job_list_controller.dart';
 import '../models.dart';
 import '../providers.dart';
 import '../widgets/gradient_header.dart';
+import '../widgets/shimmer.dart';
 
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -66,15 +67,12 @@ class JobListScreen extends HookConsumerWidget {
         label: const Text('New job'),
       ),
       body: jobsAsync.when(
-        loading: () => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading jobs…'),
-            ],
-          ),
+        loading: () => ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 5,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (_, _) => const _JobCardSkeleton(),
         ),
         error: (e, _) => _ErrorView(
           message: '$e',
@@ -156,6 +154,48 @@ class _ListFooter extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// Shimmering placeholder that mirrors the layout of [_JobCard]: avatar,
+/// title, date, candidate count, and chevron grey areas.
+class _JobCardSkeleton extends StatelessWidget {
+  const _JobCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: cardShape(theme),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Shimmer(
+          child: Row(
+            children: [
+              const ShimmerBox(width: 48, height: 48, borderRadius: 12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    ShimmerBox(height: 16, width: double.infinity),
+                    SizedBox(height: 12),
+                    ShimmerBox(height: 12, width: 140),
+                    SizedBox(height: 12),
+                    ShimmerBox(height: 12, width: 96),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const ShimmerBox(width: 20, height: 20, borderRadius: 10),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

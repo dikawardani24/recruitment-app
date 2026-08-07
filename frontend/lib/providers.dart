@@ -41,9 +41,19 @@ class JobListState {
 class JobListNotifier extends AsyncNotifier<JobListState> {
   static const int pageSize = 20;
 
+  /// Minimum time the shimmer skeleton stays visible on initial load, so the
+  /// list never flashes in faster than the eye can register.
+  static const Duration minLoadDuration = Duration(seconds: 1);
+
   @override
-  Future<JobListState> build() async {
-    final page = await ref.read(apiClientProvider).listJobs(page: 1);
+  Future<JobListState> build() => _loadFirstPage();
+
+  Future<JobListState> _loadFirstPage() async {
+    final results = await Future.wait([
+      ref.read(apiClientProvider).listJobs(page: 1),
+      Future<void>.delayed(minLoadDuration),
+    ]);
+    final page = results.first as JobPage;
     return JobListState(
       jobs: page.jobs,
       page: 1,
@@ -75,10 +85,15 @@ class JobListNotifier extends AsyncNotifier<JobListState> {
     }
   }
 
-  /// Reloads from page 1, dropping any previously loaded pages.
+  /// Reloads from page 1, dropping any previously loaded pages. The loading
+  /// state is set explicitly so the shimmer is always shown while refreshing.
   Future<void> refresh() async {
-    ref.invalidateSelf();
-    await future;
+    state = const AsyncLoading();
+    try {
+      state = AsyncValue.data(await _loadFirstPage());
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 }
 
