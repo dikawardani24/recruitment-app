@@ -12,28 +12,30 @@ class CvEntity:
     file_name: str
     storage_path: str
     status: str
-    candidate_name: str | None
-    profile_text: str | None
-    skills: str | None
-    years_experience: float | None
-    education: str | None
-    certifications: str | None
-    overall_score: float | None
-    bucket: str | None
-    recommendation: str | None
-    skill_score: float | None
-    experience_score: float | None
-    education_score: float | None
-    certification_score: float | None
-    strengths: str | None
-    weaknesses: str | None
-    skill_gaps: str | None
-    explanation: str | None
-    interview_questions: str | None
-    ranked_at: str | None
-    ranked_by: str | None
-    error: str | None
-    source: str | None
+    import_job_id: str | None = None
+    created_at: str = ""
+    candidate_name: str | None = None
+    profile_text: str | None = None
+    skills: str | None = None
+    years_experience: float | None = None
+    education: str | None = None
+    certifications: str | None = None
+    overall_score: float | None = None
+    bucket: str | None = None
+    recommendation: str | None = None
+    skill_score: float | None = None
+    experience_score: float | None = None
+    education_score: float | None = None
+    certification_score: float | None = None
+    strengths: str | None = None
+    weaknesses: str | None = None
+    skill_gaps: str | None = None
+    explanation: str | None = None
+    interview_questions: str | None = None
+    ranked_at: str | None = None
+    ranked_by: str | None = None
+    error: str | None = None
+    source: str | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "CvEntity":
@@ -43,6 +45,8 @@ class CvEntity:
             file_name=row["file_name"],
             storage_path=row["storage_path"],
             status=row["status"],
+            import_job_id=row["import_job_id"],
+            created_at=row["created_at"] if "created_at" in row.keys() else "",
             candidate_name=row["candidate_name"],
             profile_text=row["profile_text"],
             skills=row["skills"],

@@ -21,12 +21,29 @@ CREATE TABLE IF NOT EXISTS jobs (
     jd_file       TEXT
 );
 
+CREATE TABLE IF NOT EXISTS import_jobs (
+    id              TEXT PRIMARY KEY,
+    job_id          TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    total_files     INTEGER NOT NULL DEFAULT 0,
+    uploaded_files  INTEGER NOT NULL DEFAULT 0,
+    processed_files INTEGER NOT NULL DEFAULT 0,
+    failed_files    INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL DEFAULT 'uploading',
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    completed_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_jobs_job ON import_jobs(job_id);
+
 CREATE TABLE IF NOT EXISTS cvs (
     id                  TEXT PRIMARY KEY,
     job_id              TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    import_job_id       TEXT REFERENCES import_jobs(id) ON DELETE SET NULL,
     file_name           TEXT NOT NULL,
     storage_path        TEXT NOT NULL,
     status              TEXT NOT NULL DEFAULT 'queued',
+    created_at          TEXT NOT NULL DEFAULT '',
     candidate_name      TEXT,
     profile_text        TEXT,
     skills              TEXT,
@@ -52,25 +69,26 @@ CREATE TABLE IF NOT EXISTS cvs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cvs_job ON cvs(job_id);
+CREATE INDEX IF NOT EXISTS idx_cvs_import ON cvs(import_job_id);
 """
+
+
+async def _add_column(db, table: str, column: str, ddl: str) -> None:
+    try:
+        await db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
 
 async def init_db() -> None:
     settings.ensure_dirs()
     async with aiosqlite.connect(settings.db_path) as db:
         await db.executescript(SCHEMA)
-        try:
-            await db.execute("ALTER TABLE cvs ADD COLUMN source TEXT")
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        try:
-            await db.execute("ALTER TABLE cvs ADD COLUMN ranked_by TEXT")
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        try:
-            await db.execute("ALTER TABLE jobs ADD COLUMN jd_file TEXT")
-        except sqlite3.OperationalError:
-            pass  # column already exists
+        await _add_column(db, "cvs", "import_job_id", "TEXT REFERENCES import_jobs(id) ON DELETE SET NULL")
+        await _add_column(db, "cvs", "created_at", "TEXT NOT NULL DEFAULT ''")
+        await _add_column(db, "cvs", "source", "TEXT")
+        await _add_column(db, "cvs", "ranked_by", "TEXT")
+        await _add_column(db, "jobs", "jd_file", "TEXT")
         await db.commit()
 
 

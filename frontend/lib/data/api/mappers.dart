@@ -98,6 +98,39 @@ class RankResponseMapper {
   }
 }
 
+class ImportResponseMapper {
+  ImportResponseMapper._();
+
+  static ImportResponseDto fromJson(Map<String, dynamic> json) {
+    return ImportResponseDto(
+      importId: json['import_id'] as String,
+      jobId: (json['job_id'] as String?) ?? '',
+      status: (json['status'] as String?) ?? 'submitted',
+      totalFiles: (json['total_files'] as num?)?.toInt() ?? 0,
+      batchFiles: (json['batch_files'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class ImportStatusMapper {
+  ImportStatusMapper._();
+
+  static ImportStatusDto fromJson(Map<String, dynamic> json) {
+    return ImportStatusDto(
+      importId: json['import_id'] as String,
+      jobId: (json['job_id'] as String?) ?? '',
+      status: (json['status'] as String?) ?? '',
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      uploaded: (json['uploaded'] as num?)?.toInt() ?? 0,
+      processed: (json['processed'] as num?)?.toInt() ?? 0,
+      failed: (json['failed'] as num?)?.toInt() ?? 0,
+      pending: (json['pending'] as num?)?.toInt() ?? 0,
+      createdAt: json['created_at'] as String?,
+      completedAt: json['completed_at'] as String?,
+    );
+  }
+}
+
 List<String> _stringList(dynamic value) {
   if (value is List) return value.map((e) => e.toString()).toList();
   return const [];

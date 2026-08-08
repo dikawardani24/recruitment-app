@@ -7,8 +7,9 @@ from app.di.injection import (
     get_job_by_page_use_case,
     get_job_use_case,
     delete_job_use_case,
-    upload_cvs_use_case,
+    import_cv_batch_use_case,
     list_cvs_use_case,
+    get_import_status_use_case,
     delete_cv_use_case,
     rank_job_use_case,
     rank_cv_use_case,
@@ -70,14 +71,43 @@ async def delete_cv(job_id: str, cv_id: str) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/jobs/{job_id}/cvs", status_code=201)
+@router.post("/jobs/{job_id}/candidates/import", status_code=202)
+async def import_cvs_batch(
+    job_id: str,
+    files: list[UploadFile] = File(...),
+    import_id: str | None = Form(None),
+) -> dict:
+    """Upload one batch of CV files. Files are persisted and queued for
+    background processing; this call returns immediately and does not wait for
+    extraction/AI. Pass an existing `import_id` to append to an ongoing import."""
+    try:
+        return await import_cv_batch_use_case().execute(
+            job_id, files, import_id=import_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/jobs/{job_id}/cvs", status_code=202)
 async def upload_cvs(
     job_id: str,
     files: list[UploadFile] = File(...),
+    import_id: str | None = Form(None),
 ) -> dict:
-    """Upload one or many CV files (PDF/DOCX/TXT). Each is parsed immediately."""
+    """Backwards-compatible alias for `POST /jobs/{job_id}/candidates/import`."""
     try:
-        return await upload_cvs_use_case().execute(job_id, files)
+        return await import_cv_batch_use_case().execute(
+            job_id, files, import_id=import_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/jobs/{job_id}/imports/{import_id}")
+async def get_import_status(job_id: str, import_id: str) -> dict:
+    """Import progress: total/uploaded/processed/failed counts and state."""
+    try:
+        return await get_import_status_use_case().execute(job_id, import_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

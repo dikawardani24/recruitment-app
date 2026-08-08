@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ def client(tmp_path: Path):
     settings.db_path = tmp_path / "test.db"
     settings.upload_dir = tmp_path / "uploads"
     settings.llm_api_key = None
+    settings.import_poll_interval_ms = 20
     settings.ensure_dirs()
 
     import asyncio
@@ -35,6 +37,46 @@ def cv_builder(tmp_path: Path):
         return name, path.read_bytes(), "text/plain"
 
     return build
+
+
+def create_job(client, title="Senior Backend Engineer", description=None) -> str:
+    if description is None:
+        description = BACKEND_JD
+    resp = client.post("/api/jobs", data={"title": title, "description": description})
+    assert resp.status_code == 201, resp.text
+    return resp.json()["job"]["job_id"]
+
+
+def upload_cvs(client, job_id, cv_builder, *specs, **kwargs) -> dict:
+    """Upload one batch of CVs. `specs` are (name, body) tuples."""
+    import_id = kwargs.get("import_id")
+    files = [("files", cv_builder(name, body)) for name, body in specs]
+    data = {"import_id": import_id} if import_id else None
+    resp = client.post(
+        f"/api/jobs/{job_id}/candidates/import",
+        files=files,
+        data=data,
+    )
+    assert resp.status_code == 202, resp.text
+    return resp.json()
+
+
+def upload_cvs_and_wait(client, job_id, cv_builder, *specs, **kwargs) -> dict:
+    """Upload a batch and wait for its documents to reach a terminal state.
+    Returns the final import status dict."""
+    resp = upload_cvs(client, job_id, cv_builder, *specs, **kwargs)
+    return wait_for_import(client, job_id, resp["import_id"], **kwargs)
+
+
+def wait_for_import(client, job_id, import_id, timeout=10.0, **_) -> dict:
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        last = client.get(f"/api/jobs/{job_id}/imports/{import_id}").json()
+        if last["status"] in ("completed", "partially_failed", "failed"):
+            return last
+        time.sleep(0.02)
+    raise AssertionError(f"import {import_id} did not finish: {last}")
 
 
 SENIOR_BACKEND = """John Doe

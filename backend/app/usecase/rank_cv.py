@@ -32,8 +32,8 @@ class RankCv:
         cv = await self.cv_repo.find_by_id(job_id, cv_id)
         if cv is None:
             raise NotFoundError("cv_not_found")
-        if cv.status == "failed":
-            raise ValueError("cv_parse_failed")
+        if cv.status not in ("completed", "ranked"):
+            raise ValueError("cv_not_ready")
 
         profile = Profile.from_cv(cv.as_dict())
         ranked, source = await RankingService(self.settings).rank(

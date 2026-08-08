@@ -46,6 +46,25 @@ class CvRepositoryImpl:
             ranked_by=candidate.ranked_by,
         )
 
+    async def find_uploaded(self, limit: int) -> list[Candidate]:
+        entities = await self.datasource.find_uploaded(limit)
+        return [Candidate.from_entity(e) for e in entities]
+
+    async def mark_processing(self, cv_id: str):
+        await self.datasource.mark_processing(cv_id)
+
+    async def reset_stale_processing(self):
+        await self.datasource.reset_stale_processing()
+
+    async def complete_document(self, candidate: Candidate):
+        await self.datasource.complete_document(candidate.to_entity())
+
+    async def mark_failed(self, cv_id: str, error: str):
+        await self.datasource.mark_failed(cv_id, error)
+
+    async def count_by_import(self, import_id: str) -> dict[str, int]:
+        return await self.datasource.count_by_import(import_id)
+
 
 def _dumps(value):
     import json

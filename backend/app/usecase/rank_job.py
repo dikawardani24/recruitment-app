@@ -30,9 +30,10 @@ class RankJob:
             raise ValueError("job_missing_description")
 
         cvs = await self.cv_repo.find_by_job(job_id)
-        # Only score candidates that have not been ranked yet. Already-ranked CVs
-        # are re-scored individually (see rank_cv) rather than on the bulk action.
-        parsed = [cv for cv in cvs if cv.status == "parsed"]
+        # Only score candidates that have completed processing and have not been
+        # ranked yet. Already-ranked CVs are re-scored individually (see rank_cv)
+        # rather than on the bulk action.
+        parsed = [cv for cv in cvs if cv.status == "completed"]
         if not parsed:
             return {"job_id": job_id, "count": 0, "results": []}
 

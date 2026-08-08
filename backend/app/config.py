@@ -27,6 +27,12 @@ class Settings:
         )
     )
 
+    # CV import / background processing.
+    import_batch_size: int = int(os.getenv("ATS_IMPORT__BATCH_SIZE", "20"))
+    import_worker_concurrency: int = int(os.getenv("ATS_IMPORT__WORKERS", "4"))
+    import_poll_interval_ms: int = int(os.getenv("ATS_IMPORT__POLL_MS", "1000"))
+    import_retry_delay_ms: int = int(os.getenv("ATS_IMPORT__RETRY_DELAY_MS", "200"))
+
     # LLM (optional). When unset, ranking falls back to deterministic rule-based
     # scoring + template reasoning. Supports OpenAI and OpenAI-compatible endpoints
     # (e.g. Google Gemini at https://generativelanguage.googleapis.com/v1beta/openai/).

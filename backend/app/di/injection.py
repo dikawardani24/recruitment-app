@@ -2,25 +2,31 @@ from app.config import Settings, settings
 from app.database.db_client import DbClient
 from app.database.datasource.job_datasource import JobDatasource
 from app.database.datasource.cv_datasource import CvDatasource
+from app.database.datasource.import_job_datasource import ImportJobDatasource
 from app.repository.job_repository import JobRepository
 from app.repository.impl.job_repository_impl import JobRepositoryImpl
 from app.repository.cv_repository import CvRepository
 from app.repository.impl.cv_repository_impl import CvRepositoryImpl
+from app.repository.import_job_repository import ImportJobRepository
+from app.repository.impl.import_job_repository_impl import ImportJobRepositoryImpl
 from app.usecase.get_job_by_page import GetJobByPage
 from app.usecase.save_job import SaveJob
 from app.usecase.get_job import GetJob
 from app.usecase.delete_job import DeleteJob
-from app.usecase.upload_cvs import UploadCvs
+from app.usecase.import_cv_batch import ImportCvBatch
 from app.usecase.list_cvs import ListCvs
+from app.usecase.get_import_status import GetImportStatus
 from app.usecase.delete_cv import DeleteCv
 from app.usecase.rank_job import RankJob
 from app.usecase.rank_cv import RankCv
 from app.usecase.get_rankings import GetRankings
+from app.imports.processor import CvProcessor
 
 """DATASOURCE"""
 __db_client = DbClient()
 __job_datasource = JobDatasource(__db_client)
 __cv_datasource = CvDatasource(__db_client)
+__import_datasource = ImportJobDatasource(__db_client)
 
 
 """REPOSITORY"""
@@ -29,6 +35,9 @@ def __job_repo() -> JobRepository:
 
 def __cv_repo() -> CvRepository:
     return CvRepositoryImpl(__cv_datasource)
+
+def __import_repo() -> ImportJobRepository:
+    return ImportJobRepositoryImpl(__import_datasource)
 
 
 """USE CASE"""
@@ -42,13 +51,16 @@ def get_job_use_case() -> GetJob:
     return GetJob(__job_repo(), __cv_repo())
 
 def delete_job_use_case() -> DeleteJob:
-    return DeleteJob(__job_repo(), __cv_repo())
+    return DeleteJob(__job_repo(), __cv_repo(), __import_repo())
 
-def upload_cvs_use_case() -> UploadCvs:
-    return UploadCvs(__job_repo(), __cv_repo(), _settings())
+def import_cv_batch_use_case() -> ImportCvBatch:
+    return ImportCvBatch(__job_repo(), __cv_repo(), __import_repo(), _settings())
 
 def list_cvs_use_case() -> ListCvs:
     return ListCvs(__job_repo(), __cv_repo())
+
+def get_import_status_use_case() -> GetImportStatus:
+    return GetImportStatus(__job_repo(), __cv_repo(), __import_repo())
 
 def delete_cv_use_case() -> DeleteCv:
     return DeleteCv(__job_repo(), __cv_repo())
@@ -61,6 +73,18 @@ def rank_cv_use_case() -> RankCv:
 
 def get_rankings_use_case() -> GetRankings:
     return GetRankings(__job_repo(), __cv_repo())
+
+
+"""WORKER"""
+__cv_processor: CvProcessor | None = None
+
+def cv_processor() -> CvProcessor:
+    global __cv_processor
+    if __cv_processor is None:
+        __cv_processor = CvProcessor(
+            _settings(), __cv_repo(), __import_repo()
+        )
+    return __cv_processor
 
 
 def _settings() -> Settings:

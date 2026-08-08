@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.database.db_client import DbClient
 from app.database.entities.cv_entity import CvEntity
 
@@ -10,13 +12,19 @@ class CvDatasource:
         self.db = db
 
     async def save(self, entity: CvEntity):
+        created_at = (
+            entity.created_at
+            or datetime.now(timezone.utc).isoformat()
+        )
         query = """
         INSERT INTO cvs (
             id,
             job_id,
+            import_job_id,
             file_name,
             storage_path,
             status,
+            created_at,
             candidate_name,
             profile_text,
             skills,
@@ -25,16 +33,18 @@ class CvDatasource:
             certifications,
             source
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         await self.db.execute(
             query,
             (
                 entity.id,
                 entity.job_id,
+                entity.import_job_id,
                 entity.file_name,
                 entity.storage_path,
                 entity.status,
+                created_at,
                 entity.candidate_name,
                 entity.profile_text,
                 entity.skills,
@@ -148,3 +158,77 @@ class CvDatasource:
                 cv_id,
             ),
         )
+
+    async def find_uploaded(self, limit: int) -> list[CvEntity]:
+        query = """
+        SELECT *
+        FROM cvs
+        WHERE status = 'uploaded'
+        ORDER BY created_at ASC
+        LIMIT ?
+        """
+        rows = await self.db.fetchall(query, (limit,))
+        return [CvEntity.from_row(row) for row in rows]
+
+    async def mark_processing(self, cv_id: str):
+        query = """
+        UPDATE cvs
+        SET status = 'processing'
+        WHERE id = ? AND status = 'uploaded'
+        """
+        await self.db.execute(query, (cv_id,))
+
+    async def reset_stale_processing(self):
+        query = """
+        UPDATE cvs
+        SET status = 'uploaded'
+        WHERE status = 'processing'
+        """
+        await self.db.execute(query)
+
+    async def complete_document(self, entity: CvEntity):
+        query = """
+        UPDATE cvs
+        SET
+            status = 'completed',
+            candidate_name = ?,
+            profile_text = ?,
+            skills = ?,
+            years_experience = ?,
+            education = ?,
+            certifications = ?,
+            source = ?,
+            error = NULL
+        WHERE id = ?
+        """
+        await self.db.execute(
+            query,
+            (
+                entity.candidate_name,
+                entity.profile_text,
+                entity.skills,
+                entity.years_experience,
+                entity.education,
+                entity.certifications,
+                entity.source,
+                entity.id,
+            ),
+        )
+
+    async def mark_failed(self, cv_id: str, error: str):
+        query = """
+        UPDATE cvs
+        SET status = 'failed', error = ?
+        WHERE id = ?
+        """
+        await self.db.execute(query, (error, cv_id))
+
+    async def count_by_import(self, import_id: str) -> dict[str, int]:
+        query = """
+        SELECT status, COUNT(*) AS c
+        FROM cvs
+        WHERE import_job_id = ?
+        GROUP BY status
+        """
+        rows = await self.db.fetchall(query, (import_id,))
+        return {row["status"]: row["c"] for row in rows}

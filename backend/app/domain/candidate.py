@@ -26,6 +26,8 @@ class Candidate:
         file_name: str,
         storage_path: str,
         status: str,
+        import_job_id: str | None = None,
+        created_at: str = "",
         candidate_name: str | None = None,
         profile_text: str | None = None,
         skills: list[str] | None = None,
@@ -54,6 +56,8 @@ class Candidate:
         self.file_name = file_name
         self.storage_path = storage_path
         self.status = status
+        self.import_job_id = import_job_id
+        self.created_at = created_at
         self.candidate_name = candidate_name
         self.profile_text = profile_text
         self.skills = skills or []
@@ -85,6 +89,8 @@ class Candidate:
             file_name=entity.file_name,
             storage_path=entity.storage_path,
             status=entity.status,
+            import_job_id=entity.import_job_id,
+            created_at=entity.created_at,
             candidate_name=entity.candidate_name,
             profile_text=entity.profile_text,
             skills=_loads(entity.skills),
@@ -116,6 +122,7 @@ class Candidate:
             file_name=d.get("file_name") or "",
             storage_path=d.get("storage_path") or "",
             status="ranked",
+            import_job_id=d.get("import_job_id"),
             candidate_name=d.get("candidate_name"),
             profile_text=d.get("profile_text"),
             skills=d.get("skills") or [],
@@ -144,6 +151,7 @@ class Candidate:
         return {
             "id": self.id,
             "job_id": self.job_id,
+            "import_job_id": self.import_job_id,
             "file_name": self.file_name,
             "storage_path": self.storage_path,
             "status": self.status,
@@ -160,6 +168,8 @@ class Candidate:
         return CvEntity(
             id=self.id,
             job_id=self.job_id,
+            import_job_id=self.import_job_id,
+            created_at=self.created_at,
             file_name=self.file_name,
             storage_path=self.storage_path,
             status=self.status,

@@ -1,17 +1,21 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_detail_controller.dart';
+import '../controllers/upload_controller.dart';
 import '../domain/models.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/candidate_detail_sheet.dart';
+import '../widgets/cv_upload_overlay.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/rank_engine_chip.dart';
@@ -33,6 +37,33 @@ class JobDetailScreen extends HookConsumerWidget {
     final detailState = ref.watch(jobDetailControllerProvider);
     final detailController = ref.read(jobDetailControllerProvider.notifier);
 
+    final polledCvs = cvsAsync.value ?? const <CandidateResult>[];
+    final hasPendingProcessing = polledCvs.any(
+      (c) => c.status == 'uploaded' || c.status == 'processing',
+    );
+    // Poll while candidates are still being processed in the background so the
+    // list refreshes on its own. No WebSocket required.
+    useEffect(
+      () {
+        if (!hasPendingProcessing) return null;
+        Timer? timer;
+        timer = Timer.periodic(const Duration(seconds: 3), (_) {
+          final current =
+              ref.read(cvsProvider(jobId)).value ?? const <CandidateResult>[];
+          final stillPending = current.any(
+            (c) => c.status == 'uploaded' || c.status == 'processing',
+          );
+          if (!stillPending) {
+            timer?.cancel();
+            return;
+          }
+          ref.invalidate(cvsProvider(jobId));
+        });
+        return timer.cancel;
+      },
+      [jobId, hasPendingProcessing, polledCvs.length],
+    );
+
     Future<void> pickCvs() async {
       final messenger = ScaffoldMessenger.of(context);
       final result = await FilePicker.pickFiles(
@@ -46,15 +77,23 @@ class JobDetailScreen extends HookConsumerWidget {
           .map((f) => File(f.path!))
           .toList();
       if (files.isEmpty) return;
+      if (!context.mounted) return;
 
-      try {
-        final uploaded = await detailController.uploadCvs(jobId, files);
-        messenger.showSnackBar(
-          SnackBar(content: Text('Uploaded $uploaded CV(s)')),
-        );
-      } catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text('Upload failed: $e')));
-      }
+      // Uploads run in batches and are tracked by [uploadControllerProvider];
+      // the overlay closes once the user is done, but extraction continues on
+      // the backend regardless.
+      ref.read(uploadControllerProvider.notifier).start(jobId, files);
+      await showCvUploadOverlay(context, jobId);
+      if (!context.mounted) return;
+      await detailController.refreshCvs(jobId);
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${files.length} CV(s) submitted. Processing continues in the background.',
+          ),
+        ),
+      );
     }
 
     Future<void> rank() async {
@@ -267,6 +306,10 @@ class JobDetailScreen extends HookConsumerWidget {
                   'Candidates (${cvs.length})',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
+                if (cvs.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _CandidateStatusSummary(cvs: cvs),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -578,7 +621,7 @@ class _CandidateTile extends StatelessWidget {
         title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: score == null
             ? Text(
-                cv.status == 'failed' ? 'Failed: ${cv.error}' : cv.status,
+                _candidateStatusLabel(cv),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               )
@@ -642,6 +685,109 @@ class _NotRankedHint extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+String _candidateStatusLabel(CandidateResult cv) {
+  switch (cv.status) {
+    case 'completed':
+      return 'Ready to rank';
+    case 'ranked':
+      return 'Ranked';
+    case 'processing':
+      return 'Processing…';
+    case 'uploaded':
+      return 'Queued for processing';
+    case 'failed':
+      return 'Failed: ${cv.error ?? 'unknown error'}';
+    default:
+      return cv.status;
+  }
+}
+
+/// Compact ready/processing/failed breakdown for the candidates list.
+class _CandidateStatusSummary extends StatelessWidget {
+  final List<CandidateResult> cvs;
+
+  const _CandidateStatusSummary({required this.cvs});
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = cvs.where((c) {
+      return c.status == 'completed' || c.status == 'ranked';
+    }).length;
+    final processing = cvs.where((c) {
+      return c.status == 'uploaded' || c.status == 'processing';
+    }).length;
+    final failed = cvs.where((c) => c.status == 'failed').length;
+
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (ready > 0)
+          _StatusChip(
+            icon: Icons.check_circle_outline,
+            label: '$ready ready',
+            color: Colors.green.shade700,
+            theme: theme,
+          ),
+        if (processing > 0)
+          _StatusChip(
+            icon: Icons.sync,
+            label: '$processing processing',
+            color: theme.colorScheme.primary,
+            theme: theme,
+          ),
+        if (failed > 0)
+          _StatusChip(
+            icon: Icons.error_outline,
+            label: '$failed failed',
+            color: theme.colorScheme.error,
+            theme: theme,
+          ),
+      ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final ThemeData theme;
+
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

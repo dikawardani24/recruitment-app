@@ -94,6 +94,48 @@ class JobPageResponse {
   });
 }
 
+class ImportResponseDto {
+  final String importId;
+  final String jobId;
+  final String status;
+  final int totalFiles;
+  final int batchFiles;
+
+  const ImportResponseDto({
+    required this.importId,
+    required this.jobId,
+    required this.status,
+    required this.totalFiles,
+    required this.batchFiles,
+  });
+}
+
+class ImportStatusDto {
+  final String importId;
+  final String jobId;
+  final String status;
+  final int total;
+  final int uploaded;
+  final int processed;
+  final int failed;
+  final int pending;
+  final String? createdAt;
+  final String? completedAt;
+
+  const ImportStatusDto({
+    required this.importId,
+    required this.jobId,
+    required this.status,
+    required this.total,
+    required this.uploaded,
+    required this.processed,
+    required this.failed,
+    required this.pending,
+    this.createdAt,
+    this.completedAt,
+  });
+}
+
 class RankResponseDto {
   final String source;
   final List<CandidateResponse> results;

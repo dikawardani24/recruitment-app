@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../domain/models/candidate_result.dart';
+import '../../domain/models/import_result.dart';
 import '../../domain/models/rank_response.dart';
 import '../../domain/repositories/candidate_repository.dart';
 import '../api/response_models.dart';
@@ -15,12 +17,42 @@ class CandidateRepositoryImpl implements CandidateRepository {
   final CandidateApiDataSource _dataSource;
 
   @override
-  Future<List<CandidateResult>> uploadCvs(
-    String jobId,
-    List<File> files,
-  ) async {
-    final dtos = await _dataSource.uploadCvs(jobId, files);
-    return dtos.map(_toCandidate).toList();
+  Future<ImportResponse> uploadCvBatch(
+    String jobId, {
+    String? importId,
+    required List<File> files,
+    ProgressCallback? onSendProgress,
+  }) async {
+    final dto = await _dataSource.uploadCvBatch(
+      jobId,
+      importId: importId,
+      files: files,
+      onSendProgress: onSendProgress,
+    );
+    return ImportResponse(
+      importId: dto.importId,
+      jobId: dto.jobId,
+      status: dto.status,
+      totalFiles: dto.totalFiles,
+      batchFiles: dto.batchFiles,
+    );
+  }
+
+  @override
+  Future<ImportStatus> getImportStatus(String jobId, String importId) async {
+    final dto = await _dataSource.getImportStatus(jobId, importId);
+    return ImportStatus(
+      importId: dto.importId,
+      jobId: dto.jobId,
+      status: dto.status,
+      total: dto.total,
+      uploaded: dto.uploaded,
+      processed: dto.processed,
+      failed: dto.failed,
+      pending: dto.pending,
+      createdAt: dto.createdAt,
+      completedAt: dto.completedAt,
+    );
   }
 
   @override

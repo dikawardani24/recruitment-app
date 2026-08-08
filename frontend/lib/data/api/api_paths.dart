@@ -9,6 +9,12 @@ class ApiPaths {
 
   static String cv(String jobId, String cvId) => '/jobs/$jobId/cvs/$cvId';
 
+  static String candidateImport(String jobId) =>
+      '/jobs/$jobId/candidates/import';
+
+  static String importStatus(String jobId, String importId) =>
+      '/jobs/$jobId/imports/$importId';
+
   static String rank(String jobId) => '/jobs/$jobId/rank';
 
   static String cvRank(String jobId, String cvId) => '/jobs/$jobId/cvs/$cvId/rank';
