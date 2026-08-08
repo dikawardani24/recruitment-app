@@ -232,7 +232,6 @@ def test_import_from_another_job_returns_404(client, cv_builder):
 @pytest.mark.asyncio
 async def test_restart_recovers_stuck_documents(tmp_path: Path):
     """Documents stuck in PROCESSING after a crash are re-queued on startup."""
-    from app import db as app_db
     from app.database.datasource.cv_datasource import CvDatasource
     from app.database.datasource.import_job_datasource import ImportJobDatasource
     from app.database.db_client import DbClient
@@ -245,7 +244,7 @@ async def test_restart_recovers_stuck_documents(tmp_path: Path):
     settings.db_path = tmp_path / "test.db"
     settings.upload_dir = tmp_path / "uploads"
     settings.ensure_dirs()
-    await app_db.init_db()
+    await DbClient().init_scheme()
 
     db = DbClient()
     cv_repo = CvRepositoryImpl(CvDatasource(db))

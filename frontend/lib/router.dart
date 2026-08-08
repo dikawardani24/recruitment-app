@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'navigation/app_navigator.dart';
@@ -12,6 +13,7 @@ import 'screens/rankings_screen.dart';
 class AppRouter {
   static GoRouter create() {
     return GoRouter(
+      navigatorKey: ChuckerFlutter.navigatorKey,
       initialLocation: AppRoute.jobs.path,
       routes: [
         GoRoute(

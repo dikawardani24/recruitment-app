@@ -38,6 +38,7 @@ class JobDetailController extends Notifier<JobDetailState> {
     _start('Ranking candidates…');
     try {
       final response = await getIt<RankJob>()(jobId);
+      ref.invalidate(rankingsProvider(jobId));
       await refreshCvs(jobId);
       final title = ref.read(jobProvider(jobId)).value?.title ?? 'Job';
       ref.read(navigatorProvider).goToRankings(

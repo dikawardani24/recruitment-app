@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db
 from app.config import settings
+from app.database.db_client import DbClient
 
 
 @pytest.fixture()
@@ -21,7 +21,7 @@ def client(tmp_path: Path):
 
     import asyncio
 
-    asyncio.run(db.init_db())
+    asyncio.run(DbClient().init_scheme())
 
     from app.main import app
 

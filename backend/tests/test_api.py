@@ -151,7 +151,7 @@ def test_rank_single_cv_unknown_404(client, cv_builder):
     assert resp.status_code == 404
 
 
-def test_bulk_rank_skips_already_ranked_cvs(client, cv_builder):
+def test_bulk_rank_reranks_already_ranked_cvs(client, cv_builder):
     job_id = create_job(client)
     cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
     _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
@@ -160,10 +160,32 @@ def test_bulk_rank_skips_already_ranked_cvs(client, cv_builder):
 
     resp = client.post(f"/api/jobs/{job_id}/rank")
     assert resp.status_code == 200, resp.text
-    assert resp.json()["count"] == 1  # only the unranked alice
+    # bulk rank re-scores everything that has finished processing
+    assert resp.json()["count"] == 2
 
     ranked = client.get(f"/api/jobs/{job_id}/rankings").json()["results"]
     assert len(ranked) == 2  # both now ranked
+
+
+def test_bulk_rank_rejects_when_no_candidates_ready(client, cv_builder):
+    import asyncio
+
+    from app.database.db_client import DbClient
+
+    job_id = create_job(client)
+    cv_id = _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+
+    # force the CV back to an in-progress state so nothing is ready to rank
+    asyncio.run(
+        DbClient().execute(
+            "UPDATE cvs SET status = 'uploaded' WHERE id = ?",
+            (cv_id,),
+        )
+    )
+
+    resp = client.post(f"/api/jobs/{job_id}/rank")
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == "no_candidates_ready"
 
 
 def test_list_jobs_includes_cv_count(client, cv_builder):

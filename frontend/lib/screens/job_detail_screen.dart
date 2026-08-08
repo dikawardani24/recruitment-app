@@ -98,10 +98,117 @@ class JobDetailScreen extends HookConsumerWidget {
 
     Future<void> rank() async {
       final messenger = ScaffoldMessenger.of(context);
+      final cvs = cvsAsync.value ?? [];
+
+      if (cvs.isEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('No candidates to rank'),
+            content: const Text(
+              'Add CVs first, then tap "Rank CVs" to score the candidates.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final allRanked = cvs.every((c) => c.status == 'ranked');
+      if (allRanked) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Re-rank all candidates?'),
+            content: Text(
+              'All ${cvs.length} '
+              '${cvs.length == 1 ? 'candidate has' : 'candidates have'} '
+              'already been ranked. Re-run ranking on all of them?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Re-rank all'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+      }
+
+      final hasReady = cvs.any(
+        (c) => c.status == 'completed' || c.status == 'ranked',
+      );
+      if (!hasReady) {
+        if (!context.mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Ranking unavailable'),
+            content: const Text(
+              'No candidates are ready to rank yet. Wait until CV processing '
+              'finishes before ranking.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       try {
         await detailController.rank(jobId);
       } catch (e) {
         messenger.showSnackBar(SnackBar(content: Text('Ranking failed: $e')));
+      }
+    }
+
+    Future<bool> rankSingle(CandidateResult cv) async {
+      final ready = cv.status == 'completed' || cv.status == 'ranked';
+      final cvId = cv.cvId;
+      if (!ready || cvId == null) {
+        if (!context.mounted) return false;
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Ranking unavailable'),
+            content: const Text(
+              'This candidate is not ready to rank yet. Wait until CV '
+              'processing finishes before ranking.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return false;
+      }
+      try {
+        await detailController.rankCv(jobId, cvId);
+        return true;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ranking failed: $e')),
+          );
+        }
+        return false;
       }
     }
 
@@ -178,7 +285,8 @@ class JobDetailScreen extends HookConsumerWidget {
     }
 
     final job = jobAsync.value;
-    final cvs = cvsAsync.value ?? [];
+    final cvs = [...cvsAsync.value ?? const <CandidateResult>[]]
+      ..sort(_byRank);
 
     if (jobAsync.hasError) {
       return Scaffold(
@@ -259,47 +367,71 @@ class JobDetailScreen extends HookConsumerWidget {
                   _RequirementsView(requirements: job.requirements!),
                 ],
                 const SizedBox(height: 24),
-                rankingsAsync.when(
-                  loading: () => const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  ),
-                  error: (e, _) => const SizedBox.shrink(),
-                  data: (ranked) {
-                    if (ranked.isEmpty) {
-                      if (cvs.isEmpty) return const SizedBox.shrink();
-                      return const _NotRankedHint();
-                    }
-                    return Column(
+                Card(
+                  elevation: 0,
+                  shape: cardShape(Theme.of(context)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        BucketDonut(buckets: bucketCounts(ranked)),
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.center,
-                          child: TextButton.icon(
-                            onPressed: () => ref
-                                .read(navigatorProvider)
-                                .goToRankings(
-                                  RankingsScreenData(
-                                    jobId: jobId,
-                                    jobTitle: job.title,
-                                    source: ranked.first.source ?? 'rules',
+                        Text(
+                          'Ranking',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 12),
+                        rankingsAsync.when(
+                          loading: () => const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          ),
+                          error: (e, _) => const SizedBox.shrink(),
+                          data: (ranked) {
+                            if (ranked.isEmpty) {
+                              if (cvs.isEmpty) return const SizedBox.shrink();
+                              return const _NotRankedHint();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                BucketDonut(buckets: bucketCounts(ranked)),
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.center,
+                                  child: TextButton.icon(
+                                    onPressed: () => ref
+                                        .read(navigatorProvider)
+                                        .goToRankings(
+                                          RankingsScreenData(
+                                            jobId: jobId,
+                                            jobTitle: job.title,
+                                            source: ranked.first.source ?? 'rules',
+                                          ),
+                                        ),
+                                    icon: const Icon(Icons.timeline),
+                                    label: const Text('View full ranking'),
                                   ),
                                 ),
-                            icon: const Icon(Icons.timeline),
-                            label: const Text('View full ranking'),
-                          ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: detailState.busy ? null : rank,
+                          icon: const Icon(Icons.psychology),
+                          label: const Text('Rank CVs'),
                         ),
                       ],
-                    );
-                  },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -311,24 +443,10 @@ class JobDetailScreen extends HookConsumerWidget {
                   _CandidateStatusSummary(cvs: cvs),
                 ],
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: detailState.busy ? null : pickCvs,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Add CVs'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: detailState.busy ? null : rank,
-                        icon: const Icon(Icons.psychology),
-                        label: const Text('Rank CVs'),
-                      ),
-                    ),
-                  ],
+                OutlinedButton.icon(
+                  onPressed: detailState.busy ? null : pickCvs,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Add CVs'),
                 ),
                 const SizedBox(height: 12),
                 if (cvs.isEmpty)
@@ -351,9 +469,9 @@ class JobDetailScreen extends HookConsumerWidget {
                         ),
                         child: _CandidateTile(
                           cv: cv,
-                          onRank: cv.cvId == null || cv.status == 'failed'
+                          onRank: cv.cvId == null
                               ? null
-                              : () => detailController.rankCv(jobId, cv.cvId!),
+                              : () => rankSingle(cv),
                         ),
                       ),
                     ),
@@ -581,9 +699,35 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
   }
 }
 
+/// Orders candidates for the job detail list: ranked first (by score desc),
+/// then ready-to-rank, then pending, then failed.
+int _byRank(CandidateResult a, CandidateResult b) {
+  int priority(CandidateResult c) {
+    switch (c.status) {
+      case 'ranked':
+        return 0;
+      case 'completed':
+        return 1;
+      case 'uploaded':
+      case 'processing':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  final pa = priority(a);
+  final pb = priority(b);
+  if (pa != pb) return pa.compareTo(pb);
+  if (pa == 0) {
+    return (b.overallScore ?? 0).compareTo(a.overallScore ?? 0);
+  }
+  return 0;
+}
+
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
-  final Future<void> Function()? onRank;
+  final Future<bool> Function()? onRank;
 
   const _CandidateTile({required this.cv, this.onRank});
 
@@ -662,30 +806,24 @@ class _NotRankedHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.insights, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Not ranked yet', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Tap "Rank CVs" to score the candidates and see how they compare.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
+    return Row(
+      children: [
+        Icon(Icons.insights, color: theme.colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Not ranked yet', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                'Tap "Rank CVs" to score the candidates and see how they compare.',
+                style: theme.textTheme.bodySmall,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

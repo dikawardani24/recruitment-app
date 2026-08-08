@@ -30,12 +30,15 @@ class RankJob:
             raise ValueError("job_missing_description")
 
         cvs = await self.cv_repo.find_by_job(job_id)
-        # Only score candidates that have completed processing and have not been
-        # ranked yet. Already-ranked CVs are re-scored individually (see rank_cv)
-        # rather than on the bulk action.
-        parsed = [cv for cv in cvs if cv.status == "completed"]
+        # Score every candidate that has finished processing. Already-ranked
+        # CVs are included so the bulk "re-rank all" action re-scores them too.
+        # Ranking is only valid once a candidate is ready (completed/ranked),
+        # so reject the call when none are ready instead of silently skipping.
+        parsed = [
+            cv for cv in cvs if cv.status in ("completed", "ranked")
+        ]
         if not parsed:
-            return {"job_id": job_id, "count": 0, "results": []}
+            raise ValueError("no_candidates_ready")
 
         profiles = [Profile.from_cv(cv.as_dict()) for cv in parsed]
         ranked, source = await RankingService(self.settings).rank(

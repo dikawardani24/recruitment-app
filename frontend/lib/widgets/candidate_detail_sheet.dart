@@ -11,7 +11,7 @@ import 'score_color.dart';
 void showCandidateDetailSheet(
   BuildContext context,
   CandidateResult c, {
-  Future<void> Function()? onRank,
+  Future<bool> Function()? onRank,
 }) {
   final theme = Theme.of(context);
   final score = c.overallScore;
@@ -41,15 +41,15 @@ void showCandidateDetailSheet(
                   const SizedBox(height: 4),
                   Text(c.fileName, style: theme.textTheme.labelSmall),
                   const SizedBox(height: 16),
-                  if (onRank != null && c.status != 'failed') ...[
+                  if (onRank != null) ...[
                     _RankCvButton(
                       label: score == null ? 'Rank this CV' : 'Re-rank CV',
                       busy: ranking,
                       onPressed: () async {
                         setState(() => ranking = true);
                         try {
-                          await onRank();
-                          if (context.mounted) {
+                          final ranked = await onRank();
+                          if (context.mounted && ranked) {
                             Navigator.of(context).pop();
                           }
                         } finally {
