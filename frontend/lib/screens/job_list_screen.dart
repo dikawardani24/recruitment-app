@@ -58,7 +58,16 @@ class JobListScreen extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('Jobs'),
         actions: [
-          ChuckerFlutter.chuckerButton,
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => ref.read(navigatorProvider).goToSettings(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Open Chucker Flutter',
+            onPressed: ChuckerFlutter.showChuckerScreen,
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

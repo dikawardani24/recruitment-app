@@ -21,6 +21,8 @@ abstract class AppNavigator {
 
   void goToJobForm();
 
+  void goToSettings();
+
   void goToJobDetail(String jobId);
 
   void goToRankings(RankingsScreenData data);

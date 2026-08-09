@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../domain/models.dart';
 import '../providers.dart';
+import '../widgets/accent_chip.dart';
 import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
@@ -146,14 +147,8 @@ class _RankedCard extends StatelessWidget {
                 runSpacing: 6,
                 children: c.strengths
                     .map(
-                      (skill) => Chip(
-                        label: Text(skill),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: Colors.green.shade50,
-                        labelStyle: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.green.shade700,
-                        ),
-                      ),
+                      (skill) =>
+                          AccentChip(label: skill, accent: Colors.green),
                     )
                     .toList(),
               ),
@@ -171,14 +166,7 @@ class _RankedCard extends StatelessWidget {
                 runSpacing: 6,
                 children: c.skillGaps
                     .map(
-                      (gap) => Chip(
-                        label: Text(gap),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: Colors.red.shade50,
-                        labelStyle: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.red.shade700,
-                        ),
-                      ),
+                      (gap) => AccentChip(label: gap, accent: Colors.red),
                     )
                     .toList(),
               ),

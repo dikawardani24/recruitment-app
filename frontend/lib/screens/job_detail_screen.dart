@@ -907,21 +907,28 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Dark-mode safety: hardcoded accent shades like Colors.green.shade700
+    // lose contrast on a dark surface, so brighten them toward white.
+    final effective = isDark && color.computeLuminance() < 0.3
+        ? Color.lerp(color, Colors.white, 0.25)!
+        : color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: effective.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
+          Icon(icon, size: 15, color: effective),
           const SizedBox(width: 5),
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: color,
+              color: effective,
               fontWeight: FontWeight.w600,
             ),
           ),
