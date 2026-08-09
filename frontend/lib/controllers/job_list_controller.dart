@@ -1,9 +1,13 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../di.dart';
 import '../domain/models.dart';
 import '../domain/usecases/delete_job.dart';
 import '../providers.dart';
+import '../screens/action_result_screen.dart';
+import '../screens/delete_confirm_screen.dart';
 
 /// Owns the job list actions. The list has no busy/loading UI state, so this
 /// is a plain controller instead of a [Notifier].
@@ -26,12 +30,69 @@ class JobListController {
     return _ref.read(cvsProvider(jobId).future);
   }
 
+  /// Deletes [job] end to end: fetches its candidates, asks for confirmation,
+  /// deletes it server-side, and shows a result page. Resolves to `true` only
+  /// when the job was actually deleted.
+  Future<bool> deleteJob(BuildContext context, Job job) async {
+    List<CandidateResult> candidates;
+    try {
+      candidates = await candidatesFor(job.id);
+    } catch (_) {
+      candidates = const [];
+    }
+    if (!context.mounted) return false;
+
+    final confirmed = await showDeleteConfirm(
+      context,
+      title: 'Delete this job?',
+      message: candidates.isEmpty
+          ? 'This job has no candidates. It will be permanently removed.'
+          : 'This job and its ${candidates.length} '
+                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                'will be permanently removed.',
+      details: [jobDeleteDetails(job, candidates)],
+      confirmLabel: 'Delete job',
+    );
+    if (!confirmed) return false;
+
+    try {
+      await removeJob(job.id);
+      if (!context.mounted) return false;
+      await showActionResult(
+        context,
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      );
+      return true;
+    } catch (e) {
+      if (!context.mounted) return false;
+      await showActionResult(
+        context,
+        success: false,
+        title: 'Delete failed',
+        message: '$e',
+      );
+      return false;
+    }
+  }
+
   /// Deletes the job server-side, then reloads the list from page 1.
-  Future<void> deleteJob(String jobId) async {
+  Future<void> removeJob(String jobId) async {
     await getIt<DeleteJob>()(jobId);
     await refresh();
   }
+
+  void openSettings() => _ref.read(navigatorProvider).goToSettings();
+
+  void openJobForm() => _ref.read(navigatorProvider).goToJobForm();
+
+  void openJobDetail(String jobId) =>
+      _ref.read(navigatorProvider).goToJobDetail(jobId);
+
+  void openChucker() => ChuckerFlutter.showChuckerScreen();
 }
 
-final jobListControllerProvider =
-    Provider<JobListController>((ref) => JobListController(ref));
+final jobListControllerProvider = Provider<JobListController>(
+  (ref) => JobListController(ref),
+);

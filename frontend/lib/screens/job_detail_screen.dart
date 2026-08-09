@@ -12,6 +12,7 @@ import '../providers.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/card_shape.dart';
+import '../widgets/delete_background.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/rank_engine_chip.dart';
@@ -339,7 +340,7 @@ class _CandidatesSection extends ConsumerWidget {
                 direction: DismissDirection.endToStart,
                 confirmDismiss: (_) =>
                     detailController.deleteCv(context, jobId, cv),
-                background: _DeleteBackground(
+                background: DeleteBackground(
                   color: Theme.of(context).colorScheme.error,
                 ),
                 child: _CandidateTile(
@@ -749,26 +750,6 @@ class _StatusChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Red swipe-reveal background shown behind a candidate tile during a swipe.
-class _DeleteBackground extends StatelessWidget {
-  final Color color;
-
-  const _DeleteBackground({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 }

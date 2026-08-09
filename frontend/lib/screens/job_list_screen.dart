@@ -1,4 +1,3 @@
-import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -7,10 +6,9 @@ import '../controllers/job_list_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/card_shape.dart';
+import '../widgets/delete_background.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/shimmer.dart';
-import 'action_result_screen.dart';
-import 'delete_confirm_screen.dart';
 
 const _months = [
   'Jan',
@@ -72,17 +70,17 @@ class JobListScreen extends HookConsumerWidget {
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
-            onPressed: () => ref.read(navigatorProvider).goToSettings(),
+            onPressed: jobListController.openSettings,
           ),
           IconButton(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Open Chucker Flutter',
-            onPressed: ChuckerFlutter.showChuckerScreen,
+            onPressed: jobListController.openChucker,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => ref.read(navigatorProvider).goToJobForm(),
+        onPressed: jobListController.openJobForm,
         icon: const Icon(Icons.add),
         label: const Text('New job'),
       ),
@@ -124,16 +122,15 @@ class JobListScreen extends HookConsumerWidget {
                       key: ValueKey('job-${entry.value.id}'),
                       direction: DismissDirection.endToStart,
                       confirmDismiss: (_) =>
-                          _confirmDeleteJob(context, ref, entry.value),
-                      background: _DeleteBackground(
+                          jobListController.deleteJob(context, entry.value),
+                      background: DeleteBackground(
                         color: theme.colorScheme.error,
                       ),
                       child: _JobCard(
                         job: entry.value,
                         index: entry.key,
-                        onTap: () => ref
-                            .read(navigatorProvider)
-                            .goToJobDetail(entry.value.id),
+                        onTap: () =>
+                            jobListController.openJobDetail(entry.value.id),
                       ),
                     ),
                   ),
@@ -145,79 +142,8 @@ class JobListScreen extends HookConsumerWidget {
       ),
     );
   }
-
-  Future<bool> _confirmDeleteJob(
-    BuildContext context,
-    WidgetRef ref,
-    Job job,
-  ) async {
-    final controller = ref.read(jobListControllerProvider);
-    List<CandidateResult> candidates;
-    try {
-      candidates = await controller.candidatesFor(job.id);
-    } catch (_) {
-      candidates = const [];
-    }
-    if (!context.mounted) return false;
-
-    final confirmed = await showDeleteConfirm(
-      context,
-      title: 'Delete this job?',
-      message: candidates.isEmpty
-          ? 'This job has no candidates. It will be permanently removed.'
-          : 'This job and its ${candidates.length} '
-                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                'will be permanently removed.',
-      details: [jobDeleteDetails(job, candidates)],
-      confirmLabel: 'Delete job',
-    );
-    if (!confirmed) return false;
-
-    try {
-      await controller.deleteJob(job.id);
-      if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: true,
-        title: 'Job deleted',
-        message: "'${job.title}' was permanently removed.",
-      );
-      return true;
-    } catch (e) {
-      if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: false,
-        title: 'Delete failed',
-        message: '$e',
-      );
-      return false;
-    }
-  }
 }
 
-/// Red swipe-reveal background shown behind a job card during a swipe.
-class _DeleteBackground extends StatelessWidget {
-  final Color color;
-
-  const _DeleteBackground({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Icon(Icons.delete_outline, color: Colors.white),
-    );
-  }
-}
-
-/// Bottom-of-list indicator: a spinner while the next page is being fetched,
-/// and a "no more data" message once the backend has nothing left to return.
 class _ListFooter extends StatelessWidget {
   final JobListState state;
 
