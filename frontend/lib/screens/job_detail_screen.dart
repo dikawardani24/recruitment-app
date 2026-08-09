@@ -10,7 +10,6 @@ import '../controllers/job_detail_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
-import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/card_shape.dart';
 import '../widgets/delete_background.dart';
 import '../widgets/gradient_header.dart';
@@ -345,9 +344,13 @@ class _CandidatesSection extends ConsumerWidget {
                 ),
                 child: _CandidateTile(
                   cv: cv,
-                  onRank: cv.cvId == null
-                      ? null
-                      : () => detailController.rankCv(context, jobId, cv),
+                  onShowDetails: () => detailController.openCandidateDetails(
+                    context,
+                    cv,
+                    onRank: cv.cvId == null
+                        ? null
+                        : () => detailController.rankCv(context, jobId, cv),
+                  ),
                 ),
               ),
             ),
@@ -543,9 +546,9 @@ int _byRank(CandidateResult a, CandidateResult b) {
 
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
-  final Future<bool> Function()? onRank;
+  final VoidCallback onShowDetails;
 
-  const _CandidateTile({required this.cv, this.onRank});
+  const _CandidateTile({required this.cv, required this.onShowDetails});
 
   @override
   Widget build(BuildContext context) {
@@ -561,7 +564,7 @@ class _CandidateTile extends StatelessWidget {
       shape: cardShape(theme),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        onTap: () => showCandidateDetailSheet(context, cv, onRank: onRank),
+        onTap: onShowDetails,
         leading: Container(
           width: 44,
           height: 44,

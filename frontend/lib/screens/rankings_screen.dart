@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/rankings_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
@@ -26,6 +27,7 @@ class RankingsScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rankingsAsync = ref.watch(rankingsProvider(jobId));
+    final rankingsController = ref.read(rankingsControllerProvider);
 
     return Scaffold(
       appBar: AppBar(),
@@ -63,7 +65,14 @@ class RankingsScreen extends HookConsumerWidget {
                   ],
                 );
               }
-              return _RankedCard(candidate: results[index - 1], rank: index);
+              return _RankedCard(
+                candidate: results[index - 1],
+                rank: index,
+                onShowDetails: () => rankingsController.openCandidateDetails(
+                  context,
+                  results[index - 1],
+                ),
+              );
             },
           );
         },
@@ -75,8 +84,13 @@ class RankingsScreen extends HookConsumerWidget {
 class _RankedCard extends StatelessWidget {
   final CandidateResult candidate;
   final int rank;
+  final VoidCallback onShowDetails;
 
-  const _RankedCard({required this.candidate, required this.rank});
+  const _RankedCard({
+    required this.candidate,
+    required this.rank,
+    required this.onShowDetails,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +190,7 @@ class _RankedCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => showCandidateDetailSheet(context, c),
+                  onPressed: onShowDetails,
                   icon: const Icon(Icons.info_outline),
                   label: const Text('Show reasoning'),
                 ),
