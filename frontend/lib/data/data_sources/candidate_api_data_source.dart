@@ -14,11 +14,16 @@ class CandidateApiDataSource {
 
   final ApiClient _client;
 
-  Future<List<CandidateResponse>> uploadCvs(
-    String jobId,
-    List<File> files,
-  ) async {
+  Future<ImportResponseDto> uploadCvBatch(
+    String jobId, {
+    String? importId,
+    required List<File> files,
+    ProgressCallback? onSendProgress,
+  }) async {
     final form = FormData();
+    if (importId != null) {
+      form.fields.add(MapEntry('import_id', importId));
+    }
     for (final file in files) {
       form.files.add(
         MapEntry(
@@ -31,9 +36,17 @@ class CandidateApiDataSource {
       );
     }
     return _client.post(
-      ApiPaths.cvs(jobId),
+      ApiPaths.candidateImport(jobId),
       data: form,
-      parse: _resultList,
+      onSendProgress: onSendProgress,
+      parse: (data) => ImportResponseMapper.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  Future<ImportStatusDto> getImportStatus(String jobId, String importId) {
+    return _client.get(
+      ApiPaths.importStatus(jobId, importId),
+      parse: (data) => ImportStatusMapper.fromJson(data as Map<String, dynamic>),
     );
   }
 

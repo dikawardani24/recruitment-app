@@ -43,6 +43,16 @@ class GradientHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    // The Material 3 dark scheme uses light pastel primary/tertiary tones, so
+    // darken the gradient in dark mode to keep the white text readable.
+    final gradientColors = isDark
+        ? [
+            Color.lerp(scheme.primary, Colors.black, 0.6)!,
+            Color.lerp(scheme.tertiary, Colors.black, 0.6)!,
+          ]
+        : [scheme.primary, scheme.tertiary];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -50,12 +60,12 @@ class GradientHeader extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
+          colors: gradientColors,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            color: gradientColors.first.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

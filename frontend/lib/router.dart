@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'navigation/app_navigator.dart';
@@ -6,12 +7,14 @@ import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
 import 'screens/rankings_screen.dart';
+import 'screens/settings_screen.dart';
 
 /// Builds the app's [GoRouter]. Route patterns are derived from [AppRoute]
 /// so that the enum stays the single source of truth for navigation.
 class AppRouter {
   static GoRouter create() {
     return GoRouter(
+      navigatorKey: ChuckerFlutter.navigatorKey,
       initialLocation: AppRoute.jobs.path,
       routes: [
         GoRoute(
@@ -21,6 +24,10 @@ class AppRouter {
             GoRoute(
               path: 'new',
               builder: (context, state) => const JobFormScreen(),
+            ),
+            GoRoute(
+              path: 'settings',
+              builder: (context, state) => const SettingsScreen(),
             ),
             GoRoute(
               path: ':jobId',

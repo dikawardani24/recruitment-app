@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -56,6 +57,18 @@ class JobListScreen extends HookConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Jobs'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => ref.read(navigatorProvider).goToSettings(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Open Chucker Flutter',
+            onPressed: ChuckerFlutter.showChuckerScreen,
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => ref.read(navigatorProvider).goToJobForm(),

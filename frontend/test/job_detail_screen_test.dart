@@ -19,6 +19,9 @@ class _FakeNavigator implements AppNavigator {
   void goToJobForm() {}
 
   @override
+  void goToSettings() {}
+
+  @override
   void goToJobDetail(String jobId) {}
 
   @override
@@ -35,6 +38,7 @@ class _FakeDetailController extends JobDetailController {
   final deletedCvs = <String>[];
   final deletedJobs = <String>[];
   final rankedCvs = <String>[];
+  final rankedJobs = <String>[];
 
   _FakeDetailController(this.cvs);
 
@@ -52,6 +56,11 @@ class _FakeDetailController extends JobDetailController {
   @override
   Future<void> deleteJob(String jobId) async {
     deletedJobs.add(jobId);
+  }
+
+  @override
+  Future<void> rank(String jobId) async {
+    rankedJobs.add(jobId);
   }
 
   @override
@@ -331,7 +340,7 @@ void main() {
           cvId: 'cv-1',
           fileName: 'alice.pdf',
           candidateName: 'Alice',
-          status: 'uploaded',
+          status: 'completed',
         ),
       ];
       final controller = _FakeDetailController(cvs);
@@ -387,6 +396,49 @@ void main() {
 
       expect(controller.rankedCvs, ['cv-1']);
       expect(find.text('Re-rank CV'), findsNothing);
+    });
+
+    testWidgets('a candidate that is not ready shows an info dialog instead of ranking', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        CandidateResult(
+          cvId: 'cv-1',
+          fileName: 'alice.pdf',
+          candidateName: 'Alice',
+          status: 'processing',
+        ),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rank this CV'), findsOneWidget);
+
+      await tester.tap(find.text('Rank this CV'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Ranking unavailable'), findsOneWidget);
+      expect(controller.rankedCvs, isEmpty);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ranking unavailable'), findsNothing);
     });
 
   group('candidate deletion', () {
@@ -539,6 +591,221 @@ void main() {
       expect(controller.deletedJobs, isEmpty);
       expect(find.text('Delete this job?'), findsNothing);
       expect(find.text('Backend Engineer'), findsNWidgets(2));
+    });
+  });
+
+  group('bulk rank', () {
+    testWidgets('shows an info dialog when there are no candidates', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final controller = _FakeDetailController([]);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Rank CVs'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No candidates to rank'), findsOneWidget);
+      expect(controller.rankedJobs, isEmpty);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('No candidates to rank'), findsNothing);
+    });
+
+    testWidgets('asks for confirmation before re-ranking already-ranked CVs', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        ranked('cv-1', 'Alice'),
+        ranked('cv-2', 'Bob'),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Rank CVs'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Re-rank all candidates?'), findsOneWidget);
+      expect(controller.rankedJobs, isEmpty);
+
+      await tester.tap(find.text('Re-rank all'));
+      await tester.pumpAndSettle();
+
+      expect(controller.rankedJobs, ['job-1']);
+      expect(find.text('Re-rank all candidates?'), findsNothing);
+    });
+
+    testWidgets('cancelling re-rank confirmation does not rank', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [ranked('cv-1', 'Alice')];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Rank CVs'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(controller.rankedJobs, isEmpty);
+      expect(find.text('Re-rank all candidates?'), findsNothing);
+    });
+
+    testWidgets('rank runs directly when some CVs are unranked', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        ranked('cv-1', 'Alice'),
+        CandidateResult(
+          cvId: 'cv-2',
+          fileName: 'bob.pdf',
+          candidateName: 'Bob',
+          status: 'completed',
+        ),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Rank CVs'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Re-rank all candidates?'), findsNothing);
+      expect(controller.rankedJobs, ['job-1']);
+    });
+
+    testWidgets('lists ranked candidates in score order before the rest', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        CandidateResult(
+          cvId: 'cv-1',
+          fileName: 'low.pdf',
+          candidateName: 'Low',
+          status: 'completed',
+        ),
+        CandidateResult(
+          cvId: 'cv-2',
+          fileName: 'bob.pdf',
+          candidateName: 'Bob',
+          status: 'ranked',
+          overallScore: 0.4,
+          bucket: 'possible_match',
+        ),
+        CandidateResult(
+          cvId: 'cv-3',
+          fileName: 'alice.pdf',
+          candidateName: 'Alice',
+          status: 'ranked',
+          overallScore: 0.9,
+          bucket: 'strong_match',
+        ),
+      ];
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final aliceY = tester.getTopLeft(find.text('Alice')).dy;
+      final bobY = tester.getTopLeft(find.text('Bob')).dy;
+      final lowY = tester.getTopLeft(find.text('Low')).dy;
+
+      expect(aliceY, lessThan(bobY));
+      expect(bobY, lessThan(lowY));
+    });
+
+    testWidgets('shows an info dialog when no candidates are ready to rank', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final cvs = [
+        CandidateResult(
+          cvId: 'cv-1',
+          fileName: 'alice.pdf',
+          candidateName: 'Alice',
+          status: 'processing',
+        ),
+        CandidateResult(
+          cvId: 'cv-2',
+          fileName: 'bob.pdf',
+          candidateName: 'Bob',
+          status: 'uploaded',
+        ),
+      ];
+      final controller = _FakeDetailController(cvs);
+      await tester.pumpWidget(
+        buildApp(
+          buildJob(description: 'Short description'),
+          cvs: cvs,
+          detailController: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Rank CVs'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ranking unavailable'), findsOneWidget);
+      expect(controller.rankedJobs, isEmpty);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ranking unavailable'), findsNothing);
     });
   });
 }

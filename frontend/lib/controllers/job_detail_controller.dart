@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../di.dart';
@@ -7,7 +5,6 @@ import '../domain/usecases/delete_candidate.dart';
 import '../domain/usecases/delete_job.dart';
 import '../domain/usecases/rank_cv.dart';
 import '../domain/usecases/rank_job.dart';
-import '../domain/usecases/upload_cvs.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 
@@ -37,21 +34,11 @@ class JobDetailController extends Notifier<JobDetailState> {
     await ref.read(cvsProvider(jobId).future);
   }
 
-  Future<int> uploadCvs(String jobId, List<File> files) async {
-    _start('Uploading ${files.length} CV(s)…');
-    try {
-      final uploaded = await getIt<UploadCvs>()(jobId, files);
-      await refreshCvs(jobId);
-      return uploaded.length;
-    } finally {
-      _stop();
-    }
-  }
-
   Future<void> rank(String jobId) async {
     _start('Ranking candidates…');
     try {
       final response = await getIt<RankJob>()(jobId);
+      ref.invalidate(rankingsProvider(jobId));
       await refreshCvs(jobId);
       final title = ref.read(jobProvider(jobId)).value?.title ?? 'Job';
       ref.read(navigatorProvider).goToRankings(

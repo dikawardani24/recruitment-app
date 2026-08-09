@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
+import 'accent_chip.dart';
 import 'bucket_donut.dart';
 import 'score_color.dart';
 
@@ -11,7 +12,7 @@ import 'score_color.dart';
 void showCandidateDetailSheet(
   BuildContext context,
   CandidateResult c, {
-  Future<void> Function()? onRank,
+  Future<bool> Function()? onRank,
 }) {
   final theme = Theme.of(context);
   final score = c.overallScore;
@@ -41,15 +42,15 @@ void showCandidateDetailSheet(
                   const SizedBox(height: 4),
                   Text(c.fileName, style: theme.textTheme.labelSmall),
                   const SizedBox(height: 16),
-                  if (onRank != null && c.status != 'failed') ...[
+                  if (onRank != null) ...[
                     _RankCvButton(
                       label: score == null ? 'Rank this CV' : 'Re-rank CV',
                       busy: ranking,
                       onPressed: () async {
                         setState(() => ranking = true);
                         try {
-                          await onRank();
-                          if (context.mounted) {
+                          final ranked = await onRank();
+                          if (context.mounted && ranked) {
                             Navigator.of(context).pop();
                           }
                         } finally {
@@ -175,14 +176,8 @@ void showCandidateDetailSheet(
                       runSpacing: 6,
                       children: c.skills
                           .map(
-                            (skill) => Chip(
-                              label: Text(skill),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.indigo.shade50,
-                              labelStyle: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.indigo.shade700,
-                              ),
-                            ),
+                            (skill) =>
+                                AccentChip(label: skill, accent: Colors.indigo),
                           )
                           .toList(),
                     ),
@@ -223,13 +218,9 @@ void showCandidateDetailSheet(
                       runSpacing: 6,
                       children: c.certifications
                           .map(
-                            (cert) => Chip(
-                              label: Text(cert),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.deepPurple.shade50,
-                              labelStyle: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.deepPurple.shade700,
-                              ),
+                            (cert) => AccentChip(
+                              label: cert,
+                              accent: Colors.deepPurple,
                             ),
                           )
                           .toList(),
@@ -248,14 +239,8 @@ void showCandidateDetailSheet(
                       runSpacing: 6,
                       children: c.strengths
                           .map(
-                            (skill) => Chip(
-                              label: Text(skill),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.green.shade50,
-                              labelStyle: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.green.shade700,
-                              ),
-                            ),
+                            (skill) =>
+                                AccentChip(label: skill, accent: Colors.green),
                           )
                           .toList(),
                     ),
@@ -273,14 +258,8 @@ void showCandidateDetailSheet(
                       runSpacing: 6,
                       children: c.skillGaps
                           .map(
-                            (gap) => Chip(
-                              label: Text(gap),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.red.shade50,
-                              labelStyle: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.red.shade700,
-                              ),
-                            ),
+                            (gap) =>
+                                AccentChip(label: gap, accent: Colors.red),
                           )
                           .toList(),
                     ),

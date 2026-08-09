@@ -24,14 +24,32 @@ class DbClient:
         );
         """
 
+    def imports_scheme(self) -> str:
+        return """
+        CREATE TABLE IF NOT EXISTS import_jobs (
+            id              TEXT PRIMARY KEY,
+            job_id          TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            total_files     INTEGER NOT NULL DEFAULT 0,
+            uploaded_files  INTEGER NOT NULL DEFAULT 0,
+            processed_files INTEGER NOT NULL DEFAULT 0,
+            failed_files    INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'uploading',
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL,
+            completed_at    TEXT
+        );
+        """
+
     def cvs_scheme(self) -> str:
         return """
         CREATE TABLE IF NOT EXISTS cvs (
             id                  TEXT PRIMARY KEY,
             job_id              TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            import_job_id       TEXT REFERENCES import_jobs(id) ON DELETE SET NULL,
             file_name           TEXT NOT NULL,
             storage_path        TEXT NOT NULL,
             status              TEXT NOT NULL DEFAULT 'queued',
+            created_at          TEXT NOT NULL DEFAULT '',
             candidate_name      TEXT,
             profile_text        TEXT,
             skills              TEXT,
@@ -61,6 +79,12 @@ class DbClient:
         return """
         CREATE INDEX IF NOT EXISTS idx_cvs_job
         ON cvs(job_id);
+
+        CREATE INDEX IF NOT EXISTS idx_cvs_import
+        ON cvs(import_job_id);
+
+        CREATE INDEX IF NOT EXISTS idx_import_jobs_job
+        ON import_jobs(job_id);
         """
 
     async def init_scheme(self):
@@ -70,6 +94,8 @@ class DbClient:
             await db.executescript(
                 f"""
                 {self.jobs_scheme()}
+
+                {self.imports_scheme()}
 
                 {self.cvs_scheme()}
 
@@ -83,6 +109,8 @@ class DbClient:
     async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
         db = await aiosqlite.connect(settings.db_path)
         db.row_factory = sqlite3.Row
+        await db.execute("PRAGMA busy_timeout = 10000")
+        await db.execute("PRAGMA journal_mode = WAL")
 
         try:
             yield db

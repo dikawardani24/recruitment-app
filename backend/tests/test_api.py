@@ -8,6 +8,8 @@ from tests.conftest import (
     FRONTEND_ONLY,
     JUNIOR_BACKEND,
     SENIOR_BACKEND,
+    create_job,
+    upload_cvs_and_wait,
 )
 
 
@@ -50,39 +52,31 @@ def test_create_job_from_uploaded_jd_file(client, cv_builder):
 
 
 def test_upload_multiple_cvs(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
 
-    files = [
-        ("files", cv_builder("john.txt", SENIOR_BACKEND)),
-        ("files", cv_builder("alice.txt", JUNIOR_BACKEND)),
-    ]
-    resp = client.post(f"/api/jobs/{job_id}/cvs", files=files)
-    assert resp.status_code == 201, resp.text
-    results = resp.json()["results"]
+    resp = upload_cvs_and_wait(client, job_id, cv_builder, ("john.txt", SENIOR_BACKEND), ("alice.txt", JUNIOR_BACKEND))
+    assert resp["status"] == "completed"
+
+    body = client.get(f"/api/jobs/{job_id}/cvs").json()
+    results = body["results"]
     assert len(results) == 2
-    assert all(r["status"] == "parsed" for r in results)
+    assert all(r["status"] == "completed" for r in results)
     assert all(r["source"] == "rules" for r in results)  # no LLM key in tests
     names = {r["candidate_name"] for r in results}
     assert "John Doe" in names
 
 
 def test_rank_orders_candidates_with_reasoning(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
 
-    files = [
-        ("files", cv_builder("john.txt", SENIOR_BACKEND)),
-        ("files", cv_builder("alice.txt", JUNIOR_BACKEND)),
-        ("files", cv_builder("bob.txt", FRONTEND_ONLY)),
-    ]
-    assert client.post(f"/api/jobs/{job_id}/cvs", files=files).status_code == 201
+    upload_cvs_and_wait(
+        client,
+        job_id,
+        cv_builder,
+        ("john.txt", SENIOR_BACKEND),
+        ("alice.txt", JUNIOR_BACKEND),
+        ("bob.txt", FRONTEND_ONLY),
+    )
 
     resp = client.post(f"/api/jobs/{job_id}/rank")
     assert resp.status_code == 200, resp.text
@@ -109,20 +103,14 @@ def test_rank_orders_candidates_with_reasoning(client, cv_builder):
 def test_rank_without_description_returns_422(client, cv_builder):
     resp = client.post("/api/jobs", data={"title": "No JD"})
     job_id = resp.json()["job"]["job_id"]
-    name, content, mime = cv_builder("alice.txt", JUNIOR_BACKEND)
-    client.post(f"/api/jobs/{job_id}/cvs", files=[("files", (name, content, mime))])
+    upload_cvs_and_wait(client, job_id, cv_builder, ("alice.txt", JUNIOR_BACKEND))
     resp = client.post(f"/api/jobs/{job_id}/rank")
     assert resp.status_code == 422
 
 
 def test_get_rankings_persisted(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
-    name, content, mime = cv_builder("john.txt", SENIOR_BACKEND)
-    client.post(f"/api/jobs/{job_id}/cvs", files=[("files", (name, content, mime))])
+    job_id = create_job(client)
+    upload_cvs_and_wait(client, job_id, cv_builder, ("john.txt", SENIOR_BACKEND))
     client.post(f"/api/jobs/{job_id}/rank")
 
     resp = client.get(f"/api/jobs/{job_id}/rankings")
@@ -132,11 +120,7 @@ def test_get_rankings_persisted(client, cv_builder):
 
 
 def test_rank_single_cv_persists_rank(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
     cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
 
     resp = client.post(f"/api/jobs/{job_id}/cvs/{cv_id}/rank")
@@ -157,11 +141,7 @@ def test_rank_single_cv_persists_rank(client, cv_builder):
 
 
 def test_rank_single_cv_unknown_404(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
     resp = client.post(f"/api/jobs/{job_id}/cvs/{uuid4()}/rank")
     assert resp.status_code == 404
 
@@ -171,12 +151,8 @@ def test_rank_single_cv_unknown_404(client, cv_builder):
     assert resp.status_code == 404
 
 
-def test_bulk_rank_skips_already_ranked_cvs(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+def test_bulk_rank_reranks_already_ranked_cvs(client, cv_builder):
+    job_id = create_job(client)
     cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
     _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
 
@@ -184,25 +160,42 @@ def test_bulk_rank_skips_already_ranked_cvs(client, cv_builder):
 
     resp = client.post(f"/api/jobs/{job_id}/rank")
     assert resp.status_code == 200, resp.text
-    assert resp.json()["count"] == 1  # only the unranked alice
+    # bulk rank re-scores everything that has finished processing
+    assert resp.json()["count"] == 2
 
     ranked = client.get(f"/api/jobs/{job_id}/rankings").json()["results"]
     assert len(ranked) == 2  # both now ranked
 
 
-def test_list_jobs_includes_cv_count(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
+def test_bulk_rank_rejects_when_no_candidates_ready(client, cv_builder):
+    import asyncio
+
+    from app.database.db_client import DbClient
+
+    job_id = create_job(client)
+    cv_id = _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+
+    # force the CV back to an in-progress state so nothing is ready to rank
+    asyncio.run(
+        DbClient().execute(
+            "UPDATE cvs SET status = 'uploaded' WHERE id = ?",
+            (cv_id,),
+        )
     )
-    job_id = resp.json()["job"]["job_id"]
+
+    resp = client.post(f"/api/jobs/{job_id}/rank")
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == "no_candidates_ready"
+
+
+def test_list_jobs_includes_cv_count(client, cv_builder):
+    job_id = create_job(client)
 
     resp = client.get("/api/jobs")
     assert resp.status_code == 200
     assert resp.json()["jobs"][0]["cv_count"] == 0
 
-    name, content, mime = cv_builder("john.txt", SENIOR_BACKEND)
-    client.post(f"/api/jobs/{job_id}/cvs", files=[("files", (name, content, mime))])
+    upload_cvs_and_wait(client, job_id, cv_builder, ("john.txt", SENIOR_BACKEND))
 
     resp = client.get("/api/jobs")
     assert resp.json()["jobs"][0]["cv_count"] == 1
@@ -275,20 +268,14 @@ def test_list_jobs_invalid_pagination_params(client):
 
 
 def _upload_cv(client, job_id, cv_builder, name, body):
-    file_name, content, mime = cv_builder(name, body)
-    up = client.post(
-        f"/api/jobs/{job_id}/cvs",
-        files=[("files", (file_name, content, mime))],
-    )
-    return up.json()["results"][0]["cv_id"]
+    resp = upload_cvs_and_wait(client, job_id, cv_builder, (name, body))
+    assert resp["status"] == "completed"
+    cvs = client.get(f"/api/jobs/{job_id}/cvs").json()["results"]
+    return cvs[-1]["cv_id"]
 
 
 def test_delete_cv_removes_row_and_file(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
     cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
 
     assert len(list(settings.upload_dir.glob("*"))) == 1
@@ -302,11 +289,7 @@ def test_delete_cv_removes_row_and_file(client, cv_builder):
 
 
 def test_delete_cv_unknown_404(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
     cv_id = _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
 
     assert client.delete(f"/api/jobs/{job_id}/cvs/{uuid4()}").status_code == 404
@@ -319,11 +302,7 @@ def test_delete_cv_unknown_404(client, cv_builder):
 
 
 def test_delete_job_cascades_cvs_and_files(client, cv_builder):
-    resp = client.post(
-        "/api/jobs",
-        data={"title": "Senior Backend Engineer", "description": BACKEND_JD},
-    )
-    job_id = resp.json()["job"]["job_id"]
+    job_id = create_job(client)
     _upload_cv(client, job_id, cv_builder, "john.txt", SENIOR_BACKEND)
     _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
     assert len(list(settings.upload_dir.glob("*"))) == 2
