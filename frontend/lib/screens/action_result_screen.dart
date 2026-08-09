@@ -35,9 +35,7 @@ class ActionResultScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  success
-                      ? Icons.check_circle_outline
-                      : Icons.error_outline,
+                  success ? Icons.check_circle_outline : Icons.error_outline,
                   size: 56,
                   color: color,
                 ),
@@ -85,11 +83,8 @@ Future<void> showActionResult(
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
-      builder: (_) => ActionResultScreen(
-        success: success,
-        title: title,
-        message: message,
-      ),
+      builder: (_) =>
+          ActionResultScreen(success: success, title: title, message: message),
     ),
   );
 }

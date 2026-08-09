@@ -5,6 +5,7 @@ import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
 import '../widgets/candidate_detail_sheet.dart';
+import '../widgets/card_shape.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/rankings_summary.dart';
@@ -147,8 +148,7 @@ class _RankedCard extends StatelessWidget {
                 runSpacing: 6,
                 children: c.strengths
                     .map(
-                      (skill) =>
-                          AccentChip(label: skill, accent: Colors.green),
+                      (skill) => AccentChip(label: skill, accent: Colors.green),
                     )
                     .toList(),
               ),
@@ -165,9 +165,7 @@ class _RankedCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: c.skillGaps
-                    .map(
-                      (gap) => AccentChip(label: gap, accent: Colors.red),
-                    )
+                    .map((gap) => AccentChip(label: gap, accent: Colors.red))
                     .toList(),
               ),
             ],

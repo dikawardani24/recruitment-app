@@ -20,12 +20,6 @@ Color candidateColor(String id) {
   return avatarColor(h);
 }
 
-ShapeBorder cardShape(ThemeData theme, {double radius = 16}) =>
-    RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(radius),
-      side: BorderSide(color: theme.colorScheme.outlineVariant),
-    );
-
 class GradientHeader extends StatelessWidget {
   final IconData icon;
   final String title;

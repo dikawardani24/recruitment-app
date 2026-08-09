@@ -31,19 +31,17 @@ class _FakeNavigator implements AppNavigator {
   void pop() {}
 }
 
-/// Controller that records deletes and mirrors the real [JobDetailController]
-/// behaviour of refreshing the CV list after a candidate is removed.
-class _FakeDetailController extends JobDetailController {
+/// Notifier that records deletes/ranks and mirrors the real
+/// [JobDetailNotifier] behaviour of refreshing the CV list after a candidate
+/// is removed.
+class _FakeDetailNotifier extends JobDetailNotifier {
   final List<CandidateResult> cvs;
   final deletedCvs = <String>[];
   final deletedJobs = <String>[];
   final rankedCvs = <String>[];
   final rankedJobs = <String>[];
 
-  _FakeDetailController(this.cvs);
-
-  @override
-  JobDetailState build() => const JobDetailState();
+  _FakeDetailNotifier(this.cvs);
 
   @override
   Future<void> deleteCv(String jobId, String cvId) async {
@@ -59,8 +57,9 @@ class _FakeDetailController extends JobDetailController {
   }
 
   @override
-  Future<void> rank(String jobId) async {
+  Future<RankResponse> rankJob(String jobId) async {
     rankedJobs.add(jobId);
+    return const RankResponse(source: 'rules', results: []);
   }
 
   @override
@@ -91,9 +90,7 @@ void main() {
       description: description,
       status: 'open',
       createdAt: '2026-01-01T00:00:00',
-      requirements: JobRequirements(
-        requiredSkills: const ['Dart', 'Flutter'],
-      ),
+      requirements: JobRequirements(requiredSkills: const ['Dart', 'Flutter']),
     );
   }
 
@@ -101,7 +98,7 @@ void main() {
     Job job, {
     List<CandidateResult> cvs = const [],
     List<CandidateResult> rankings = const [],
-    _FakeDetailController? detailController,
+    _FakeDetailNotifier? detailNotifier,
     _FakeNavigator? navigator,
   }) {
     return ProviderScope(
@@ -109,8 +106,8 @@ void main() {
         jobProvider('job-1').overrideWith((ref) async => job),
         cvsProvider('job-1').overrideWith((ref) async => cvs),
         rankingsProvider('job-1').overrideWith((ref) async => rankings),
-        if (detailController != null)
-          jobDetailControllerProvider.overrideWith(() => detailController),
+        if (detailNotifier != null)
+          jobDetailStateProvider.overrideWith(() => detailNotifier),
         navigatorProvider.overrideWithValue(navigator ?? _FakeNavigator()),
       ],
       child: const MaterialApp(home: JobDetailScreen(jobId: 'job-1')),
@@ -173,7 +170,9 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(buildApp(buildJob(description: 'Short description')));
+    await tester.pumpWidget(
+      buildApp(buildJob(description: 'Short description')),
+    );
     await tester.pump();
     await tester.pump();
 
@@ -207,200 +206,193 @@ void main() {
     expect(find.text('Buckets'), findsNothing);
   });
 
-    testWidgets('shows bucket donut when candidates are ranked', (tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+  testWidgets('shows bucket donut when candidates are ranked', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
-          rankings: [
-            buildRankedResult(name: 'Alice', score: 0.9),
-            buildRankedResult(
-              name: 'Bob',
-              score: 0.55,
-              bucket: 'possible_match',
-            ),
-          ],
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
+        rankings: [
+          buildRankedResult(name: 'Alice', score: 0.9),
+          buildRankedResult(name: 'Bob', score: 0.55, bucket: 'possible_match'),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
 
-      expect(find.text('Not ranked yet'), findsNothing);
-      expect(find.text('Buckets'), findsOneWidget);
-      expect(find.text('View full ranking'), findsOneWidget);
-      expect(find.text('Strong Match'), findsWidgets);
-      expect(find.text('Possible Match'), findsWidgets);
-    });
+    expect(find.text('Not ranked yet'), findsNothing);
+    expect(find.text('Buckets'), findsOneWidget);
+    expect(find.text('View full ranking'), findsOneWidget);
+    expect(find.text('Strong Match'), findsWidgets);
+    expect(find.text('Possible Match'), findsWidgets);
+  });
 
-    testWidgets('tapping a ranked candidate opens the detail sheet', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+  testWidgets('tapping a ranked candidate opens the detail sheet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
-      final alice = CandidateResult(
+    final alice = CandidateResult(
+      cvId: 'cv-1',
+      fileName: 'alice.pdf',
+      candidateName: 'Alice',
+      status: 'ranked',
+      overallScore: 0.9,
+      bucket: 'strong_match',
+      recommendation: 'Strong hire',
+      strengths: const ['Dart', 'Flutter'],
+      explanation: 'Matches all required skills.',
+      rankedBy: 'llm',
+    );
+    await tester.pumpWidget(
+      buildApp(buildJob(description: 'Short description'), cvs: [alice]),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('AI'), findsOneWidget);
+
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Match Score'), findsOneWidget);
+    expect(find.text('90%'), findsWidgets);
+    expect(find.text('Strong Match'), findsWidgets);
+    expect(find.text('Ranked by'), findsOneWidget);
+    expect(find.text('AI'), findsWidgets);
+    expect(find.text('STRENGTHS'), findsOneWidget);
+    expect(find.text('Dart'), findsWidgets);
+    expect(find.text('Explanation'), findsOneWidget);
+  });
+
+  testWidgets('tapping an unranked candidate shows status, hint, and profile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: [
+          CandidateResult(
+            cvId: 'cv-1',
+            fileName: 'alice.pdf',
+            candidateName: 'Alice',
+            status: 'uploaded',
+            skills: const ['Dart', 'Flutter'],
+            yearsExperience: 5,
+            education: 'Bachelor of Science',
+            certifications: const ['AWS Certified'],
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Status'), findsOneWidget);
+    expect(find.text('uploaded'), findsWidgets);
+    expect(
+      find.text('This candidate has not been ranked yet.'),
+      findsOneWidget,
+    );
+    expect(find.text('Match Score'), findsNothing);
+    expect(find.text('STRENGTHS'), findsNothing);
+
+    expect(find.text('SKILLS'), findsOneWidget);
+    expect(find.text('Dart'), findsWidgets);
+    expect(find.text('EXPERIENCE'), findsOneWidget);
+    expect(find.text('5 years'), findsOneWidget);
+    expect(find.text('EDUCATION'), findsOneWidget);
+    expect(find.text('Bachelor of Science'), findsOneWidget);
+    expect(find.text('CERTIFICATIONS'), findsOneWidget);
+    expect(find.text('AWS Certified'), findsOneWidget);
+  });
+
+  testWidgets('ranking an unranked candidate from the sheet ranks and closes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final cvs = [
+      CandidateResult(
         cvId: 'cv-1',
         fileName: 'alice.pdf',
         candidateName: 'Alice',
-        status: 'ranked',
-        overallScore: 0.9,
-        bucket: 'strong_match',
-        recommendation: 'Strong hire',
-        strengths: const ['Dart', 'Flutter'],
-        explanation: 'Matches all required skills.',
-        rankedBy: 'llm',
-      );
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: [alice],
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
+        status: 'completed',
+      ),
+    ];
+    final controller = _FakeDetailNotifier(cvs);
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: cvs,
+        detailNotifier: controller,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
 
-      expect(find.text('AI'), findsOneWidget);
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Alice'));
-      await tester.pumpAndSettle();
+    expect(find.text('Rank this CV'), findsOneWidget);
 
-      expect(find.text('Match Score'), findsOneWidget);
-      expect(find.text('90%'), findsWidgets);
-      expect(find.text('Strong Match'), findsWidgets);
-      expect(find.text('Ranked by'), findsOneWidget);
-      expect(find.text('AI'), findsWidgets);
-      expect(find.text('STRENGTHS'), findsOneWidget);
-      expect(find.text('Dart'), findsWidgets);
-      expect(find.text('Explanation'), findsOneWidget);
-    });
+    await tester.tap(find.text('Rank this CV'));
+    await tester.pumpAndSettle();
 
-    testWidgets('tapping an unranked candidate shows status, hint, and profile', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    expect(controller.rankedCvs, ['cv-1']);
+    expect(find.text('Rank this CV'), findsNothing);
+    expect(find.text('Alice'), findsOneWidget);
+  });
 
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: [
-            CandidateResult(
-              cvId: 'cv-1',
-              fileName: 'alice.pdf',
-              candidateName: 'Alice',
-              status: 'uploaded',
-              skills: const ['Dart', 'Flutter'],
-              yearsExperience: 5,
-              education: 'Bachelor of Science',
-              certifications: const ['AWS Certified'],
-            ),
-          ],
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
+  testWidgets('ranked candidate can be re-ranked from the sheet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
-      await tester.tap(find.text('Alice'));
-      await tester.pumpAndSettle();
+    final cvs = [ranked('cv-1', 'Alice')];
+    final controller = _FakeDetailNotifier(cvs);
+    await tester.pumpWidget(
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: cvs,
+        detailNotifier: controller,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
 
-      expect(find.text('Status'), findsOneWidget);
-      expect(find.text('uploaded'), findsWidgets);
-      expect(
-        find.text('This candidate has not been ranked yet.'),
-        findsOneWidget,
-      );
-      expect(find.text('Match Score'), findsNothing);
-      expect(find.text('STRENGTHS'), findsNothing);
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('SKILLS'), findsOneWidget);
-      expect(find.text('Dart'), findsWidgets);
-      expect(find.text('EXPERIENCE'), findsOneWidget);
-      expect(find.text('5 years'), findsOneWidget);
-      expect(find.text('EDUCATION'), findsOneWidget);
-      expect(find.text('Bachelor of Science'), findsOneWidget);
-      expect(find.text('CERTIFICATIONS'), findsOneWidget);
-      expect(find.text('AWS Certified'), findsOneWidget);
-    });
+    expect(find.text('Re-rank CV'), findsOneWidget);
 
-    testWidgets('ranking an unranked candidate from the sheet ranks and closes', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    await tester.tap(find.text('Re-rank CV'));
+    await tester.pumpAndSettle();
 
-      final cvs = [
-        CandidateResult(
-          cvId: 'cv-1',
-          fileName: 'alice.pdf',
-          candidateName: 'Alice',
-          status: 'completed',
-        ),
-      ];
-      final controller = _FakeDetailController(cvs);
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: cvs,
-          detailController: controller,
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
+    expect(controller.rankedCvs, ['cv-1']);
+    expect(find.text('Re-rank CV'), findsNothing);
+  });
 
-      await tester.tap(find.text('Alice'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Rank this CV'), findsOneWidget);
-
-      await tester.tap(find.text('Rank this CV'));
-      await tester.pumpAndSettle();
-
-      expect(controller.rankedCvs, ['cv-1']);
-      expect(find.text('Rank this CV'), findsNothing);
-      expect(find.text('Alice'), findsOneWidget);
-    });
-
-    testWidgets('ranked candidate can be re-ranked from the sheet', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      final cvs = [ranked('cv-1', 'Alice')];
-      final controller = _FakeDetailController(cvs);
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: cvs,
-          detailController: controller,
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      await tester.tap(find.text('Alice'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Re-rank CV'), findsOneWidget);
-
-      await tester.tap(find.text('Re-rank CV'));
-      await tester.pumpAndSettle();
-
-      expect(controller.rankedCvs, ['cv-1']);
-      expect(find.text('Re-rank CV'), findsNothing);
-    });
-
-    testWidgets('a candidate that is not ready shows an info dialog instead of ranking', (
-      tester,
-    ) async {
+  testWidgets(
+    'a candidate that is not ready shows an info dialog instead of ranking',
+    (tester) async {
       tester.view.physicalSize = const Size(800, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -413,12 +405,12 @@ void main() {
           status: 'processing',
         ),
       ];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -439,7 +431,8 @@ void main() {
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
       expect(find.text('Ranking unavailable'), findsNothing);
-    });
+    },
+  );
 
   group('candidate deletion', () {
     testWidgets('swipe reveals confirmation with candidate details', (
@@ -453,12 +446,12 @@ void main() {
         ranked('cv-1', 'Alice'),
         CandidateResult(cvId: 'cv-2', fileName: 'bob.pdf', status: 'uploaded'),
       ];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -490,12 +483,12 @@ void main() {
           status: 'uploaded',
         ),
       ];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -528,13 +521,13 @@ void main() {
       addTearDown(tester.view.reset);
 
       final cvs = [ranked('cv-1', 'Alice')];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       final navigator = _FakeNavigator();
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
           navigator: navigator,
         ),
       );
@@ -571,12 +564,12 @@ void main() {
       addTearDown(tester.view.reset);
 
       final cvs = [ranked('cv-1', 'Alice')];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -602,11 +595,11 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      final controller = _FakeDetailController([]);
+      final controller = _FakeDetailNotifier([]);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -630,16 +623,13 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      final cvs = [
-        ranked('cv-1', 'Alice'),
-        ranked('cv-2', 'Bob'),
-      ];
-      final controller = _FakeDetailController(cvs);
+      final cvs = [ranked('cv-1', 'Alice'), ranked('cv-2', 'Bob')];
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -658,18 +648,20 @@ void main() {
       expect(find.text('Re-rank all candidates?'), findsNothing);
     });
 
-    testWidgets('cancelling re-rank confirmation does not rank', (tester) async {
+    testWidgets('cancelling re-rank confirmation does not rank', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
       final cvs = [ranked('cv-1', 'Alice')];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -685,7 +677,9 @@ void main() {
       expect(find.text('Re-rank all candidates?'), findsNothing);
     });
 
-    testWidgets('rank runs directly when some CVs are unranked', (tester) async {
+    testWidgets('rank runs directly when some CVs are unranked', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -699,12 +693,12 @@ void main() {
           status: 'completed',
         ),
       ];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();
@@ -749,10 +743,7 @@ void main() {
         ),
       ];
       await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: cvs,
-        ),
+        buildApp(buildJob(description: 'Short description'), cvs: cvs),
       );
       await tester.pump();
       await tester.pump();
@@ -786,12 +777,12 @@ void main() {
           status: 'uploaded',
         ),
       ];
-      final controller = _FakeDetailController(cvs);
+      final controller = _FakeDetailNotifier(cvs);
       await tester.pumpWidget(
         buildApp(
           buildJob(description: 'Short description'),
           cvs: cvs,
-          detailController: controller,
+          detailNotifier: controller,
         ),
       );
       await tester.pump();

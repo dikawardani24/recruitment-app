@@ -6,14 +6,25 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../controllers/job_list_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
+import '../widgets/card_shape.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/shimmer.dart';
 import 'action_result_screen.dart';
 import 'delete_confirm_screen.dart';
 
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// Formats an ISO-8601 UTC timestamp as `dd MMM yyyy h:mm am/pm` in local time.
@@ -83,10 +94,8 @@ class JobListScreen extends HookConsumerWidget {
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (_, _) => const _JobCardSkeleton(),
         ),
-        error: (e, _) => _ErrorView(
-          message: '$e',
-          onRetry: jobListController.refresh,
-        ),
+        error: (e, _) =>
+            _ErrorView(message: '$e', onRetry: jobListController.refresh),
         data: (state) {
           final jobs = state.jobs;
           if (jobs.isEmpty) return const _EmptyView();
@@ -157,8 +166,8 @@ class JobListScreen extends HookConsumerWidget {
       message: candidates.isEmpty
           ? 'This job has no candidates. It will be permanently removed.'
           : 'This job and its ${candidates.length} '
-              '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-              'will be permanently removed.',
+                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                'will be permanently removed.',
       details: [jobDeleteDetails(job, candidates)],
       confirmLabel: 'Delete job',
     );
@@ -293,11 +302,7 @@ class _JobCard extends StatelessWidget {
   final int index;
   final VoidCallback onTap;
 
-  const _JobCard({
-    required this.job,
-    required this.index,
-    required this.onTap,
-  });
+  const _JobCard({required this.job, required this.index, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -377,7 +382,10 @@ class _JobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -441,8 +449,10 @@ class _ErrorView extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            Text('Cannot reach the backend.\n$message',
-                textAlign: TextAlign.center),
+            Text(
+              'Cannot reach the backend.\n$message',
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 12),
             FilledButton(onPressed: onRetry, child: const Text('Retry')),
           ],
