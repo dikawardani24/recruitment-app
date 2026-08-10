@@ -18,6 +18,16 @@ class DeferredPage extends StatefulWidget {
 class _DeferredPageState extends State<DeferredPage> {
   bool _ready = false;
 
+  // Cached so dispose() can remove the listener without looking up an
+  // ancestor on a deactivated element (which throws).
+  Animation<double>? _animation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _animation = ModalRoute.of(context)?.animation;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +36,7 @@ class _DeferredPageState extends State<DeferredPage> {
 
   void _arm() {
     if (!mounted) return;
-    final animation = ModalRoute.of(context)?.animation;
+    final animation = _animation;
     if (animation == null || animation.status == AnimationStatus.completed) {
       _setReady();
     } else {
@@ -45,7 +55,7 @@ class _DeferredPageState extends State<DeferredPage> {
 
   @override
   void dispose() {
-    ModalRoute.of(context)?.animation?.removeStatusListener(_onStatus);
+    _animation?.removeStatusListener(_onStatus);
     super.dispose();
   }
 
