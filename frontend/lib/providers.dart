@@ -150,6 +150,33 @@ final searchJobsProvider =
       SearchJobNotifier.new,
     );
 
+/// Recent search keywords, most recent first. Kept in memory only so it
+/// survives navigation within the session but is lost on app restart.
+class SearchHistoryNotifier extends Notifier<List<String>> {
+  static const int maxEntries = 10;
+
+  @override
+  List<String> build() => const [];
+
+  /// Records [keyword] at the front of the list, de-duplicated and capped at
+  /// [maxEntries].
+  void add(String keyword) {
+    final trimmed = keyword.trim();
+    if (trimmed.isEmpty) return;
+    state = [
+      trimmed,
+      ...state.where((k) => k != trimmed),
+    ].take(maxEntries).toList();
+  }
+
+  void clear() => state = const [];
+}
+
+final searchHistoryProvider =
+    NotifierProvider<SearchHistoryNotifier, List<String>>(
+      SearchHistoryNotifier.new,
+    );
+
 final jobProvider = FutureProvider.family<Job, String>((ref, jobId) {
   return getIt<GetJob>()(jobId);
 });

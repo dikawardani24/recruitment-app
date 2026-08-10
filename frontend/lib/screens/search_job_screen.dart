@@ -6,14 +6,16 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_list_controller.dart';
 import '../providers.dart';
+import '../widgets/card_shape.dart';
 import '../widgets/delete_background.dart';
 import '../widgets/error_view.dart';
 import '../widgets/job_card.dart';
 import '../widgets/job_list_footer.dart';
 
-/// Full-page job search. Type a keyword and press enter (or the search button)
-/// to query the backend; an empty keyword returns every job. Results load with
-/// shimmer placeholders and paginate as the user scrolls.
+/// Full-page job search. Type a keyword and press enter (or let the debounce
+/// fire) to query the backend; an empty keyword returns every job. Results load
+/// with shimmer placeholders and paginate as the user scrolls. When the input
+/// is empty, a card lists the recent in-memory searches for quick re-runs.
 class SearchJobScreen extends HookConsumerWidget {
   const SearchJobScreen({super.key});
 
@@ -29,6 +31,7 @@ class SearchJobScreen extends HookConsumerWidget {
     final keyword = useState('');
 
     final searchAsync = ref.watch(searchJobsProvider(keyword.value));
+    final searchHistory = ref.watch(searchHistoryProvider);
     final jobListController = ref.read(jobListControllerProvider);
 
     useEffect(() {
@@ -37,6 +40,9 @@ class SearchJobScreen extends HookConsumerWidget {
 
     void runSearch(String value) {
       keyword.value = value.trim();
+      if (keyword.value.isNotEmpty) {
+        ref.read(searchHistoryProvider.notifier).add(keyword.value);
+      }
     }
 
     void onChanged(String value) {
@@ -65,25 +71,45 @@ class SearchJobScreen extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => ref.read(navigatorProvider).pop(),
+        ),
         titleSpacing: 0,
-        title: TextField(
-          controller: searchController,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          style: theme.textTheme.titleMedium,
-          decoration: const InputDecoration(
-            hintText: 'Search jobs',
-            border: InputBorder.none,
+        title: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: TextField(
+            controller: searchController,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            style: theme.textTheme.titleMedium,
+            decoration: InputDecoration(
+              hintText: 'Search jobs',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onChanged: onChanged,
+            onSubmitted: onSubmitted,
           ),
-          onChanged: onChanged,
-          onSubmitted: onSubmitted,
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Search',
-            onPressed: () => onSubmitted(searchController.text),
-          ),
           ValueListenableBuilder<TextEditingValue>(
             valueListenable: searchController,
             builder: (context, value, _) => value.text.isEmpty
@@ -115,7 +141,10 @@ class SearchJobScreen extends HookConsumerWidget {
         ),
         data: (state) {
           final jobs = state.jobs;
-          if (jobs.isEmpty) return _NoResultsView(keyword: keyword.value);
+          final showHistory = keyword.value.isEmpty && searchHistory.isNotEmpty;
+          if (jobs.isEmpty && !showHistory) {
+            return _NoResultsView(keyword: keyword.value);
+          }
           return RefreshIndicator(
             onRefresh: () => ref
                 .read(searchJobsProvider(keyword.value).notifier)
@@ -125,6 +154,23 @@ class SearchJobScreen extends HookConsumerWidget {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
+                if (showHistory)
+                  _SearchHistoryCard(
+                    keywords: searchHistory,
+                    onSelect: (kw) {
+                      searchController.text = kw;
+                      runSearch(kw);
+                    },
+                  ),
+                if (jobs.isEmpty && showHistory)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'No jobs yet. Create your first job.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
                 for (final entry in jobs.asMap().entries)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -153,11 +199,56 @@ class SearchJobScreen extends HookConsumerWidget {
                       ),
                     ),
                   ),
-                JobListFooter(state: state),
+                if (jobs.isNotEmpty) JobListFooter(state: state),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Card shown under the search input while it is empty, listing the recent
+/// searches recorded this session. Tapping one re-runs that search.
+class _SearchHistoryCard extends StatelessWidget {
+  const _SearchHistoryCard({required this.keywords, required this.onSelect});
+
+  final List<String> keywords;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: cardShape(theme),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+              child: Text(
+                'Recent searches',
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
+            for (final kw in keywords)
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  Icons.history,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                title: Text(kw, maxLines: 1, overflow: TextOverflow.ellipsis),
+                onTap: () => onSelect(kw),
+              ),
+          ],
+        ),
       ),
     );
   }

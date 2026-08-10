@@ -16,6 +16,7 @@ import 'package:ai_ats/widgets/shimmer.dart';
 class _FakeNavigator implements AppNavigator {
   final navigatorKey = GlobalKey<NavigatorState>();
   final openedJobIds = <String>[];
+  var popCount = 0;
 
   @override
   void goToJobs() {}
@@ -62,7 +63,7 @@ class _FakeNavigator implements AppNavigator {
   }
 
   @override
-  void pop() {}
+  void pop() => popCount++;
 }
 
 /// Notifier whose build stays pending until a [Completer] resolves, used to
@@ -456,6 +457,144 @@ void main() {
     await tester.pump();
 
     expect(navigator.openedJobIds, ['j1']);
+  });
+
+  testWidgets('back button pops the navigator', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final navigator = _FakeNavigator();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          searchJobsProvider.overrideWith2(
+            (kw) => _FakeSearchNotifier(kw, {
+              '': [_job('j1', 'Backend Engineer')],
+            }),
+          ),
+          navigatorProvider.overrideWithValue(navigator),
+        ],
+        child: MaterialApp(
+          navigatorKey: navigator.navigatorKey,
+          home: const SearchJobScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pump();
+
+    expect(navigator.popCount, 1);
+  });
+
+  testWidgets('search input uses an outlined border like the job form', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          searchJobsProvider.overrideWith2(
+            (kw) => _FakeSearchNotifier(kw, const {}),
+          ),
+        ],
+        child: const MaterialApp(home: SearchJobScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    final decoration = textField.decoration!;
+    expect(decoration.border, isA<OutlineInputBorder>());
+  });
+
+  testWidgets('shows recent searches when the keyword is empty', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final results = {
+      '': [_job('j1', 'Backend Engineer')],
+      'flutter': [_job('j2', 'Flutter Developer')],
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          searchJobsProvider.overrideWith2(
+            (kw) => _FakeSearchNotifier(kw, results),
+          ),
+        ],
+        child: const MaterialApp(home: SearchJobScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Recent searches'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'flutter');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Flutter Developer'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Recent searches'), findsOneWidget);
+    expect(find.text('flutter'), findsOneWidget);
+  });
+
+  testWidgets('tapping a recent search re-runs it', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final results = {
+      '': [_job('j1', 'Backend Engineer')],
+      'flutter': [_job('j2', 'Flutter Developer')],
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          searchJobsProvider.overrideWith2(
+            (kw) => _FakeSearchNotifier(kw, results),
+          ),
+        ],
+        child: const MaterialApp(home: SearchJobScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'flutter');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('flutter'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Flutter Developer'), findsOneWidget);
+    expect(find.text('Backend Engineer'), findsNothing);
   });
 
   group('deletion', () {
