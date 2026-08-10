@@ -47,21 +47,30 @@ class JobListScreen extends HookConsumerWidget {
             onPressed: jobListController.openSettings,
           ),
           IconButton(
-            icon: const Icon(Icons.support_agent_outlined),
-            tooltip: 'Recruiter Copilot',
-            onPressed: jobListController.openChat,
-          ),
-          IconButton(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Open Chucker Flutter',
             onPressed: jobListController.openChucker,
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: jobListController.openJobForm,
-        icon: const Icon(Icons.add),
-        label: const Text('New job'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'copilot',
+            onPressed: jobListController.openChat,
+            icon: const Icon(Icons.support_agent),
+            label: const Text('Copilot'),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.extended(
+            heroTag: 'new-job',
+            onPressed: jobListController.openJobForm,
+            icon: const Icon(Icons.add),
+            label: const Text('New job'),
+          ),
+        ],
       ),
       body: jobsAsync.when(
         loading: () => ListView.separated(

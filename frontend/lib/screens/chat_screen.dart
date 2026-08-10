@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/chat/chat_controller.dart';
@@ -22,7 +23,7 @@ class ChatScreen extends HookConsumerWidget {
         }
       });
       return null;
-    }, [chatState.messages.length]);
+    }, [chatState.messages.length, chatState.streamingText]);
 
     void send() {
       final text = inputController.text;
@@ -45,19 +46,25 @@ class ChatScreen extends HookConsumerWidget {
         children: [
           if (!chatState.configured) const _NotConfiguredBanner(),
           Expanded(
-            child: chatState.messages.isEmpty
+            child: chatState.messages.isEmpty && !chatState.isLoading
                 ? const _EmptyChat()
                 : ListView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: chatState.messages.length,
+                    itemCount: chatState.messages.length +
+                        (chatState.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index == chatState.messages.length) {
+                        return _StreamingBubble(
+                          streamingText: chatState.streamingText,
+                          usingTools: chatState.usingTools,
+                        );
+                      }
                       final message = chatState.messages[index];
                       return _MessageBubble(message: message);
                     },
                   ),
           ),
-          if (chatState.isLoading) const _TypingIndicator(),
           _Composer(controller: inputController, onSend: send),
         ],
       ),
@@ -156,22 +163,26 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SelectableText(
-              message.content,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isUser
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurface,
+            if (isUser)
+              SelectableText(
+                message.content,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              )
+            else
+              MarkdownBody(
+                data: message.content,
+                styleSheet: MarkdownStyleSheet.fromTheme(theme),
               ),
-            ),
             if (!isUser && message.sources.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final source in message.sources)
-                    _SourceChip(source: source),
+                  for (final group in _groupSources(message.sources))
+                    _SourceChip(group: group),
                 ],
               ),
             ],
@@ -182,16 +193,49 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _SourceChip extends StatelessWidget {
-  const _SourceChip({required this.source});
+class _SourceGroup {
+  _SourceGroup({required this.label, required this.name, required this.sections});
 
-  final ChatSource source;
+  final String label;
+  final String name;
+  final List<({String section, double score})> sections;
+}
+
+List<_SourceGroup> _groupSources(List<ChatSource> sources) {
+  final byEntity = <String, _SourceGroup>{};
+  for (final source in sources) {
+    final key = '${source.entityType}:${source.entityId}';
+    final group = byEntity.putIfAbsent(
+      key,
+      () => _SourceGroup(
+        label: source.label,
+        name: source.name,
+        sections: [],
+      ),
+    );
+    group.sections.add((section: source.section, score: source.score));
+  }
+  final groups = byEntity.values.toList();
+  for (final group in groups) {
+    group.sections.sort((a, b) => b.score.compareTo(a.score));
+  }
+  groups.sort((a, b) => b.sections.first.score.compareTo(a.sections.first.score));
+  return groups;
+}
+
+class _SourceChip extends StatelessWidget {
+  const _SourceChip({required this.group});
+
+  final _SourceGroup group;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tooltip = group.sections
+        .map((s) => '${s.section} · match ${(s.score * 100).round()}%')
+        .join('\n');
     return Tooltip(
-      message: '${source.section} · match ${(source.score * 100).round()}%',
+      message: tooltip,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -199,7 +243,7 @@ class _SourceChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          '${source.label} · ${source.name}',
+          '${group.label} · ${group.name}',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSecondaryContainer,
           ),
@@ -209,22 +253,42 @@ class _SourceChip extends StatelessWidget {
   }
 }
 
-class _TypingIndicator extends StatelessWidget {
-  const _TypingIndicator();
+class _StreamingBubble extends StatelessWidget {
+  const _StreamingBubble({required this.streamingText, required this.usingTools});
+
+  final String streamingText;
+  final bool usingTools;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, bottom: 6),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          'Thinking…',
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+    final hasText = streamingText.isNotEmpty;
+    final placeholder = usingTools
+        ? 'Consulting workspace data…'
+        : 'Thinking…';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: hasText
+            ? MarkdownBody(
+                data: streamingText,
+                styleSheet: MarkdownStyleSheet.fromTheme(theme),
+              )
+            : Text(
+                placeholder,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
       ),
     );
   }

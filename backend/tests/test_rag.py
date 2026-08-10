@@ -5,7 +5,10 @@ import json
 import math
 from datetime import UTC, datetime
 
+import pytest
+
 from app.config import Settings
+from app.chat import ToolCall, ToolError, ToolRegistry
 from app.domain.candidate import Candidate
 from app.domain.job import Job
 from app.domain.page import Page
@@ -107,6 +110,12 @@ class FakeCvRepo:
         cv = self.cvs.get(cv_id)
         return cv if cv and cv.job_id == job_id else None
 
+    async def count_by_job_ids(self, job_ids: list[str]) -> dict[str, int]:
+        return {
+            job_id: sum(1 for cv in self.cvs.values() if cv.job_id == job_id)
+            for job_id in job_ids
+        }
+
 
 def _job(job_id: str, title: str, description: str = "", req: dict | None = None) -> Job:
     now = datetime.now(UTC)
@@ -169,6 +178,24 @@ def test_chunk_job_requirements():
     assert "Kubernetes" in sections["preferred_skills"]
     assert "Fix bugs" in sections["responsibilities"]
     assert "BSc" in sections["qualifications"]
+
+
+def test_chunk_job_metadata_includes_dates():
+    created = datetime(2026, 8, 6, 14, 5, 0, tzinfo=UTC)
+    job = Job(
+        title="Flutter Dev",
+        desc="Build the app",
+        req=None,
+        status="open",
+        created_at=created,
+        updated_at=created,
+        id="job-1",
+    )
+    sections = {chunk.section: chunk.content for chunk in chunk_job(job)}
+    assert "Flutter Dev" in sections["metadata"]
+    assert "Status: open" in sections["metadata"]
+    assert "Created at: 2026-08-06 14:05:00" in sections["metadata"]
+    assert "Last updated at: 2026-08-06 14:05:00" in sections["metadata"]
 
 
 async def test_semantic_search_disabled_returns_enabled_false():
@@ -316,9 +343,24 @@ class FakeChatClient:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str) -> str:
+    async def complete(self, system: str, user: str, tools=None, execute_tool=None):
         self.calls.append((system, user))
         return "Jane Doe matches the Flutter role [1]."
+
+
+class FakeStreamingChatClient(FakeChatClient):
+    def __init__(self, items):
+        super().__init__()
+        self.items = items
+        self.tool_calls: list[tuple[str, str]] = []
+
+    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+        self.calls.append((system, user))
+        for item in self.items:
+            if isinstance(item, ToolCall):
+                await execute_tool(item.name, item.arguments)
+                self.tool_calls.append((item.name, item.arguments))
+            yield item
 
 
 def _chat_settings() -> Settings:
@@ -404,6 +446,113 @@ def test_system_prompt_enforces_scope():
     assert "Never invent" in SYSTEM_PROMPT
 
 
+# --- Copilot tools (function calling) ---
+
+
+def _registry() -> ToolRegistry:
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    c1 = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])
+    c2 = _candidate("cv-2", "job-1", "John Roe", ["Kotlin"])
+    c1.overall_score = 0.9
+    c2.overall_score = 0.7
+    return ToolRegistry(FakeJobRepo([job]), FakeCvRepo([c1, c2]))
+
+
+async def test_tool_registry_specs_expose_default_tools():
+    registry = _registry()
+    names = {spec["function"]["name"] for spec in registry.specs()}
+    assert {
+        "list_jobs",
+        "get_job_detail",
+        "list_candidates",
+        "get_candidate_detail",
+        "get_rankings",
+    } <= names
+
+
+async def test_tool_list_jobs():
+    result = await _registry().execute("list_jobs", "{}")
+    assert result["jobs"][0]["title"] == "Flutter Developer"
+    assert result["jobs"][0]["candidate_count"] == 2
+    assert "created_at" in result["jobs"][0]
+
+
+async def test_tool_get_job_detail():
+    result = await _registry().execute("get_job_detail", '{"job_id": "job-1"}')
+    assert result["title"] == "Flutter Developer"
+    assert result["job_id"] == "job-1"
+    assert result["status"] == "open"
+
+
+async def test_tool_get_job_detail_missing_job():
+    result = await _registry().execute("get_job_detail", '{"job_id": "nope"}')
+    assert result["error"] == "job_not_found"
+
+
+async def test_tool_list_candidates_and_detail():
+    registry = _registry()
+    listing = await registry.execute("list_candidates", '{"job_id": "job-1"}')
+    assert listing["candidates"][0]["name"] == "Jane Doe"
+    assert listing["candidates"][0]["overall_score"] == 0.9
+    detail = await registry.execute(
+        "get_candidate_detail", '{"job_id": "job-1", "cv_id": "cv-1"}'
+    )
+    assert detail["candidate_name"] == "Jane Doe"
+
+
+async def test_tool_get_rankings_sorts_by_score():
+    result = await _registry().execute("get_rankings", '{"job_id": "job-1"}')
+    assert result["count"] == 2
+    assert result["results"][0]["candidate_name"] == "Jane Doe"
+    assert result["results"][0]["rank"] == 1
+
+
+async def test_tool_unknown_and_invalid_args():
+    with pytest.raises(ToolError):
+        await _registry().execute("nope", "{}")
+    with pytest.raises(ToolError):
+        await _registry().execute("get_job_detail", '{"job_id": ""}')
+    with pytest.raises(ToolError):
+        await _registry().execute("get_job_detail", "not json")
+
+
+async def test_ask_stream_emits_text_and_done():
+    client = FakeStreamingChatClient(["Hel", "lo ", "Flutter"])
+    events = [
+        event
+        async for event in Ask(_chat_settings(), client, None).stream(
+            "who is best?", history=[]
+        )
+    ]
+    texts = [e["content"] for e in events if e["type"] == "text"]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert "".join(texts) == "Hello Flutter"
+    assert done["answer"] == "Hello Flutter"
+    assert done["configured"] is True
+
+
+async def test_ask_stream_reports_tool_and_executes():
+    registry = _registry()
+    client = FakeStreamingChatClient(
+        [ToolCall("get_job_detail", '{"job_id": "job-1"}'), "Job: Flutter Developer"]
+    )
+    ask = Ask(_chat_settings(), client, None, registry)
+    events = [event async for event in ask.stream("details please", history=[])]
+    tool_events = [e for e in events if e["type"] == "tool"]
+    assert tool_events == [{"type": "tool", "name": "get_job_detail"}]
+    assert client.tool_calls == [("get_job_detail", '{"job_id": "job-1"}')]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert done["answer"].startswith("Job: Flutter Developer")
+
+
+async def test_ask_stream_not_configured_errors():
+    s = _settings()
+    s.llm_api_key = None
+    events = [event async for event in Ask(s, FakeChatClient(), None).stream("hi")]
+    assert events[0]["type"] == "error"
+    assert "not configured" in events[0]["message"]
+
+
 def test_api_chat_disabled(client):
     resp = client.post(
         "/api/chat",
@@ -413,3 +562,14 @@ def test_api_chat_disabled(client):
     body = resp.json()
     assert body["configured"] is False
     assert body["sources"] == []
+
+
+def test_api_chat_stream_disabled(client):
+    resp = client.post(
+        "/api/chat/stream",
+        json={"question": "who is the best flutter candidate?", "history": []},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "error"' in resp.text
+    assert "not configured" in resp.text

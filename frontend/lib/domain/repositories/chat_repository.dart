@@ -7,4 +7,11 @@ abstract class ChatRepository {
     List<ChatMessage> history,
     int topK,
   });
+
+  Stream<ChatStreamEvent> askStream({
+    required String question,
+    String? jobId,
+    List<ChatMessage> history,
+    int topK,
+  });
 }

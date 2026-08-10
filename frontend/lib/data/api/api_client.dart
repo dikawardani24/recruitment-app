@@ -46,4 +46,16 @@ class ApiClient {
   Future<void> delete(String path) async {
     await _dio.delete(path);
   }
+
+  /// POST returning the raw response body as a byte stream (e.g. SSE).
+  Stream<List<int>> postStream(String path, {Object? data}) async* {
+    final resp = await _dio.post<ResponseBody>(
+      path,
+      data: data,
+      options: Options(responseType: ResponseType.stream),
+    );
+    final body = resp.data;
+    if (body == null) return;
+    yield* body.stream;
+  }
 }

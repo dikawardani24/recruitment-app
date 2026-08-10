@@ -24,7 +24,7 @@ from app.usecase.get_rankings import GetRankings
 from app.usecase.semantic_search import SemanticSearch
 from app.usecase.reindex_embeddings import ReindexEmbeddings
 from app.usecase.ask import Ask
-from app.chat import ChatClient
+from app.chat import ChatClient, ToolRegistry
 from app.rag import EmbeddingIndexer, LocalEmbedder, VectorStore
 from app.imports.processor import CvProcessor
 
@@ -90,7 +90,17 @@ def reindex_embeddings_use_case() -> ReindexEmbeddings:
     return ReindexEmbeddings(_embedding_indexer(), __job_repo(), __cv_repo())
 
 def ask_use_case() -> Ask:
-    return Ask(_settings(), _chat_client(), _embedding_indexer())
+    return Ask(_settings(), _chat_client(), _embedding_indexer(), _tool_registry())
+
+
+"""CHAT TOOLS"""
+__tool_registry: ToolRegistry | None = None
+
+def _tool_registry() -> ToolRegistry:
+    global __tool_registry
+    if __tool_registry is None:
+        __tool_registry = ToolRegistry(__job_repo(), __cv_repo())
+    return __tool_registry
 
 
 """CHAT CLIENT"""

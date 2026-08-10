@@ -76,7 +76,8 @@ def chunk_candidate(candidate: Candidate) -> list[Chunk]:
 
 def chunk_job(job: Job) -> list[Chunk]:
     """Job chunks: windowed description plus requirement groups from the parsed JD
-    (docs/10 §5)."""
+    (docs/10 §5), plus a metadata chunk with status and dates so the copilot can
+    answer created/updated questions."""
     chunks: list[Chunk] = []
     description = job.desc or ""
     windows = _windows(description)
@@ -84,6 +85,10 @@ def chunk_job(job: Job) -> list[Chunk]:
     for i, window in enumerate(windows):
         text = window if i > 0 else f"{header}\n{window}"
         chunks.append(Chunk("description", text))
+
+    metadata = _job_metadata_chunk(job)
+    if metadata:
+        chunks.append(Chunk("metadata", metadata))
 
     requirements = job.requirements()
     if isinstance(requirements, dict):
@@ -101,6 +106,19 @@ def chunk_job(job: Job) -> list[Chunk]:
             chunks.append(Chunk("qualifications", quals))
 
     return chunks
+
+
+def _job_metadata_chunk(job: Job) -> str | None:
+    if job.title is None:
+        return None
+    parts = [f"Title: {job.title}"]
+    if job.status:
+        parts.append(f"Status: {job.status}")
+    if job.created_at:
+        parts.append(f"Created at: {job.created_at}")
+    if job.updated_at:
+        parts.append(f"Last updated at: {job.updated_at}")
+    return "\n".join(parts)
 
 
 def _qualifications_chunk(requirements: dict) -> str:
