@@ -48,7 +48,7 @@ async def list_jobs(
 
 @router.get("/jobs/search")
 async def search_jobs(
-    keyword: str = Query(..., min_length=1, max_length=200),
+    keyword: str = Query(..., max_length=200),
     page: int = Query(1, ge=1),
     limit: int = Query(20, alias="limit", ge=1, le=100),
 ) -> dict:
