@@ -233,6 +233,9 @@ class _RankingSection extends ConsumerWidget {
     final detailState = ref.watch(jobDetailStateProvider);
     final detailController = ref.read(jobDetailControllerProvider);
 
+    final ranked = rankingsAsync.value;
+    final hasRankings = ranked != null && ranked.isNotEmpty;
+
     return SectionCard(
       title: 'Ranking',
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -256,34 +259,38 @@ class _RankingSection extends ConsumerWidget {
                 if (cvs.isEmpty) return const SizedBox.shrink();
                 return const _NotRankedHint();
               }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  BucketDonut(buckets: bucketCounts(ranked)),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.center,
-                    child: TextButton.icon(
-                      onPressed: () => detailController.viewRankings(
-                        jobId,
-                        jobTitle,
-                        ranked.first.source ?? 'rules',
-                      ),
-                      icon: const Icon(Icons.timeline),
-                      label: const Text('View full ranking'),
-                    ),
-                  ),
-                ],
-              );
+              return BucketDonut(buckets: bucketCounts(ranked));
             },
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: detailState.busy
-                ? null
-                : () => detailController.rank(context, jobId, cvs),
-            icon: const Icon(Icons.psychology),
-            label: const Text('Rank CVs'),
+          Row(
+            children: [
+              if (hasRankings) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: detailState.busy
+                        ? null
+                        : () => detailController.viewRankings(
+                            jobId,
+                            jobTitle,
+                            ranked.first.source ?? 'rules',
+                          ),
+                    icon: const Icon(Icons.timeline),
+                    label: const Text('View full ranking'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: detailState.busy
+                      ? null
+                      : () => detailController.rank(context, jobId, cvs),
+                  icon: const Icon(Icons.psychology),
+                  label: const Text('Rank CVs'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
