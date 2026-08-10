@@ -7,13 +7,14 @@ import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
 import '../widgets/bucket_donut.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/score_color.dart';
 
 /// Full-screen page with a candidate's ranking details, opened from the job
 /// detail and rankings screens. Supports ranking this CV (when it is ready)
 /// and deleting it. The page stays in sync with `cvsProvider(jobId)` so the
 /// details refresh after a rank or delete.
-class CandidateDetailScreen extends HookConsumerWidget {
+class CandidateDetailScreen extends StatelessWidget {
   final String jobId;
   final String cvId;
 
@@ -24,6 +25,29 @@ class CandidateDetailScreen extends HookConsumerWidget {
 
   const CandidateDetailScreen({
     super.key,
+    required this.jobId,
+    required this.cvId,
+    this.initial,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DeferredPage(
+      child: _CandidateDetailContent(
+        jobId: jobId,
+        cvId: cvId,
+        initial: initial,
+      ),
+    );
+  }
+}
+
+class _CandidateDetailContent extends HookConsumerWidget {
+  final String jobId;
+  final String cvId;
+  final CandidateResult? initial;
+
+  const _CandidateDetailContent({
     required this.jobId,
     required this.cvId,
     this.initial,

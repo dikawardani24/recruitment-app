@@ -5,12 +5,22 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/jobForm/job_form_controller.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/section_card.dart';
 
-class JobFormScreen extends HookConsumerWidget {
+class JobFormScreen extends StatelessWidget {
   const JobFormScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const DeferredPage(child: _JobFormContent());
+  }
+}
+
+class _JobFormContent extends HookConsumerWidget {
+  const _JobFormContent();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -8,6 +8,7 @@ import '../controllers/job_list_controller.dart';
 import '../providers.dart';
 import '../widgets/card_shape.dart';
 import '../widgets/delete_background.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/error_view.dart';
 import '../widgets/job_card.dart';
 import '../widgets/job_list_footer.dart';
@@ -16,8 +17,17 @@ import '../widgets/job_list_footer.dart';
 /// fire) to query the backend; an empty keyword returns every job. Results load
 /// with shimmer placeholders and paginate as the user scrolls. When the input
 /// is empty, a card lists the recent in-memory searches for quick re-runs.
-class SearchJobScreen extends HookConsumerWidget {
+class SearchJobScreen extends StatelessWidget {
   const SearchJobScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const DeferredPage(child: _SearchJobContent());
+  }
+}
+
+class _SearchJobContent extends HookConsumerWidget {
+  const _SearchJobContent();
 
   static const _loadMoreThreshold = 300.0;
   static const _debounceDelay = Duration(milliseconds: 600);

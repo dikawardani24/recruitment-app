@@ -5,6 +5,7 @@ import '../controllers/deleteConfirm/delete_confirm_controller.dart';
 import '../domain/models.dart';
 import '../navigation/app_navigator.dart';
 import '../widgets/bucket_donut.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/section_card.dart';
 import 'job_list_screen.dart' show formatCreatedAt;
 
@@ -46,13 +47,24 @@ Widget candidateDeleteDetails(CandidateResult cv) {
 /// Full-screen confirmation shown before a destructive delete. Runs the
 /// caller-supplied deletion through [DeleteConfirmController] and pops with
 /// `true` when it succeeded, `false` on cancel or failure.
-class DeleteConfirmScreen extends ConsumerWidget {
+class DeleteConfirmScreen extends StatelessWidget {
   final DeleteConfirmArgs args;
 
   const DeleteConfirmScreen({
     super.key,
     required this.args,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return DeferredPage(child: _DeleteConfirmContent(args: args));
+  }
+}
+
+class _DeleteConfirmContent extends ConsumerWidget {
+  final DeleteConfirmArgs args;
+
+  const _DeleteConfirmContent({required this.args});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
