@@ -10,8 +10,10 @@ How to run the application locally, run its test suites, and smoke-test the API 
 | Storage | SQLite (`backend/data/ats.db`) — no database server needed |
 | File uploads | Local disk (`backend/data/uploads/`) |
 | Ranking | Rule-based scoring always; AI reasoning via any OpenAI-compatible LLM when a key is set |
+| Semantic search (RAG) | Opt-in: local bge-small embeddings + Qdrant (embedded/local mode) |
 
-No PostgreSQL, Qdrant, Redis, Docker, or model downloads are required.
+In the default (RAG-disabled) configuration no PostgreSQL, Qdrant, Redis, Docker,
+or model downloads are required.
 
 ## Prerequisites
 
@@ -71,6 +73,32 @@ ATS_EXTRACT__NER_CONFIDENCE=0.5
 Extraction priority is: NER → LLM → rules. The `source` field on each CV records
 which engine produced it (`ner` / `llm` / `rules`).
 
+### Optional: semantic search (RAG)
+
+Off by default. When enabled, jobs and CVs are embedded locally with the free
+`BAAI/bge-small-en-v1.5` model (the model ~130 MB downloads on first use) and
+stored in Qdrant running in **embedded/local mode** (persistent files under
+`backend/data/qdrant/` — no server). Set `ATS_QDRANT__URL` to point at a real
+Qdrant server instead.
+
+```
+ATS_RAG__ENABLED=true
+# ATS_RAG__EMBEDDING_MODEL=BAAI/bge-small-en-v1.5   # 384-dim by default
+# ATS_RAG__EMBEDDING_VERSION=bge-small-en-v1.5:v1   # bump to force re-embed
+# ATS_RAG__TOP_K=20                                 # default search result count
+# ATS_QDRANT__PATH=.../data/qdrant                  # embedded mode storage dir
+# ATS_QDRANT__URL=http://localhost:6333             # optional real server
+# ATS_QDRANT__COLLECTION=recruitment
+```
+
+Indexing is automatic: new jobs are embedded on create, CVs are embedded when
+background extraction completes, and deletes remove vectors. To index existing
+data, run `POST /api/search/reindex` (or pass `{"job_id": "..."}` for a single
+job). Semantic search is served by `POST /api/search/semantic` with body
+`{"query": "...", "entity": "job"|"candidate", "top_k": 10, "job_id": "..."}`;
+when RAG is disabled both endpoints respond with `"enabled": false` and an empty
+result set.
+
 ### Run the API
 
 ```bash
@@ -124,11 +152,13 @@ or:
 make backend-test
 ```
 
-**72 tests, no external services.** `tests/test_api.py` covers: health, create job
+**86 tests, no external services.** `tests/test_api.py` covers: health, create job
 from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
 persisted rankings, and error cases (missing title, missing JD, unknown job).
-`tests/test_imports.py` covers the background import pipeline, and
-`tests/test_jd_skills.py` covers JD structuring + skill matching.
+`tests/test_imports.py` covers the background import pipeline,
+`tests/test_jd_skills.py` covers JD structuring + skill matching, and
+`tests/test_rag.py` covers chunking, indexing, semantic search, and the
+RAG-disabled fallback (all with fake embedders/stores — no model or Qdrant).
 
 ### Code check
 
@@ -181,6 +211,15 @@ curl -X POST http://localhost:8000/api/jobs/<job_id>/rank
 
 # 5. Persisted rankings (best match first)
 curl http://localhost:8000/api/jobs/<job_id>/rankings
+
+# 6. Semantic search over candidates (returns "enabled": false until RAG is on)
+curl -X POST http://localhost:8000/api/search/semantic \
+  -H "Content-Type: application/json" \
+  -d '{"query": "flutter developer", "entity": "candidate", "top_k": 10}'
+
+# 7. Backfill the vector index (after enabling RAG)
+curl -X POST http://localhost:8000/api/search/reindex \
+  -H "Content-Type: application/json" -d '{}'
 ```
 
 ---
@@ -206,7 +245,7 @@ cd backend && .venv/bin/uvicorn app.main:app --reload
 cd frontend && flutter run
 
 # Tests
-make backend-test       # 72 tests
+make backend-test       # 86 tests
 make frontend-test
 make lint               # compileall + flutter analyze
 ```

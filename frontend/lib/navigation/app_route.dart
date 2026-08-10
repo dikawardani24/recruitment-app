@@ -10,6 +10,7 @@ enum AppRoute {
   jobDetail('/jobs/:jobId'),
   candidateDetail('/jobs/:jobId/candidate/:cvId'),
   rankings('/jobs/:jobId/rankings'),
+  chat('/jobs/chat'),
   deleteConfirm('/jobs/delete-confirm'),
   actionResult('/jobs/action-result');
 

@@ -142,3 +142,37 @@ class RankResponseDto {
 
   const RankResponseDto({required this.source, required this.results});
 }
+
+class ChatSourceResponse {
+  final String entityType;
+  final String entityId;
+  final String? jobId;
+  final String name;
+  final String section;
+  final double score;
+
+  const ChatSourceResponse({
+    required this.entityType,
+    required this.entityId,
+    this.jobId,
+    required this.name,
+    required this.section,
+    required this.score,
+  });
+}
+
+class ChatResponseDto {
+  final bool configured;
+  final String answer;
+  final List<ChatSourceResponse> sources;
+  final bool retrievalEnabled;
+  final int retrievalCount;
+
+  const ChatResponseDto({
+    required this.configured,
+    required this.answer,
+    required this.sources,
+    required this.retrievalEnabled,
+    required this.retrievalCount,
+  });
+}

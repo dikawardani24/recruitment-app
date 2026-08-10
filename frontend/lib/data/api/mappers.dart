@@ -131,6 +131,39 @@ class ImportStatusMapper {
   }
 }
 
+class ChatResponseMapper {
+  ChatResponseMapper._();
+
+  static ChatResponseDto fromJson(Map<String, dynamic> json) {
+    final sources = ((json['sources'] as List?) ?? [])
+        .map((e) => ChatSourceResponseMapper.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final retrieval = json['retrieval'] as Map<String, dynamic>? ?? const {};
+    return ChatResponseDto(
+      configured: (json['configured'] as bool?) ?? false,
+      answer: (json['answer'] as String?) ?? '',
+      sources: sources,
+      retrievalEnabled: (retrieval['enabled'] as bool?) ?? false,
+      retrievalCount: (retrieval['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class ChatSourceResponseMapper {
+  ChatSourceResponseMapper._();
+
+  static ChatSourceResponse fromJson(Map<String, dynamic> json) {
+    return ChatSourceResponse(
+      entityType: (json['entity_type'] as String?) ?? 'candidate',
+      entityId: (json['entity_id'] as String?) ?? '',
+      jobId: json['job_id'] as String?,
+      name: (json['entity_name'] as String?) ?? '',
+      section: (json['section'] as String?) ?? '',
+      score: (json['score'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 List<String> _stringList(dynamic value) {
   if (value is List) return value.map((e) => e.toString()).toList();
   return const [];

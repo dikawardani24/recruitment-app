@@ -47,6 +47,11 @@ class JobListScreen extends HookConsumerWidget {
             onPressed: jobListController.openSettings,
           ),
           IconButton(
+            icon: const Icon(Icons.support_agent_outlined),
+            tooltip: 'Recruiter Copilot',
+            onPressed: jobListController.openChat,
+          ),
+          IconButton(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Open Chucker Flutter',
             onPressed: jobListController.openChucker,

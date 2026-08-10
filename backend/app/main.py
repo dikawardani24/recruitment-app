@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database.db_client import DbClient
 from app.di.injection import cv_processor
-from app.routers import jobs
+from app.routers import chat, jobs, search
 
 logger = logging.getLogger("ai_ats.access")
 
@@ -112,6 +112,8 @@ app.add_middleware(RequestLogMiddleware)
 
 API_PREFIX = "/api"
 app.include_router(jobs.router, prefix=API_PREFIX)
+app.include_router(search.router, prefix=API_PREFIX)
+app.include_router(chat.router, prefix=API_PREFIX)
 
 
 @app.get("/health")
