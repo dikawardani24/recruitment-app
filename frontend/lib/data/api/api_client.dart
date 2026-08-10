@@ -1,4 +1,3 @@
-import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -17,7 +16,7 @@ class ApiClient {
           defaultValue: _defaultBase,
         ),
       ),
-    )..interceptors.add(ChuckerDioInterceptor());
+    );
   }
 
   final Dio _dio;
@@ -39,7 +38,11 @@ class ApiClient {
     ProgressCallback? onSendProgress,
     required T Function(dynamic data) parse,
   }) async {
-    final resp = await _dio.post(path, data: data, onSendProgress: onSendProgress);
+    final resp = await _dio.post(
+      path,
+      data: data,
+      onSendProgress: onSendProgress,
+    );
     return parse(resp.data);
   }
 
