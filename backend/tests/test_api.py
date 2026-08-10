@@ -267,6 +267,84 @@ def test_list_jobs_invalid_pagination_params(client):
     assert client.get("/api/jobs", params={"limit": 101}).status_code == 422
 
 
+def test_search_jobs_filters_by_title(client):
+    _create_jobs(client, 3)
+
+    resp = client.get("/api/jobs/search", params={"keyword": "Job 1"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["jobs"]) == 1
+    assert body["jobs"][0]["title"] == "Job 1"
+    assert body["meta"] == {"page": 1, "limit": 20, "has_more": False}
+
+
+def test_search_jobs_filters_case_insensitively(client):
+    _create_jobs(client, 2)
+
+    resp = client.get("/api/jobs/search", params={"keyword": "job 0"})
+    assert resp.status_code == 200
+    assert [j["title"] for j in resp.json()["jobs"]] == ["Job 0"]
+
+
+def test_search_jobs_matches_description(client):
+    client.post(
+        "/api/jobs",
+        data={"title": "Data Platform", "description": "Builds Kafka pipelines"},
+    )
+    client.post(
+        "/api/jobs",
+        data={"title": "Web UI", "description": "React dashboards"},
+    )
+
+    resp = client.get("/api/jobs/search", params={"keyword": "kafka"})
+    body = resp.json()
+    assert len(body["jobs"]) == 1
+    assert body["jobs"][0]["title"] == "Data Platform"
+
+
+def test_search_jobs_no_match_returns_empty(client):
+    _create_jobs(client, 2)
+
+    resp = client.get("/api/jobs/search", params={"keyword": "zzz-no-such-job"})
+    assert resp.status_code == 200
+    assert resp.json()["jobs"] == []
+    assert resp.json()["meta"] == {"page": 1, "limit": 20, "has_more": False}
+
+
+def test_search_jobs_requires_keyword(client):
+    assert client.get("/api/jobs/search").status_code == 422
+    assert client.get("/api/jobs/search", params={"keyword": ""}).status_code == 422
+
+
+def test_search_jobs_paginates(client):
+    for i in range(5):
+        client.post(
+            "/api/jobs",
+            data={"title": f"Engineer {i}", "description": BACKEND_JD},
+        )
+
+    first = client.get(
+        "/api/jobs/search", params={"keyword": "Engineer", "page": 1, "limit": 2}
+    )
+    assert first.status_code == 200
+    assert len(first.json()["jobs"]) == 2
+    assert first.json()["meta"] == {"page": 1, "limit": 2, "has_more": True}
+
+    last = client.get(
+        "/api/jobs/search", params={"keyword": "Engineer", "page": 3, "limit": 2}
+    )
+    assert len(last.json()["jobs"]) == 1
+    assert last.json()["meta"] == {"page": 3, "limit": 2, "has_more": False}
+
+
+def test_search_jobs_does_not_shadow_job_by_id(client):
+    job_id = create_job(client)
+
+    assert client.get(f"/api/jobs/{job_id}").status_code == 200
+    # /jobs/search is its own route, not a job id lookup
+    assert client.get("/api/jobs/search").status_code == 422
+
+
 def _upload_cv(client, job_id, cv_builder, name, body):
     resp = upload_cvs_and_wait(client, job_id, cv_builder, (name, body))
     assert resp["status"] == "completed"

@@ -11,5 +11,5 @@ final getIt = GetIt.instance;
   asExtension: true,
 )
 void setupDependencies() async {
-  GetIt.instance.$setupDependencies();
+  getIt.$setupDependencies();
 }

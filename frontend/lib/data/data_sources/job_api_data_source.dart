@@ -26,6 +26,22 @@ class JobApiDataSource {
     );
   }
 
+  Future<JobPageResponse> searchJobs({
+    required String keyword,
+    int page = 1,
+    int limit = 20,
+  }) {
+    return _client.get(
+      ApiPaths.searchJobs,
+      query: {'keyword': keyword, 'page': page, 'limit': limit},
+      parse: (data) => JobPageResponseMapper.fromJson(
+        data as Map<String, dynamic>,
+        fallbackPage: page,
+        fallbackLimit: limit,
+      ),
+    );
+  }
+
   Future<JobResponse> createJob({
     required String title,
     required String description,

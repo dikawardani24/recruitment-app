@@ -5,7 +5,7 @@ import 'package:injectable/injectable.dart';
 @singleton
 class ApiClient {
   /// [dio] is injectable for tests; production uses the default client.
-  ApiClient({Dio? dio}) : _dio = dio ?? _defaultDio();
+  ApiClient({@ignoreParam Dio? dio}) : _dio = dio ?? _defaultDio();
 
   static const String _defaultBase = 'http://127.0.0.1:8000/api';
 

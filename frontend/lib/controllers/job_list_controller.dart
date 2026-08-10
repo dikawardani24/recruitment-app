@@ -74,6 +74,8 @@ class JobListController {
 
   void openSettings() => _ref.read(navigatorProvider).goToSettings();
 
+  void openJobSearch() => _ref.read(navigatorProvider).goToSearchJobs();
+
   void openJobForm() => _ref.read(navigatorProvider).goToJobForm();
 
   void openJobDetail(String jobId) =>

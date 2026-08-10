@@ -21,6 +21,9 @@ class GoRouterNavigator implements AppNavigator {
   void goToSettings() => _router.go(AppRoute.settings.path);
 
   @override
+  void goToSearchJobs() => _router.go(AppRoute.searchJobs.path);
+
+  @override
   void goToJobDetail(String jobId) =>
       _router.go(AppRoute.jobDetail.withJobId(jobId));
 

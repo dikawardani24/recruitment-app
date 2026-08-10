@@ -7,6 +7,7 @@ import 'domain/usecases/get_job.dart';
 import 'domain/usecases/get_rankings.dart';
 import 'domain/usecases/list_cvs.dart';
 import 'domain/usecases/list_jobs.dart';
+import 'domain/usecases/search_jobs.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/go_router_navigator.dart';
 
@@ -91,6 +92,63 @@ class JobListNotifier extends AsyncNotifier<JobListState> {
 
 final jobsProvider =
     AsyncNotifierProvider<JobListNotifier, JobListState>(JobListNotifier.new);
+
+/// Search results for one keyword. A new instance is created per keyword, so
+/// switching search terms reloads from page 1 with a fresh loading state.
+class SearchJobNotifier extends AsyncNotifier<JobListState> {
+  SearchJobNotifier(this.keyword);
+
+  final String keyword;
+
+  @override
+  Future<JobListState> build() => _loadFirstPage();
+
+  Future<JobListState> _loadFirstPage() async {
+    final page = await getIt<SearchJobs>()(keyword: keyword);
+    return JobListState(jobs: page.jobs, page: 1, hasMore: page.hasMore);
+  }
+
+  /// Fetches the next page of the current keyword and appends it. No-op while
+  /// a page is already loading or when there is nothing left to load.
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
+    try {
+      final next = await getIt<SearchJobs>().call(
+        page: current.page + 1,
+        keyword: keyword,
+      );
+      state = AsyncValue.data(
+        current.copyWith(
+          jobs: [...current.jobs, ...next.jobs],
+          page: next.page,
+          hasMore: next.hasMore,
+          isLoadingMore: false,
+        ),
+      );
+    } catch (_) {
+      state = AsyncValue.data(current.copyWith(isLoadingMore: false));
+    }
+  }
+
+  /// Reloads from page 1 for the current keyword. The loading state is set
+  /// explicitly so the shimmer is always shown while refreshing.
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      state = AsyncValue.data(await _loadFirstPage());
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final searchJobsProvider =
+    AsyncNotifierProvider.family<SearchJobNotifier, JobListState, String>(
+      SearchJobNotifier.new,
+    );
 
 final jobProvider = FutureProvider.family<Job, String>((ref, jobId) {
   return getIt<GetJob>()(jobId);

@@ -6,6 +6,12 @@ import '../models/job_page.dart';
 abstract class JobRepository {
   Future<JobPage> listJobs({int page = 1, int limit = 20});
 
+  Future<JobPage> searchJobs({
+    required String keyword,
+    int page = 1,
+    int limit = 20,
+  });
+
   Future<Job> createJob({
     required String title,
     required String description,

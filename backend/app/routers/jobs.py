@@ -5,6 +5,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from app.di.injection import (
     saveJobUseCase,
     get_job_by_page_use_case,
+    search_jobs_use_case,
     get_job_use_case,
     delete_job_use_case,
     import_cv_batch_use_case,
@@ -43,6 +44,18 @@ async def list_jobs(
     limit: int = Query(20, alias="limit", ge=1, le=100),
 ) -> dict:
     return await get_job_by_page_use_case().execute(page=page, page_size=limit)
+
+
+@router.get("/jobs/search")
+async def search_jobs(
+    keyword: str = Query(..., min_length=1, max_length=200),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, alias="limit", ge=1, le=100),
+) -> dict:
+    """Search jobs by title or description, paginated like the job list."""
+    return await search_jobs_use_case().execute(
+        keyword=keyword, page=page, page_size=limit
+    )
 
 
 @router.get("/jobs/{job_id}")
