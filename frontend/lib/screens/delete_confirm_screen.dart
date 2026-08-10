@@ -109,7 +109,7 @@ class DeleteConfirmScreen extends StatelessWidget {
                       foregroundColor: theme.colorScheme.onError,
                     ),
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(data.confirmLabel),
+                    child: Text('Confirm'),
                   ),
                 ),
               ],

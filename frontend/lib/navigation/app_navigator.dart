@@ -20,13 +20,11 @@ class DeleteConfirmData {
   final String title;
   final String message;
   final List<Widget> details;
-  final String confirmLabel;
 
   const DeleteConfirmData({
     required this.title,
     required this.message,
     this.details = const [],
-    this.confirmLabel = 'Confirm',
   });
 }
 
