@@ -10,6 +10,7 @@ import '../../providers.dart';
 import '../../screens/delete_confirm_screen.dart';
 import '../../widgets/cv_upload_overlay.dart';
 import '../upload/upload_controller.dart';
+import '../deleteConfirm/delete_confirm_controller.dart';
 import 'job_detail_notifier.dart';
 
 /// Owns every job detail action end to end: confirmations, API calls (via
@@ -117,6 +118,16 @@ class JobDetailController {
   /// Deletes the whole job: confirms, calls the API, shows a result page, then
   /// navigates back to the job list.
   Future<void> deleteJob(String jobId, Job job, List<CandidateResult> candidates) async {
+    final deleteFlow = _ref.read(deleteConfirmControllerProvider.notifier);
+    deleteFlow.prepare(
+      onConfirm: () => _notifier.deleteJob(jobId),
+      successResult: ActionResultData(
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      ),
+    );
+
     await _ref.read(navigatorProvider).pushDeleteConfirm(
       DeleteConfirmArgs(
         data: DeleteConfirmData(
@@ -128,12 +139,6 @@ class JobDetailController {
                     'will be permanently removed.',
           details: [jobDeleteDetails(job, candidates)],
         ),
-        successResult: ActionResultData(
-          success: true,
-          title: 'Job deleted',
-          message: "'${job.title}' was permanently removed.",
-        ),
-        onConfirm: () => _notifier.deleteJob(jobId),
         onDeleted: () async {
           _ref.read(navigatorProvider).goToJobs();
         },
@@ -147,6 +152,16 @@ class JobDetailController {
     final cvId = cv.cvId;
     if (cvId == null) return false;
     final name = cv.candidateName ?? cv.fileName;
+    final deleteFlow = _ref.read(deleteConfirmControllerProvider.notifier);
+    deleteFlow.prepare(
+      onConfirm: () => _notifier.deleteCv(jobId, cvId),
+      successResult: ActionResultData(
+        success: true,
+        title: 'Candidate deleted',
+        message: "'$name' and their CV were permanently removed.",
+      ),
+    );
+
     return _ref.read(navigatorProvider).pushDeleteConfirm(
       DeleteConfirmArgs(
         data: DeleteConfirmData(
@@ -154,12 +169,6 @@ class JobDetailController {
           message: 'This candidate and their CV will be permanently removed.',
           details: [candidateDeleteDetails(cv)],
         ),
-        successResult: ActionResultData(
-          success: true,
-          title: 'Candidate deleted',
-          message: "'$name' and their CV were permanently removed.",
-        ),
-        onConfirm: () => _notifier.deleteCv(jobId, cvId),
       ),
     );
   }

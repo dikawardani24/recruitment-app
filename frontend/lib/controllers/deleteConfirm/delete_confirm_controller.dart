@@ -5,20 +5,38 @@ import '../../providers.dart';
 import 'delete_confirm_state.dart';
 
 /// Owns the confirm → delete → result flow for the delete confirmation
-/// screen. Callers supply the deletion operation via [DeleteConfirmArgs];
-/// this controller runs it, reports the outcome, and runs the follow-up.
+/// screen. Callers register the delete operation (and its success page) with
+/// [prepare] before pushing the screen; [confirm] runs it, reports the
+/// outcome, and runs the follow-up.
 class DeleteConfirmController extends Notifier<DeleteConfirmState> {
+  Future<void> Function()? _onConfirm;
+  ActionResultData? _successResult;
+
   @override
   DeleteConfirmState build() => const DeleteConfirmState();
 
-  /// Runs [args.onConfirm], shows the outcome, runs [args.onDeleted], and
-  /// resolves to `true` only when the deletion succeeded.
+  /// Registers the deletion that [confirm] will run and the result page to
+  /// show when it succeeds.
+  void prepare({
+    required Future<void> Function() onConfirm,
+    required ActionResultData successResult,
+  }) {
+    _onConfirm = onConfirm;
+    _successResult = successResult;
+  }
+
+  /// Runs the registered deletion, shows the outcome, runs [DeleteConfirmArgs.onDeleted],
+  /// and resolves to `true` only when the deletion succeeded.
   Future<bool> confirm(DeleteConfirmArgs args) async {
+    final onConfirm = _onConfirm;
+    final successResult = _successResult;
+    if (onConfirm == null || successResult == null) return false;
+
     state = const DeleteConfirmState(deleting: true);
     try {
-      await args.onConfirm();
-      await ref.read(navigatorProvider).pushActionResult(args.successResult);
-      await args.onDeleted();
+      await onConfirm();
+      await ref.read(navigatorProvider).pushActionResult(successResult);
+      await args.onDeleted?.call();
       return true;
     } catch (e) {
       await ref.read(navigatorProvider).pushActionResult(
@@ -31,6 +49,8 @@ class DeleteConfirmController extends Notifier<DeleteConfirmState> {
       return false;
     } finally {
       state = const DeleteConfirmState();
+      _onConfirm = null;
+      _successResult = null;
     }
   }
 }

@@ -41,25 +41,20 @@ class ActionResultData {
   });
 }
 
-/// Data plus callbacks passed to the delete confirmation screen.
+/// Data passed to the delete confirmation screen.
 ///
-/// [onConfirm] performs the deletion (throws on failure) and [onDeleted] runs
-/// after a successful delete, e.g. to navigate away.
+/// [onDeleted] runs after a successful delete, e.g. to navigate away.
+/// The delete operation itself is registered on [DeleteConfirmController]
+/// before the screen is pushed.
 class DeleteConfirmArgs {
   final DeleteConfirmData data;
-  final ActionResultData successResult;
-  final Future<void> Function() onConfirm;
-  final Future<void> Function() onDeleted;
+  final Future<void> Function()? onDeleted;
 
   const DeleteConfirmArgs({
     required this.data,
-    required this.successResult,
-    required this.onConfirm,
-    this.onDeleted = _noopAfterDelete,
+    this.onDeleted,
   });
 }
-
-Future<void> _noopAfterDelete() async {}
 
 /// Defines every navigation that can be performed in the app.
 ///

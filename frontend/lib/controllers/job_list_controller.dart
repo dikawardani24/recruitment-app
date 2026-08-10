@@ -7,6 +7,7 @@ import '../domain/usecases/delete_job.dart';
 import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../screens/delete_confirm_screen.dart';
+import 'deleteConfirm/delete_confirm_controller.dart';
 
 /// Owns the job list actions. The list has no busy/loading UI state, so this
 /// is a plain controller instead of a [Notifier].
@@ -40,6 +41,16 @@ class JobListController {
       candidates = const [];
     }
 
+    final deleteFlow = _ref.read(deleteConfirmControllerProvider.notifier);
+    deleteFlow.prepare(
+      onConfirm: () => removeJob(job.id),
+      successResult: ActionResultData(
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      ),
+    );
+
     return _ref.read(navigatorProvider).pushDeleteConfirm(
       DeleteConfirmArgs(
         data: DeleteConfirmData(
@@ -51,12 +62,6 @@ class JobListController {
                     'will be permanently removed.',
           details: [jobDeleteDetails(job, candidates)],
         ),
-        successResult: ActionResultData(
-          success: true,
-          title: 'Job deleted',
-          message: "'${job.title}' was permanently removed.",
-        ),
-        onConfirm: () => removeJob(job.id),
       ),
     );
   }
