@@ -7,6 +7,7 @@ enum AppRoute {
   jobForm('/jobs/new'),
   settings('/jobs/settings'),
   jobDetail('/jobs/:jobId'),
+  candidateDetail('/jobs/:jobId/candidate/:cvId'),
   rankings('/jobs/:jobId/rankings');
 
   const AppRoute(this.path);
@@ -16,4 +17,8 @@ enum AppRoute {
 
   /// Path with the `:jobId` placeholder filled in.
   String withJobId(String jobId) => path.replaceFirst(':jobId', jobId);
+
+  /// Path with both placeholders filled in.
+  String withCandidate(String jobId, String cvId) =>
+      candidateDetail.path.replaceFirst(':jobId', jobId).replaceFirst(':cvId', cvId);
 }

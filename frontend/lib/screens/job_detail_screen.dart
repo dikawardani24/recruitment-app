@@ -344,13 +344,8 @@ class _CandidatesSection extends ConsumerWidget {
                 ),
                 child: _CandidateTile(
                   cv: cv,
-                  onShowDetails: () => detailController.openCandidateDetails(
-                    context,
-                    cv,
-                    onRank: cv.cvId == null
-                        ? null
-                        : () => detailController.rankCv(context, jobId, cv),
-                  ),
+                  onShowDetails: () =>
+                      detailController.openCandidateDetails(context, jobId, cv),
                 ),
               ),
             ),

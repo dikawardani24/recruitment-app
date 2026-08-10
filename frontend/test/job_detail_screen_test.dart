@@ -11,6 +11,7 @@ import 'package:ai_ats/screens/job_detail_screen.dart';
 /// Navigator that records navigation calls instead of touching go_router.
 class _FakeNavigator implements AppNavigator {
   final wentToJobs = <String>[];
+  final wentToCandidateDetail = <String>[];
 
   @override
   void goToJobs() => wentToJobs.add('goToJobs');
@@ -23,6 +24,10 @@ class _FakeNavigator implements AppNavigator {
 
   @override
   void goToJobDetail(String jobId) {}
+
+  @override
+  void goToCandidateDetail(String jobId, CandidateResult candidate) =>
+      wentToCandidateDetail.add(candidate.cvId ?? candidate.fileName);
 
   @override
   void goToRankings(RankingsScreenData data) {}
@@ -231,7 +236,7 @@ void main() {
     expect(find.text('Possible Match'), findsWidgets);
   });
 
-  testWidgets('tapping a ranked candidate opens the detail sheet', (
+  testWidgets('tapping a ranked candidate opens the candidate detail page', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 2400);
@@ -250,8 +255,13 @@ void main() {
       explanation: 'Matches all required skills.',
       rankedBy: 'llm',
     );
+    final navigator = _FakeNavigator();
     await tester.pumpWidget(
-      buildApp(buildJob(description: 'Short description'), cvs: [alice]),
+      buildApp(
+        buildJob(description: 'Short description'),
+        cvs: [alice],
+        navigator: navigator,
+      ),
     );
     await tester.pump();
     await tester.pump();
@@ -259,25 +269,19 @@ void main() {
     expect(find.text('AI'), findsOneWidget);
 
     await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('Match Score'), findsOneWidget);
-    expect(find.text('90%'), findsWidgets);
-    expect(find.text('Strong Match'), findsWidgets);
-    expect(find.text('Ranked by'), findsOneWidget);
-    expect(find.text('AI'), findsWidgets);
-    expect(find.text('STRENGTHS'), findsOneWidget);
-    expect(find.text('Dart'), findsWidgets);
-    expect(find.text('Explanation'), findsOneWidget);
+    expect(navigator.wentToCandidateDetail, ['cv-1']);
   });
 
-  testWidgets('tapping an unranked candidate shows status, hint, and profile', (
+  testWidgets('tapping an unranked candidate opens the candidate detail page', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    final navigator = _FakeNavigator();
     await tester.pumpWidget(
       buildApp(
         buildJob(description: 'Short description'),
@@ -293,146 +297,17 @@ void main() {
             certifications: const ['AWS Certified'],
           ),
         ],
+        navigator: navigator,
       ),
     );
     await tester.pump();
     await tester.pump();
 
     await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('Status'), findsOneWidget);
-    expect(find.text('uploaded'), findsWidgets);
-    expect(
-      find.text('This candidate has not been ranked yet.'),
-      findsOneWidget,
-    );
-    expect(find.text('Match Score'), findsNothing);
-    expect(find.text('STRENGTHS'), findsNothing);
-
-    expect(find.text('SKILLS'), findsOneWidget);
-    expect(find.text('Dart'), findsWidgets);
-    expect(find.text('EXPERIENCE'), findsOneWidget);
-    expect(find.text('5 years'), findsOneWidget);
-    expect(find.text('EDUCATION'), findsOneWidget);
-    expect(find.text('Bachelor of Science'), findsOneWidget);
-    expect(find.text('CERTIFICATIONS'), findsOneWidget);
-    expect(find.text('AWS Certified'), findsOneWidget);
+    expect(navigator.wentToCandidateDetail, ['cv-1']);
   });
-
-  testWidgets('ranking an unranked candidate from the sheet ranks and closes', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    final cvs = [
-      CandidateResult(
-        cvId: 'cv-1',
-        fileName: 'alice.pdf',
-        candidateName: 'Alice',
-        status: 'completed',
-      ),
-    ];
-    final controller = _FakeDetailNotifier(cvs);
-    await tester.pumpWidget(
-      buildApp(
-        buildJob(description: 'Short description'),
-        cvs: cvs,
-        detailNotifier: controller,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Rank this CV'), findsOneWidget);
-
-    await tester.tap(find.text('Rank this CV'));
-    await tester.pumpAndSettle();
-
-    expect(controller.rankedCvs, ['cv-1']);
-    expect(find.text('Rank this CV'), findsNothing);
-    expect(find.text('Alice'), findsOneWidget);
-  });
-
-  testWidgets('ranked candidate can be re-ranked from the sheet', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    final cvs = [ranked('cv-1', 'Alice')];
-    final controller = _FakeDetailNotifier(cvs);
-    await tester.pumpWidget(
-      buildApp(
-        buildJob(description: 'Short description'),
-        cvs: cvs,
-        detailNotifier: controller,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Re-rank CV'), findsOneWidget);
-
-    await tester.tap(find.text('Re-rank CV'));
-    await tester.pumpAndSettle();
-
-    expect(controller.rankedCvs, ['cv-1']);
-    expect(find.text('Re-rank CV'), findsNothing);
-  });
-
-  testWidgets(
-    'a candidate that is not ready shows an info dialog instead of ranking',
-    (tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      final cvs = [
-        CandidateResult(
-          cvId: 'cv-1',
-          fileName: 'alice.pdf',
-          candidateName: 'Alice',
-          status: 'processing',
-        ),
-      ];
-      final controller = _FakeDetailNotifier(cvs);
-      await tester.pumpWidget(
-        buildApp(
-          buildJob(description: 'Short description'),
-          cvs: cvs,
-          detailNotifier: controller,
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      await tester.tap(find.text('Alice'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Rank this CV'), findsOneWidget);
-
-      await tester.tap(find.text('Rank this CV'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.text('Ranking unavailable'), findsOneWidget);
-      expect(controller.rankedCvs, isEmpty);
-
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-      expect(find.text('Ranking unavailable'), findsNothing);
-    },
-  );
 
   group('candidate deletion', () {
     testWidgets('swipe reveals confirmation with candidate details', (

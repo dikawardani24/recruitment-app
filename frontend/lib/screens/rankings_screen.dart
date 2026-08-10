@@ -5,12 +5,12 @@ import '../controllers/rankings_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
-import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/card_shape.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
+import 'candidate_detail_screen.dart';
 
 class RankingsScreen extends HookConsumerWidget {
   final String jobId;
@@ -69,7 +69,7 @@ class RankingsScreen extends HookConsumerWidget {
                 candidate: results[index - 1],
                 rank: index,
                 onShowDetails: () => rankingsController.openCandidateDetails(
-                  context,
+                  jobId,
                   results[index - 1],
                 ),
               );

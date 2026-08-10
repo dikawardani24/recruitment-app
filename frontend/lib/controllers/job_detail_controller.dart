@@ -14,7 +14,6 @@ import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../screens/action_result_screen.dart';
 import '../screens/delete_confirm_screen.dart';
-import '../widgets/candidate_detail_sheet.dart';
 import '../widgets/cv_upload_overlay.dart';
 import 'upload_controller.dart';
 
@@ -241,14 +240,14 @@ class JobDetailController {
     }
   }
 
-  /// Opens the candidate detail bottom sheet. When [onRank] is provided the
-  /// sheet can trigger [rankCv] directly, keeping the screen decoupled.
+  /// Opens the candidate detail page. Deleting and ranking are handled by the
+  /// page itself through this controller.
   void openCandidateDetails(
     BuildContext context,
-    CandidateResult cv, {
-    Future<bool> Function()? onRank,
-  }) {
-    showCandidateDetailSheet(context, cv, onRank: onRank);
+    String jobId,
+    CandidateResult cv,
+  ) {
+    _ref.read(navigatorProvider).goToCandidateDetail(jobId, cv);
   }
 
   /// Deletes the whole job: confirms, calls the API, shows a result page, then

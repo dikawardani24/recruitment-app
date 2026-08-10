@@ -1,8 +1,10 @@
 import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:go_router/go_router.dart';
 
+import 'domain/models.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/app_route.dart';
+import 'screens/candidate_detail_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
@@ -34,6 +36,14 @@ class AppRouter {
               builder: (context, state) =>
                   JobDetailScreen(jobId: state.pathParameters['jobId']!),
               routes: [
+                GoRoute(
+                  path: 'candidate/:cvId',
+                  builder: (context, state) => CandidateDetailScreen(
+                    jobId: state.pathParameters['jobId']!,
+                    cvId: state.pathParameters['cvId']!,
+                    initial: state.extra as CandidateResult?,
+                  ),
+                ),
                 GoRoute(
                   path: 'rankings',
                   builder: (context, state) {

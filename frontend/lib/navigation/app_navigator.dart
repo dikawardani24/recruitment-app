@@ -1,3 +1,5 @@
+import '../domain/models.dart';
+
 /// Data passed to the rankings screen when navigating to it.
 class RankingsScreenData {
   final String jobId;
@@ -24,6 +26,8 @@ abstract class AppNavigator {
   void goToSettings();
 
   void goToJobDetail(String jobId);
+
+  void goToCandidateDetail(String jobId, CandidateResult candidate);
 
   void goToRankings(RankingsScreenData data);
 

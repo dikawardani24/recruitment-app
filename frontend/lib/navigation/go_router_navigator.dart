@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../domain/models.dart';
 import 'app_navigator.dart';
 import 'app_route.dart';
 
@@ -22,6 +23,15 @@ class GoRouterNavigator implements AppNavigator {
   @override
   void goToJobDetail(String jobId) =>
       _router.go(AppRoute.jobDetail.withJobId(jobId));
+
+  @override
+  void goToCandidateDetail(String jobId, CandidateResult candidate) => _router.go(
+        AppRoute.candidateDetail.withCandidate(
+          jobId,
+          candidate.cvId ?? 'none',
+        ),
+        extra: candidate,
+      );
 
   @override
   void goToRankings(RankingsScreenData data) => _router.go(
