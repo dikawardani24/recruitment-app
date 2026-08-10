@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../controllers/deleteConfirm/delete_confirm_controller.dart';
 import '../domain/models.dart';
 import '../navigation/app_navigator.dart';
 import '../widgets/bucket_donut.dart';
@@ -41,22 +43,24 @@ Widget candidateDeleteDetails(CandidateResult cv) {
   );
 }
 
-/// Full-screen confirmation shown before a destructive delete. Pops with
-/// `true` when the user taps the delete button and `false` on cancel or back.
-/// The [data.details] list renders the affected-data preview (what will be
-/// lost).
-class DeleteConfirmScreen extends StatelessWidget {
-  final DeleteConfirmData data;
+/// Full-screen confirmation shown before a destructive delete. Runs the
+/// caller-supplied deletion through [DeleteConfirmController] and pops with
+/// `true` when it succeeded, `false` on cancel or failure.
+class DeleteConfirmScreen extends ConsumerWidget {
+  final DeleteConfirmArgs args;
 
   const DeleteConfirmScreen({
     super.key,
-    required this.data,
+    required this.args,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final errorColor = theme.colorScheme.error;
+    final onError = theme.colorScheme.onError;
+    final data = args.data;
+    final deleting = ref.watch(deleteConfirmControllerProvider).deleting;
     return Scaffold(
       appBar: AppBar(title: const Text('Confirm deletion')),
       body: SafeArea(
@@ -97,7 +101,9 @@ class DeleteConfirmScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(false),
+                    onPressed: deleting
+                        ? null
+                        : () => Navigator.of(context).pop(false),
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -106,10 +112,28 @@ class DeleteConfirmScreen extends StatelessWidget {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: errorColor,
-                      foregroundColor: theme.colorScheme.onError,
+                      foregroundColor: onError,
                     ),
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: Text('Confirm'),
+                    onPressed: deleting
+                        ? null
+                        : () async {
+                            final ok = await ref
+                                .read(deleteConfirmControllerProvider.notifier)
+                                .confirm(args);
+                            if (context.mounted) {
+                              Navigator.of(context).pop(ok);
+                            }
+                          },
+                    child: deleting
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: onError,
+                            ),
+                          )
+                        : const Text('Confirm'),
                   ),
                 ),
               ],

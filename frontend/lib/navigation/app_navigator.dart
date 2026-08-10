@@ -41,6 +41,26 @@ class ActionResultData {
   });
 }
 
+/// Data plus callbacks passed to the delete confirmation screen.
+///
+/// [onConfirm] performs the deletion (throws on failure) and [onDeleted] runs
+/// after a successful delete, e.g. to navigate away.
+class DeleteConfirmArgs {
+  final DeleteConfirmData data;
+  final ActionResultData successResult;
+  final Future<void> Function() onConfirm;
+  final Future<void> Function() onDeleted;
+
+  const DeleteConfirmArgs({
+    required this.data,
+    required this.successResult,
+    required this.onConfirm,
+    this.onDeleted = _noopAfterDelete,
+  });
+}
+
+Future<void> _noopAfterDelete() async {}
+
 /// Defines every navigation that can be performed in the app.
 ///
 /// Screens depend on this interface instead of go_router directly. The
@@ -59,9 +79,9 @@ abstract class AppNavigator {
 
   void goToRankings(RankingsScreenData data);
 
-  /// Pushes the delete confirmation screen; resolves to `true` only when the
-  /// user confirms the deletion.
-  Future<bool> pushDeleteConfirm(DeleteConfirmData data);
+  /// Pushes the delete confirmation screen, which runs the deletion and
+  /// resolves to `true` only when it succeeded.
+  Future<bool> pushDeleteConfirm(DeleteConfirmArgs args);
 
   /// Pushes the action result screen; resolves once the user dismisses it.
   Future<void> pushActionResult(ActionResultData data);

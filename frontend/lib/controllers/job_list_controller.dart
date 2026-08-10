@@ -40,63 +40,31 @@ class JobListController {
       candidates = const [];
     }
 
-    final confirmed = await _confirmDeleteJob(job, candidates);
-    if (!confirmed) return false;
-
-    try {
-      await removeJob(job.id);
-      await _showJobDeleted(job);
-      return true;
-    } catch (e) {
-      await _showJobDeleteFailed(e);
-      return false;
-    }
+    return _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmArgs(
+        data: DeleteConfirmData(
+          title: 'Delete this job?',
+          message: candidates.isEmpty
+              ? 'This job has no candidates. It will be permanently removed.'
+              : 'This job and its ${candidates.length} '
+                    '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                    'will be permanently removed.',
+          details: [jobDeleteDetails(job, candidates)],
+        ),
+        successResult: ActionResultData(
+          success: true,
+          title: 'Job deleted',
+          message: "'${job.title}' was permanently removed.",
+        ),
+        onConfirm: () => removeJob(job.id),
+      ),
+    );
   }
 
   /// Deletes the job server-side, then reloads the list from page 1.
   Future<void> removeJob(String jobId) async {
     await getIt<DeleteJob>()(jobId);
     await refresh();
-  }
-
-  /// Confirm dialog before deleting a whole job.
-  Future<bool> _confirmDeleteJob(
-    Job job,
-    List<CandidateResult> candidates,
-  ) {
-    return _ref.read(navigatorProvider).pushDeleteConfirm(
-      DeleteConfirmData(
-        title: 'Delete this job?',
-        message: candidates.isEmpty
-            ? 'This job has no candidates. It will be permanently removed.'
-            : 'This job and its ${candidates.length} '
-                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                  'will be permanently removed.',
-        details: [jobDeleteDetails(job, candidates)],
-      ),
-    );
-  }
-
-  /// Result page after a successful job deletion.
-  Future<void> _showJobDeleted(Job job) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: true,
-        title: 'Job deleted',
-        message: "'${job.title}' was permanently removed.",
-      ),
-    );
-  }
-
-  /// Result page after a failed job deletion.
-  Future<void> _showJobDeleteFailed(Object error) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: false,
-        title: 'Delete failed',
-        message: '$error',
-      ),
-    );
   }
 
   void openSettings() => _ref.read(navigatorProvider).goToSettings();

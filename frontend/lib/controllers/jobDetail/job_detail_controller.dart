@@ -117,16 +117,28 @@ class JobDetailController {
   /// Deletes the whole job: confirms, calls the API, shows a result page, then
   /// navigates back to the job list.
   Future<void> deleteJob(String jobId, Job job, List<CandidateResult> candidates) async {
-    final confirmed = await _confirmDeleteJob(job, candidates);
-    if (!confirmed) return;
-    try {
-      await _notifier.deleteJob(jobId);
-      await _showJobDeleted(job);
-    } catch (e) {
-      await _showJobDeleteFailed(e);
-      return;
-    }
-    _ref.read(navigatorProvider).goToJobs();
+    await _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmArgs(
+        data: DeleteConfirmData(
+          title: 'Delete this job?',
+          message: candidates.isEmpty
+              ? 'This job has no candidates. It will be permanently removed.'
+              : 'This job and its ${candidates.length} '
+                    '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                    'will be permanently removed.',
+          details: [jobDeleteDetails(job, candidates)],
+        ),
+        successResult: ActionResultData(
+          success: true,
+          title: 'Job deleted',
+          message: "'${job.title}' was permanently removed.",
+        ),
+        onConfirm: () => _notifier.deleteJob(jobId),
+        onDeleted: () async {
+          _ref.read(navigatorProvider).goToJobs();
+        },
+      ),
+    );
   }
 
   /// Deletes a single candidate: confirms, calls the API, shows a result page.
@@ -135,16 +147,21 @@ class JobDetailController {
     final cvId = cv.cvId;
     if (cvId == null) return false;
     final name = cv.candidateName ?? cv.fileName;
-    final confirmed = await _confirmDeleteCv(cv);
-    if (!confirmed) return false;
-    try {
-      await _notifier.deleteCv(jobId, cvId);
-      await _showCvDeleted(name);
-      return true;
-    } catch (e) {
-      await _showCvDeleteFailed(e);
-      return false;
-    }
+    return _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmArgs(
+        data: DeleteConfirmData(
+          title: 'Delete this candidate?',
+          message: 'This candidate and their CV will be permanently removed.',
+          details: [candidateDeleteDetails(cv)],
+        ),
+        successResult: ActionResultData(
+          success: true,
+          title: 'Candidate deleted',
+          message: "'$name' and their CV were permanently removed.",
+        ),
+        onConfirm: () => _notifier.deleteCv(jobId, cvId),
+      ),
+    );
   }
 
   /// Lets the user pick CV files and submits them for upload. File selection
@@ -258,79 +275,6 @@ class JobDetailController {
             child: const Text('OK'),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Confirm dialog before deleting a whole job.
-  Future<bool> _confirmDeleteJob(
-    Job job,
-    List<CandidateResult> candidates,
-  ) {
-    return _ref.read(navigatorProvider).pushDeleteConfirm(
-      DeleteConfirmData(
-        title: 'Delete this job?',
-        message: candidates.isEmpty
-            ? 'This job has no candidates. It will be permanently removed.'
-            : 'This job and its ${candidates.length} '
-                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                  'will be permanently removed.',
-        details: [jobDeleteDetails(job, candidates)],
-      ),
-    );
-  }
-
-  /// Confirm dialog before deleting a single candidate.
-  Future<bool> _confirmDeleteCv(CandidateResult cv) {
-    return _ref.read(navigatorProvider).pushDeleteConfirm(
-      DeleteConfirmData(
-        title: 'Delete this candidate?',
-        message: 'This candidate and their CV will be permanently removed.',
-        details: [candidateDeleteDetails(cv)],
-      ),
-    );
-  }
-
-  /// Result page after a successful job deletion.
-  Future<void> _showJobDeleted(Job job) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: true,
-        title: 'Job deleted',
-        message: "'${job.title}' was permanently removed.",
-      ),
-    );
-  }
-
-  /// Result page after a failed job deletion.
-  Future<void> _showJobDeleteFailed(Object error) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: false,
-        title: 'Delete failed',
-        message: '$error',
-      ),
-    );
-  }
-
-  /// Result page after a successful candidate deletion.
-  Future<void> _showCvDeleted(String name) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: true,
-        title: 'Candidate deleted',
-        message: "'$name' and their CV were permanently removed.",
-      ),
-    );
-  }
-
-  /// Result page after a failed candidate deletion.
-  Future<void> _showCvDeleteFailed(Object error) {
-    return _ref.read(navigatorProvider).pushActionResult(
-      ActionResultData(
-        success: false,
-        title: 'Delete failed',
-        message: '$error',
       ),
     );
   }

@@ -64,8 +64,12 @@ class AppRouter {
         GoRoute(
           path: AppRoute.deleteConfirm.path,
           builder: (context, state) => DeleteConfirmScreen(
-            data: state.extra as DeleteConfirmData? ??
-                const DeleteConfirmData(title: '', message: ''),
+            args: state.extra as DeleteConfirmArgs? ??
+                DeleteConfirmArgs(
+                  data: const DeleteConfirmData(title: '', message: ''),
+                  successResult: const ActionResultData(success: true, title: ''),
+                  onConfirm: () async {},
+                ),
           ),
         ),
         GoRoute(

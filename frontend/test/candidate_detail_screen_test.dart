@@ -35,12 +35,12 @@ class _FakeNavigator implements AppNavigator {
   void goToRankings(RankingsScreenData data) {}
 
   @override
-  Future<bool> pushDeleteConfirm(DeleteConfirmData data) async {
+  Future<bool> pushDeleteConfirm(DeleteConfirmArgs args) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return false;
     return await navigator.push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => DeleteConfirmScreen(data: data),
+            builder: (_) => DeleteConfirmScreen(args: args),
           ),
         ) ??
         false;
