@@ -313,7 +313,15 @@ def test_search_jobs_no_match_returns_empty(client):
 
 def test_search_jobs_requires_keyword(client):
     assert client.get("/api/jobs/search").status_code == 422
-    assert client.get("/api/jobs/search", params={"keyword": ""}).status_code == 422
+
+
+def test_search_jobs_empty_keyword_lists_all(client):
+    _create_jobs(client, 2)
+
+    resp = client.get("/api/jobs/search", params={"keyword": ""})
+    assert resp.status_code == 200
+    assert len(resp.json()["jobs"]) == 2
+    assert resp.json()["meta"] == {"page": 1, "limit": 20, "has_more": False}
 
 
 def test_search_jobs_paginates(client):

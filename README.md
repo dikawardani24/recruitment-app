@@ -17,38 +17,41 @@ A simple recruiter tool:
 
 ## Backend structure
 
+Clean-architecture monorepo (domain → use cases → repositories → datasources →
+routers). All HTTP endpoints live under `/api` in `routers/jobs.py`.
+
 ```
 backend/app/
-├── main.py              # FastAPI app entry point
-├── config.py            # Settings singleton (env vars)
-├── db.py                # SQLite schema + async helpers
+├── main.py                 # FastAPI entry point: lifespan, middleware, /health
+├── config.py               # Settings dataclass (env-driven, single source of truth)
 │
-├── parsers/             # File parsing (PDF, DOCX, TXT)
-│   ├── __init__.py
-│   └── _extract.py
+├── database/
+│   ├── db_client.py        # SQLite schema + async helpers (aiosqlite)
+│   ├── datasource/         # Raw SQL per table: jobs, cvs, import_jobs
+│   └── entities/           # Row ↔ dataclass entities
 │
-├── skills/              # Skill dictionaries + matching
-│   ├── __init__.py
-│   └── _match.py
+├── repository/
+│   ├── impl/               # Repository implementations over the datasources
+│   └── *.py                # Repository interfaces (job, cv, import_job)
 │
-├── jd/                  # Job description structuring
-│   ├── __init__.py
-│   └── _structure.py
+├── usecase/                # Orchestration: create/list/search/delete job,
+│   │                       #   import/list/delete CV, rank (job & CV), rankings
+├── di/
+│   └── injection.py        # Composition root (manual DI), background worker factory
 │
-├── extraction/          # CV profile extraction (orchestrator + NER + LLM + rules)
-│   ├── __init__.py
-│   ├── _profile.py      # Profile dataclass + deterministic extraction
-│   ├── _orchestrator.py # NER → LLM → Rules fallback chain
-│   └── _ner.py          # Local BERT NER extraction
+├── domain/                 # Job, Candidate, ImportJob, Page, errors
 │
-├── ranking/             # Candidate scoring + reasoning
-│   ├── __init__.py
-│   ├── _scoring.py      # score_profile, bucket_for, rule_reasoning
-│   └── _llm.py          # LLM-powered ranking
+├── routers/
+│   └── jobs.py             # All /api endpoints
 │
-└── routers/
-    ├── __init__.py
-    └── jobs.py          # All HTTP endpoints
+├── parsers/                # File text extraction (PDF, DOCX, TXT)
+├── skills/                 # Skill dictionaries + matching
+├── jd/                     # JD → structured requirements
+├── extraction/             # CV → profile (NER → LLM → rules fallback)
+├── imports/                # Background CV processing
+│   ├── processor.py        # asyncio worker pool; DB acts as the queue
+│   └── pipeline.py         # extract_and_profile orchestration
+└── ranking/                # Scoring, buckets, LLM reasoning
 ```
 
 Each folder is a domain:
@@ -57,6 +60,7 @@ Each folder is a domain:
 - **jd/** — parses job descriptions
 - **extraction/** — pulls structured data from resumes
 - **ranking/** — scores and ranks candidates
+- **imports/** — processes uploaded CVs in the background
 
 ## Quick start
 
@@ -96,12 +100,22 @@ New scripts are discovered automatically by filename in `<project>/scripts/`.
 
 ## API
 
+Base URL: `http://localhost:8000/api`
+
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/api/jobs` | Create a job from pasted text and/or a JD file |
-| GET | `/api/jobs` | List jobs |
+| GET | `/api/jobs` | List jobs (paginated) |
+| GET | `/api/jobs/search?keyword=` | Search jobs by title/description |
 | GET | `/api/jobs/{id}` | Job detail incl. structured requirements |
-| POST | `/api/jobs/{id}/cvs` | Upload one or many CV files |
-| GET | `/api/jobs/{id}/cvs` | CV processing status |
-| POST | `/api/jobs/{id}/rank` | Rank candidates (LLM reasoning when configured) |
+| DELETE | `/api/jobs/{id}` | Delete a job and everything attached to it |
+| POST | `/api/jobs/{id}/candidates/import` | Batch-upload CVs; returns `import_id`, processed in the background |
+| POST | `/api/jobs/{id}/cvs` | Backwards-compatible alias for `candidates/import` |
+| GET | `/api/jobs/{id}/imports/{import_id}` | Import progress (processed/failed counts) |
+| GET | `/api/jobs/{id}/cvs` | List CVs + processing status |
+| DELETE | `/api/jobs/{id}/cvs/{cv_id}` | Delete a single candidate |
+| POST | `/api/jobs/{id}/rank` | Rank all parsed CVs (LLM reasoning when configured) |
+| POST | `/api/jobs/{id}/cvs/{cv_id}/rank` | Rank a single CV |
 | GET | `/api/jobs/{id}/rankings` | Persisted rankings, best match first |
+
+Plus `GET /health` (service health).

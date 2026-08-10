@@ -7,47 +7,46 @@ flowchart TD
     subgraph Upload_JD["1. Create Job (POST /api/jobs)"]
         A[User uploads JD\nPDF/DOCX/TXT or pastes text]
         A --> B[parsers.extract_text]
-        B --> C[jd.structure_jd\nrule-based parsing]
+        B --> C[jd.parser + jd.structure\nrule-based parsing]
         C --> D[(SQLite: jobs table)]
     end
 
-    subgraph Upload_CVs["2. Upload CVs (POST /api/jobs/{id}/cvs)"]
-        E[User uploads CV files]
-        E --> F[parsers.extract_text\nPDF/DOCX/TXT]
-        F --> G{Extraction Pipeline\nextraction.extract_profile_text}
+    subgraph Upload_CVs["2. Import CVs (POST /api/jobs/{id}/candidates/import)"]
+        E[User uploads CV files] --> F[usecase.ImportCvBatch]
+        F --> G[Files saved to disk\n+ queued rows in cvs table status=uploaded]
+        G --> H[import_jobs row created/updated\nstatus=uploading]
+        F -->|202, returns import_id| I[Frontend shows progress overlay]
+        H --> J[Background: imports.CvProcessor\nasyncio worker pool, DB-as-queue]
+        J --> K{Extraction Pipeline\nextraction.extract_profile_text}
 
-        G -->|1. NER enabled?| H[extraction._ner\nlocal BERT model]
-        G -->|2. LLM key set?| I[extraction._orchestrator\nOpenAI API]
-        G -->|3. Fallback| J[extraction._profile\nregex + dictionaries]
+        K -->|1. NER enabled?| L[extraction._ner\nlocal BERT model]
+        K -->|2. LLM key set?| M[extraction._orchestrator\nOpenAI-compatible API]
+        K -->|3. Fallback| N[extraction._profile\nregex + dictionaries]
 
-        H --> K[Profile dataclass\ncandidate_name, skills,\nyears, education, certs]
-        I --> K
-        J --> K
+        L --> O[Profile dataclass\ncandidate_name, skills,\nyears, education, certs]
+        M --> O
+        N --> O
 
-        K --> L[(SQLite: cvs table\nstatus=parsed)]
+        O --> P[(SQLite: cvs table\nstatus=completed, source=ner|llm|rules)]
+        P --> Q[import_jobs progress updated\nprocessed/failed counts]
     end
 
     subgraph Ranking["3. Rank Candidates (POST /api/jobs/{id}/rank)"]
-        M[Trigger ranking]
-        M --> N[ranking.score_profile\nrule-based scoring]
+        R[Trigger ranking] --> S[ranking.service\nrule-based scoring]
 
-        N --> O{LLM enabled?}
+        S --> T{LLM enabled?}
+        T -->|Yes| U[ranking._llm\nper-candidate reasoning]
+        U --> V[Update overall score,\nrecommendation, explanation]
+        T -->|No| W[ranking._scoring\nrule_reasoning deterministic text]
 
-        O -->|Yes| P[ranking._llm\nOpenAI API\nper-candidate reasoning]
-        P --> Q[Update overall score,\nrecommendation, explanation\nfrom LLM]
-
-        O -->|No| R[ranking.rule_reasoning\ndeterministic text]
-
-        N --> S[Compute sub-scores:\nskill_score, experience_score,\neducation_score, cert_score]
-
-        S --> T[(SQLite: cvs table\nscores, bucket,\nrecommendation)]
-        Q --> T
-        R --> T
+        S --> X[Sub-scores: skill, experience,\neducation, certification]
+        X --> V
+        V --> Y[(SQLite: cvs table\nscores, bucket, recommendation, ranked_at)]
+        W --> Y
     end
 
     subgraph Results["4. View Rankings (GET /api/jobs/{id}/rankings)"]
-        U[Frontend queries rankings]
-        U --> V[Sorted by overall_score DESC]
+        Z[Frontend queries rankings] --> AA[Sorted by overall_score DESC]
     end
 ```
 
@@ -64,7 +63,7 @@ flowchart LR
 
     B -->|No| F
 
-    F -->|Yes| G[OpenAI API\nparse resume fields]
+    F -->|Yes| G[LLM API\nparse resume fields]
     G --> H{Valid response?}
     H -->|Yes| E
     H -->|No| I[Deterministic Rules\nregex + skill dictionaries]
@@ -103,25 +102,33 @@ flowchart TD
 flowchart TD
     main[main.py\nFastAPI app + lifespan]
     config[config.py\nSettings singleton]
-    db[db.py\nSQLite schema + async helpers]
+    db[app/database\nSQLite schema + async helpers]
+    di[app/di/injection.py\nComposition root]
 
     parsers[parsers/\nFile parsing]
     skills[skills/\nSkill dictionaries]
     jd[jd/\nJD structuring]
     extraction[extraction/\nCV profile extraction]
+    imports[imports/\nBackground CV processor]
     ranking[ranking/\nScoring + reasoning]
     router[routers/jobs.py\nAll HTTP endpoints]
+    usecase[usecase/\nOrchestration]
+    repo[repository/\nInterfaces + impls]
 
     main --> config
     main --> db
     main --> router
+    main --> di
 
-    router --> config
-    router --> db
-    router --> parsers
-    router --> extraction
-    router --> ranking
-    router --> jd
+    router --> usecase
+    usecase --> repo
+    repo --> db
+
+    usecase --> parsers
+    usecase --> extraction
+    usecase --> ranking
+    usecase --> jd
+    usecase --> imports
 
     jd --> skills
     extraction --> config
@@ -137,11 +144,16 @@ flowchart TD
 flowchart LR
     subgraph API["/api"]
         POST_JOB["POST /jobs\nCreate job from text + JD file"]
-        GET_JOBS["GET /jobs\nList all jobs"]
+        GET_JOBS["GET /jobs\nList all jobs (paginated)"]
+        SEARCH_JOBS["GET /jobs/search?keyword=\nSearch jobs"]
         GET_JOB["GET /jobs/{id}\nJob detail + requirements"]
-        POST_CVS["POST /jobs/{id}/cvs\nUpload CV files"]
+        DELETE_JOB["DELETE /jobs/{id}\nDelete job + CVs + files"]
+        IMPORT_CVS["POST /jobs/{id}/candidates/import\nBatch-upload CVs (async)"]
+        IMPORT_STATUS["GET /jobs/{id}/imports/{import_id}\nImport progress"]
         GET_CVS["GET /jobs/{id}/cvs\nCV processing status"]
-        POST_RANK["POST /jobs/{id}/rank\nTrigger AI ranking"]
+        DELETE_CV["DELETE /jobs/{id}/cvs/{cv_id}\nDelete one candidate"]
+        POST_RANK["POST /jobs/{id}/rank\nRank all candidates"]
+        POST_RANK_CV["POST /jobs/{id}/cvs/{cv_id}/rank\nRank one candidate"]
         GET_RANK["GET /jobs/{id}/rankings\nRanked candidates"]
     end
 
@@ -152,5 +164,6 @@ flowchart LR
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `jobs` | Job vacancies | id, title, description, requirements (JSON), status |
-| `cvs` | Candidate CVs + scores | id, job_id (FK), file_name, storage_path, status, skills (JSON), overall_score, bucket, recommendation |
+| `jobs` | Job vacancies | id, title, description, requirements (JSON), status, jd_file |
+| `cvs` | Candidate CVs + scores | id, job_id (FK, CASCADE), import_job_id (FK, SET NULL), file_name, storage_path, status, skills (JSON), overall_score, bucket, recommendation, source |
+| `import_jobs` | CV batch import progress | id, job_id (FK, CASCADE), total/uploaded/processed/failed_files, status, completed_at |

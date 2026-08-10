@@ -37,12 +37,13 @@ cp .env.example .env
 ```
 
 Nothing needs to be set to run. To enable **AI reasoning** during ranking, set an
-OpenAI-compatible endpoint in `.env`:
+OpenAI-compatible endpoint in `.env`. The app defaults to Google Gemini's
+OpenAI-compatible endpoint (`gemini-flash-latest`), but any provider works:
 
 ```
 ATS_LLM__API_KEY=sk-...
-ATS_LLM__BASE_URL=https://api.openai.com/v1   # or Ollama/vLLM/DeepSeek/...
-ATS_LLM__MODEL=gpt-4o-mini
+ATS_LLM__BASE_URL=https://api.openai.com/v1   # or Gemini/Ollama/vLLM/DeepSeek/...
+ATS_LLM__MODEL=gpt-4o-mini                    # or gemini-flash-latest
 ```
 
 Without a key, the app still ranks candidates and produces template reasoning via
@@ -83,8 +84,8 @@ cd backend
 ### Recruiter workflow (the whole product)
 
 1. `POST /api/jobs` — describe the job (pasted text and/or an uploaded JD file: PDF/DOCX/TXT). Skills, min years, education, and certifications are extracted automatically.
-2. `POST /api/jobs/{id}/cvs` — batch-upload CVs (PDF/DOCX/TXT). Each is parsed immediately into a structured profile.
-3. `POST /api/jobs/{id}/rank` — scores and ranks every candidate, best match first, with an explanation, strengths, weaknesses, skill gaps, and a hiring recommendation.
+2. `POST /api/jobs/{id}/candidates/import` — batch-upload CVs (PDF/DOCX/TXT). The request returns immediately with an `import_id`; each CV is parsed **in the background** by a built-in asyncio worker (`POST /api/jobs/{id}/cvs` is a backwards-compatible alias). Track progress with `GET /api/jobs/{id}/imports/{import_id}` or poll `GET /api/jobs/{id}/cvs`.
+3. `POST /api/jobs/{id}/rank` — scores and ranks every candidate, best match first, with an explanation, strengths, weaknesses, skill gaps, and a hiring recommendation. A single CV can be ranked with `POST /api/jobs/{id}/cvs/{cv_id}/rank`.
 4. `GET /api/jobs/{id}/rankings` — persisted ranking results, best match first.
 
 ---
@@ -123,9 +124,11 @@ or:
 make backend-test
 ```
 
-**9 tests, no external services.** `tests/test_api.py` covers: health, create job
+**72 tests, no external services.** `tests/test_api.py` covers: health, create job
 from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
 persisted rankings, and error cases (missing title, missing JD, unknown job).
+`tests/test_imports.py` covers the background import pipeline, and
+`tests/test_jd_skills.py` covers JD structuring + skill matching.
 
 ### Code check
 
@@ -165,15 +168,18 @@ curl -X POST http://localhost:8000/api/jobs \
   -F "title=Senior Backend Engineer" \
   -F "description=Requirements%0A- Python%0A- 5+ years%0AResponsibilities%0A- Build backend services"
 
-# 2. Upload CVs
-curl -X POST http://localhost:8000/api/jobs/<job_id>/cvs \
+# 2. Upload CVs (queued; processed in the background)
+curl -X POST http://localhost:8000/api/jobs/<job_id>/candidates/import \
   -F "files=@john.pdf;type=application/pdf" \
   -F "files=@jane.docx"
 
-# 3. Rank all candidates (returns scores + reasoning)
+# 3. Check import progress
+curl http://localhost:8000/api/jobs/<job_id>/imports/<import_id>
+
+# 4. Rank all candidates (returns scores + reasoning)
 curl -X POST http://localhost:8000/api/jobs/<job_id>/rank
 
-# 4. Persisted rankings (best match first)
+# 5. Persisted rankings (best match first)
 curl http://localhost:8000/api/jobs/<job_id>/rankings
 ```
 
@@ -200,7 +206,7 @@ cd backend && .venv/bin/uvicorn app.main:app --reload
 cd frontend && flutter run
 
 # Tests
-make backend-test       # 9 tests
+make backend-test       # 72 tests
 make frontend-test
 make lint               # compileall + flutter analyze
 ```

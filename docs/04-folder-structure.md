@@ -1,284 +1,140 @@
 # 04 — Folder Structure
 
+> This document reflects the **current implemented** layout. Docs 01–13 describe
+> the target design; the code is a simplified, single-process subset of it.
+
 ## 1. Monorepo Layout
 
 ```
-ai-ats/
+recruitment-app/
 ├── README.md
-├── Makefile
-├── docker-compose.yml            # local: api + worker + pg + qdrant + redis
-├── .env.example
-├── docs/                         # design deliverables 01–14
-│   ├── 01-system-architecture.md
-│   ├── ...
-│   └── 14-implementation-roadmap.md
-│
-├── backend/                      # Python FastAPI monorepo
-│   ├── pyproject.toml / requirements.txt
-│   ├── alembic/                  # migrations
-│   │   ├── env.py
-│   │   └── versions/
-│   ├── app/
-│   │   ├── main.py               # FastAPI app factory
-│   │   ├── core/                 # config, DI container, ports
-│   │   ├── domain/               # entities, value objects, enums
-│   │   ├── application/          # use cases (orchestration, business rules)
-│   │   ├── infrastructure/       # adapters (pg, qdrant, providers, workers)
-│   │   └── api/                  # routers, schemas, deps
-│   ├── workers/                  # background worker entrypoints
-│   └── tests/
-│
-└── frontend/                     # Flutter app
-    ├── pubspec.yaml
-    ├── lib/
-    │   ├── main.dart
-    │   ├── app/                  # app config, DI, router, theme
-    │   ├── core/                 # network, storage, constants, widgets, errors
-    │   ├── features/
-    │   └── shared/               # models shared across features
-    └── test/
+├── Makefile                  # backend/frontend run, test, analyze shortcuts
+├── scripts/                  # one-off bash scripts (run_script.sh runner)
+├── docs/                     # design deliverables 01–14 + backend-flow + setup
+├── backend/                  # Python FastAPI (single process)
+└── frontend/                 # Flutter app (Material 3)
 ```
 
 ## 2. Backend — Detailed
 
 ```
-backend/app/
-├── core/
-│   ├── config.py                 # pydantic-settings: env, providers, models
-│   ├── container.py              # DI container (see doc 05)
-│   ├── ports/
-│   │   ├── embedding_provider.py
-│   │   ├── llm_provider.py
-│   │   ├── vector_store.py
-│   │   ├── ocr_provider.py
-│   │   ├── object_storage.py
-│   │   ├── file_parser.py
-│   │   └── repositories.py       # CandidateRepo, ResumeRepo, ...
-│   ├── enums.py                  # ResumeStatus, Section, Bucket, Role
-│   ├── exceptions.py
-│   └── events.py                 # domain events + event bus
-│
-├── domain/
-│   ├── entities/
-│   │   ├── candidate.py          # Candidate, Experience, Education, ...
-│   │   ├── resume.py
-│   │   ├── job.py
-│   │   └── ranking.py
-│   ├── value_objects.py          # Email, Skill, DateRange, Score
-│   └── services/
-│       ├── skill_normalizer.py
-│       └── years_experience.py
-│
-├── application/
-│   ├── use_cases/
-│   │   ├── resumes/
-│   │   │   ├── upload_resume.py
-│   │   │   ├── process_resume.py        # pipeline orchestrator (state machine)
-│   │   │   ├── get_resume_status.py
-│   │   │   └── reindex_resume.py
-│   │   ├── candidates/
-│   │   │   ├── get_candidate.py
-│   │   │   ├── list_candidates.py
-│   │   │   └── delete_candidate.py      # GDPR erasure
-│   │   ├── search/
-│   │   │   ├── search_candidates.py
-│   │   │   └── match_job.py
-│   │   ├── ranking/
-│   │   │   ├── rank_candidates.py       # orchestrates hybrid ranking
-│   │   │   ├── hidden_gem.py
-│   │   │   └── llm_reasoner.py
-│   │   ├── jobs/
-│   │   │   ├── create_job.py
-│   │   │   └── update_job.py
-│   │   └── applications/
-│   │       ├── create_application.py
-│   │       └── update_application.py
-│   ├── dto/                     # data transfer objects
-│   └── interfaces/              # abstract use-case in/out ports (if needed)
-│
-├── infrastructure/
-│   ├── persistence/
-│   │   ├── postgres/
-│   │   │   ├── db.py            # async engine, session
-│   │   │   ├── models.py        # SQLAlchemy ORM
-│   │   │   └── repositories/    # CandidateRepository, ResumeRepository, ...
-│   │   └── cache.py             # redis (result cache, rate limit)
-│   ├── vector/
-│   │   ├── qdrant_store.py      # QdrantVectorStore (port impl)
-│   │   └── migrations/          # collection creation / versioning
-│   ├── providers/
-│   │   ├── embeddings/
-│   │   │   ├── base.py
-│   │   │   ├── openai_embedding.py
-│   │   │   ├── gemini_embedding.py
-│   │   │   └── local_bge.py     # sentence-transformers / ONNX
-│   │   ├── llm/
-│   │   │   ├── base.py
-│   │   │   ├── openai_llm.py
-│   │   │   ├── gemini_llm.py
-│   │   │   ├── ollama_llm.py    # llama, qwen, deepseek
-│   │   │   └── vllm_llm.py      # any OpenAI-compatible endpoint
-│   │   ├── ocr/
-│   │   │   ├── base.py
-│   │   │   ├── tesseract_ocr.py
-│   │   │   └── paddle_ocr.py
-│   │   ├── parsers/
-│   │   │   ├── pdf_digital.py   # pypdf / pdfplumber
-│   │   │   └── pdf_scanned.py   # rasterize + OCR
-│   │   └── storage/
-│   │       ├── s3_storage.py
-│   │       └── local_storage.py
-│   ├── ai/
-│   │   ├── structuring.py       # resume → JSON via LLM (doc 08)
-│   │   ├── chunker.py           # semantic chunking (doc 10)
-│   │   ├── embedding_service.py
-│   │   └── validation.py        # JSON-schema validation, retries
-│   ├── workers/
-│   │   ├── task_queue.py        # ARQ/Celery wrappers, retries, DLQ
-│   │   └── tasks/
-│   │       ├── process_resume_task.py
-│   │       ├── reindex_task.py
-│   │       └── notify_task.py
-│   └── observability/
-│       ├── logging.py
-│       ├── tracing.py           # OpenTelemetry
-│       └── metrics.py           # Prometheus
-│
-├── api/
-│   ├── deps.py                  # FastAPI dependencies (auth, container)
+backend/
+├── pyproject.toml / requirements.txt
+├── data/                     # runtime: ats.db (SQLite) + uploads/ (CV/JD files)
+├── app/
+│   ├── main.py               # FastAPI entry point: lifespan, middleware, /health
+│   ├── config.py             # Settings dataclass (env-driven)
+│   ├── database/
+│   │   ├── db_client.py      # SQLite schema (jobs, cvs, import_jobs) + async helpers
+│   │   ├── datasource/       # Raw SQL per table: job, cv, import_job
+│   │   └── entities/         # Row ↔ dataclass entities
+│   ├── repository/
+│   │   ├── job_repository.py / cv_repository.py / import_job_repository.py
+│   │   └── impl/             # Implementations over the datasources
+│   ├── usecase/              # Orchestration (one file per operation)
+│   │   ├── save_job, get_job, get_job_by_page, search_jobs, delete_job
+│   │   ├── import_cv_batch, list_cvs, delete_cv
+│   │   ├── rank_job, rank_cv, get_rankings
+│   │   └── get_import_status
+│   ├── di/
+│   │   ├── injection.py      # Composition root (manual DI), cv_processor()
+│   │   └── __init__.py
+│   ├── domain/               # Job, Candidate, ImportJob, Page, errors
 │   ├── routers/
-│   │   ├── auth.py
-│   │   ├── resumes.py
-│   │   ├── candidates.py
-│   │   ├── search.py
-│   │   ├── jobs.py
-│   │   ├── applications.py
-│   │   ├── dashboard.py
-│   │   └── admin.py
-│   ├── schemas/                 # Pydantic request/response models
-│   │   ├── candidate.py
-│   │   ├── search.py
-│   │   ├── ranking.py
-│   │   └── ...
-│   └── middlewares.py           # auth, correlation-id, rate-limit, CORS
-│
+│   │   └── jobs.py           # All /api/jobs/* endpoints
+│   ├── parsers/              # File text extraction (_extract.py: PDF/DOCX/TXT)
+│   ├── skills/               # Skill dictionaries + matching (_match.py)
+│   ├── jd/                   # JD → structured requirements (_parser.py, _structure.py)
+│   ├── extraction/           # CV → profile (NER → LLM → rules)
+│   │   ├── _profile.py       # Profile dataclass + deterministic extraction
+│   │   ├── _orchestrator.py  # NER → LLM → Rules fallback chain
+│   │   └── _ner.py           # Local BERT NER extraction
+│   ├── imports/              # Background CV processing
+│   │   ├── processor.py      # asyncio worker pool; DB-as-queue
+│   │   └── pipeline.py       # extract_and_profile orchestration
+│   ├── ranking/              # Scoring, buckets, LLM reasoning
+│   │   ├── _scoring.py       # score_profile, bucket_for, rule_reasoning
+│   │   ├── _llm.py           # LLM-powered reasoning
+│   │   ├── _requirements.py, _profile_score_counter.py, _service.py
+│   └── util/                 # file_util, str_util, date_util
 └── tests/
-    ├── unit/
-    │   ├── domain/              # pure logic: years calc, skill normalization
-    │   ├── application/         # use cases with fakes
-    │   └── infrastructure/      # adapter unit tests
-    ├── integration/
-    │   ├── test_pipeline.py     # real pg + qdrant (testcontainers)
-    │   └── test_search.py
-    └── e2e/
-        └── test_api.py
+    ├── conftest.py
+    ├── test_api.py           # endpoint smoke tests
+    ├── test_imports.py       # background import flow
+    ├── test_jd_skills.py     # JD structuring + skill matching
+    ├── test_llm_extract.py   # LLM extraction (mocked)
+    └── test_ner_extract.py   # NER extraction (mocked)
 ```
 
 ## 3. Frontend (Flutter) — Detailed
 
+Clean-architecture layout: `domain → data → controllers → screens`, with
+`navigation`, `widgets`, and `theme` shared across screens.
+
 ```
 frontend/lib/
-├── main.dart
-├── app/
-│   ├── app.dart                 # MaterialApp.router, themes
-│   ├── di.dart                  # service locator (get_it) wiring
-│   ├── router.dart              # go_router routes + guards
-│   ├── theme/
-│   │   ├── app_theme.dart       # Material 3 ColorScheme
-│   │   └── text_styles.dart
-│   └── environment.dart
+├── main.dart                 # app bootstrap: DI init, provider overrides, GoRouter
+├── router.dart               # go_router route table (routes derived from AppRoute)
+├── providers.dart            # Riverpod providers (jobs, cvs, rankings, navigation)
+├── di.dart / di.config.dart  # get_it + injectable wiring (generated)
 │
-├── core/
-│   ├── network/
-│   │   ├── api_client.dart      # dio + interceptors (auth, retry)
-│   │   ├── api_exception.dart
-│   │   └── endpoints.dart
-│   ├── storage/
-│   │   ├── secure_storage.dart  # tokens
-│   │   └── local_cache.dart
-│   ├── utils/
-│   ├── errors/                  # error mapper → user messages
-│   └── widgets/
-│       ├── score_gauge.dart
-│       ├── bucket_badge.dart
-│       ├── chunk_evidence_card.dart
-│       ├── file_uploader.dart
-│       └── ...
+├── domain/
+│   ├── models/               # Job, CandidateResult, JobPage, JobRequirements,
+│   │                         #   RankResponse, ImportResult
+│   ├── repositories/         # JobRepository, CandidateRepository interfaces
+│   └── usecases/             # create/delete/list/search job, list/delete/rank CV,
+│                             #   get job, get rankings, get import status
 │
-├── features/
-│   ├── auth/
-│   │   ├── data/                # datasource + repository impl
-│   │   ├── domain/              # entities + repository interface
-│   │   └── presentation/
-│   │       ├── login_screen.dart
-│   │       ├── register_screen.dart
-│   │       └── auth_cubit.dart / auth_bloc.dart
-│   ├── resume_upload/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # upload_screen, progress_poller, status_view
-│   ├── candidate_profile/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # profile_screen, sections, resume_viewer
-│   ├── search/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # search_screen, query_bar, results_list
-│   ├── ranking/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # ranking_screen, buckets, score_cards,
-│   │                            #   explanation_sheet, evidence_drawer
-│   ├── compare/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # compare_screen, comparison_table,
-│   │                            #   ai_summary_panel
-│   ├── jobs/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/        # job_list, job_form, job_detail, rank_button
-│   └── dashboard/
-│       ├── data/
-│       ├── domain/
-│       └── presentation/        # dashboard_screen, metrics_cards
+├── data/
+│   ├── api/                  # ApiClient (dio), ApiPaths, mappers, response models
+│   ├── data_sources/         # JobApiDataSource, CandidateApiDataSource
+│   └── repositories/         # JobRepositoryImpl, CandidateRepositoryImpl
 │
-└── shared/
-    ├── models/                  # Candidate, Resume, RankingResult, Chunk
-    └── widgets/                 # shared ui components
+├── controllers/              # Riverpod controllers/notifiers per screen
+│   ├── job_list_controller.dart
+│   ├── jobDetail/            # job_detail_controller, _notifier, _state
+│   ├── jobForm/              # job_form_controller, _state, picked_jd_file
+│   ├── rankings_controller.dart
+│   ├── upload/               # upload_controller, _state
+│   └── deleteConfirm/        # delete_confirm_controller, _state
+│
+├── navigation/
+│   ├── app_route.dart        # AppRoute enum (single source of path truth)
+│   ├── app_navigator.dart    # AppNavigator interface + shared data types
+│   └── go_router_navigator.dart  # go_router-backed AppNavigator
+│
+├── screens/                  # One file per screen
+│   ├── job_list_screen.dart
+│   ├── search_job_screen.dart
+│   ├── job_form_screen.dart
+│   ├── job_detail_screen.dart
+│   ├── candidate_detail_screen.dart
+│   ├── rankings_screen.dart
+│   ├── delete_confirm_screen.dart
+│   ├── action_result_screen.dart
+│   └── settings_screen.dart
+│
+├── widgets/                  # Shared UI components
+│   ├── deferred_page.dart    # smooth page transitions (defer heavy builds)
+│   ├── bucket_donut.dart, score_color.dart, rank_engine_chip.dart
+│   ├── job_card.dart, job_list_footer.dart, gradient_header.dart
+│   ├── section_card.dart, card_shape.dart, accent_chip.dart
+│   ├── cv_upload_overlay.dart, loading_overlay.dart, shimmer.dart
+│   ├── delete_background.dart, error_view.dart, rankings_summary.dart
+│   └── ...
+│
+└── theme/
+    ├── app_theme.dart        # Material 3 ColorScheme
+    └── theme_controller.dart # light/dark/system theme mode (Riverpod)
 ```
 
-## 4. Infrastructure as Code
+## 4. Directory Rules
 
-```
-infra/
-├── terraform/
-│   ├── modules/
-│   │   ├── api/                 # ECS/Fargate service
-│   │   ├── worker/              # ECS/Fargate worker
-│   │   ├── db/                  # RDS PostgreSQL
-│   │   ├── qdrant/              # ECS qdrant service
-│   │   ├── cache/               # Elasticache Redis
-│   │   └── cdn/                 # CloudFront for resume viewer
-│   └── environments/
-│       ├── dev/
-│       ├── staging/
-│       └── prod/
-├── k8s/                         # (alternative to ECS)
-│   ├── base/  ├── overlays/
-├── docker/
-│   ├── api.Dockerfile
-│   ├── worker.Dockerfile
-│   └── qdrant.Dockerfile
-└── .github/workflows/
-    ├── backend-ci.yml
-    ├── frontend-ci.yml
-    └── deploy.yml
-```
-
-## 5. Directory Rules
-
-- **Backend**: `domain` + `application` never import `infrastructure` or `api` (inversion of dependency, doc 05). Adapters implement `core/ports` interfaces.
-- **Frontend**: `presentation` never imports `data` directly; features depend on `domain` interfaces; `core` is shared infrastructure only.
-- **Config** lives only in `core/config.py` / `app/environment.dart` — no hard-coded URLs or model names in business code.
+- **Backend**: `domain` and `usecase` never import `database`, `repository`, or
+  `routers` implementations — use cases depend on repository interfaces; the
+  composition root (`di/injection.py`) wires concrete implementations.
+- **Frontend**: `screens` and `controllers` depend on `domain` interfaces and
+  `data` repository impls (via get_it); `data` contains all third-party/API
+  concerns; `navigation` is the only place go_router is touched.
+- **Config** lives only in `backend/app/config.py`; the Flutter base URL is
+  injected via `--dart-define=API_BASE_URL`.
