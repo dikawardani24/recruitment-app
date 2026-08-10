@@ -6,19 +6,43 @@ import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
 import '../widgets/card_shape.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
 import 'candidate_detail_screen.dart';
 
-class RankingsScreen extends HookConsumerWidget {
+class RankingsScreen extends StatelessWidget {
   final String jobId;
   final String jobTitle;
   final String source;
 
   const RankingsScreen({
     super.key,
+    required this.jobId,
+    required this.jobTitle,
+    required this.source,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DeferredPage(
+      child: _RankingsContent(
+        jobId: jobId,
+        jobTitle: jobTitle,
+        source: source,
+      ),
+    );
+  }
+}
+
+class _RankingsContent extends HookConsumerWidget {
+  final String jobId;
+  final String jobTitle;
+  final String source;
+
+  const _RankingsContent({
     required this.jobId,
     required this.jobTitle,
     required this.source,

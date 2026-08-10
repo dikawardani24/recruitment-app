@@ -98,3 +98,15 @@ class JobDatasource:
         """
         list_data = await self.db.fetchall(query, (limit, offset))
         return [JobEntity.from_row(row) for row in list_data]
+
+    async def search(
+        self, keyword: str, limit: int, offset: int
+    ) -> list[JobEntity]:
+        like = f"%{keyword}%"
+        query = """
+        SELECT * FROM jobs
+        WHERE title LIKE ? OR description LIKE ?
+        ORDER BY created_at DESC LIMIT ? OFFSET ?
+        """
+        list_data = await self.db.fetchall(query, (like, like, limit, offset))
+        return [JobEntity.from_row(row) for row in list_data]

@@ -11,6 +11,7 @@ import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
 import 'screens/rankings_screen.dart';
+import 'screens/search_job_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Builds the app's [GoRouter]. Route patterns are derived from [AppRoute]
@@ -32,6 +33,26 @@ class AppRouter {
             GoRoute(
               path: 'settings',
               builder: (context, state) => const SettingsScreen(),
+            ),
+            GoRoute(
+              path: 'search',
+              builder: (context, state) => const SearchJobScreen(),
+            ),
+            GoRoute(
+              path: 'delete-confirm',
+              builder: (context, state) => DeleteConfirmScreen(
+                args: state.extra as DeleteConfirmArgs? ??
+                    const DeleteConfirmArgs(
+                      data: DeleteConfirmData(title: '', message: ''),
+                    ),
+              ),
+            ),
+            GoRoute(
+              path: 'action-result',
+              builder: (context, state) => ActionResultScreen(
+                data: state.extra as ActionResultData? ??
+                    const ActionResultData(success: true, title: ''),
+              ),
             ),
             GoRoute(
               path: ':jobId',
@@ -60,22 +81,6 @@ class AppRouter {
               ],
             ),
           ],
-        ),
-        GoRoute(
-          path: AppRoute.deleteConfirm.path,
-          builder: (context, state) => DeleteConfirmScreen(
-            args: state.extra as DeleteConfirmArgs? ??
-                const DeleteConfirmArgs(
-                  data: DeleteConfirmData(title: '', message: ''),
-                ),
-          ),
-        ),
-        GoRoute(
-          path: AppRoute.actionResult.path,
-          builder: (context, state) => ActionResultScreen(
-            data: state.extra as ActionResultData? ??
-                const ActionResultData(success: true, title: ''),
-          ),
         ),
       ],
     );

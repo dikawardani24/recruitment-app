@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../navigation/app_navigator.dart';
+import '../widgets/deferred_page.dart';
 
 /// Full-screen result page shown after a delete attempt: a green check for
 /// success or a red error for failure, with a single Done button that pops.
@@ -11,6 +12,17 @@ class ActionResultScreen extends StatelessWidget {
     super.key,
     required this.data,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return DeferredPage(child: _ActionResultContent(data: data));
+  }
+}
+
+class _ActionResultContent extends StatelessWidget {
+  final ActionResultData data;
+
+  const _ActionResultContent({required this.data});
 
   @override
   Widget build(BuildContext context) {

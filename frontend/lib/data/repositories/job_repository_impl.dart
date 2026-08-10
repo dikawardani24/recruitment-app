@@ -26,6 +26,24 @@ class JobRepositoryImpl implements JobRepository {
   }
 
   @override
+  Future<JobPage> searchJobs({
+    required String keyword,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final dto = await _dataSource.searchJobs(
+      keyword: keyword,
+      page: page,
+      limit: limit,
+    );
+    return JobPage(
+      jobs: dto.jobs.map(_toJob).toList(),
+      page: dto.page,
+      hasMore: dto.hasMore,
+    );
+  }
+
+  @override
   Future<Job> createJob({
     required String title,
     required String description,

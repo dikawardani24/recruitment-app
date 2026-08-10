@@ -10,6 +10,7 @@ from app.repository.impl.cv_repository_impl import CvRepositoryImpl
 from app.repository.import_job_repository import ImportJobRepository
 from app.repository.impl.import_job_repository_impl import ImportJobRepositoryImpl
 from app.usecase.get_job_by_page import GetJobByPage
+from app.usecase.search_jobs import SearchJobs
 from app.usecase.save_job import SaveJob
 from app.usecase.get_job import GetJob
 from app.usecase.delete_job import DeleteJob
@@ -46,6 +47,9 @@ def saveJobUseCase() -> SaveJob:
 
 def get_job_by_page_use_case() -> GetJobByPage:
     return GetJobByPage(__job_repo(), __cv_repo())
+
+def search_jobs_use_case() -> SearchJobs:
+    return SearchJobs(__job_repo(), __cv_repo())
 
 def get_job_use_case() -> GetJob:
     return GetJob(__job_repo(), __cv_repo())

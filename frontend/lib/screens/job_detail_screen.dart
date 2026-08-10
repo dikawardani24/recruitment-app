@@ -13,16 +13,32 @@ import '../providers.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/card_shape.dart';
 import '../widgets/delete_background.dart';
+import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/score_color.dart';
 import '../widgets/section_card.dart';
 
-class JobDetailScreen extends HookConsumerWidget {
+class JobDetailScreen extends ConsumerWidget {
   final String jobId;
 
   const JobDetailScreen({super.key, required this.jobId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Kick off the job/CV fetches during the transition so only the heavy UI
+    // build is deferred, not the network requests.
+    ref.watch(jobProvider(jobId));
+    ref.watch(cvsProvider(jobId));
+    return DeferredPage(child: _JobDetailContent(jobId: jobId));
+  }
+}
+
+class _JobDetailContent extends HookConsumerWidget {
+  final String jobId;
+
+  const _JobDetailContent({required this.jobId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,11 +243,16 @@ class _RankingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rankingsAsync = ref.watch(rankingsProvider(jobId));
     final cvs =
         ref.watch(cvsProvider(jobId)).value ?? const <CandidateResult>[];
     final detailState = ref.watch(jobDetailStateProvider);
     final detailController = ref.read(jobDetailControllerProvider);
+
+    // Ranked candidates come from the already-loaded CV list; no extra
+    // rankings fetch on screen open (the full-ranking screen loads its own).
+    final ranked =
+        cvs.where((c) => c.overallScore != null).toList(growable: false);
+    final hasRankings = ranked.isNotEmpty;
 
     return SectionCard(
       title: 'Ranking',
@@ -239,51 +260,39 @@ class _RankingSection extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          rankingsAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+          if (ranked.isEmpty)
+            cvs.isEmpty ? const SizedBox.shrink() : const _NotRankedHint()
+          else
+            BucketDonut(buckets: bucketCounts(ranked)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (hasRankings) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: detailState.busy
+                        ? null
+                        : () => detailController.viewRankings(
+                            jobId,
+                            jobTitle,
+                            ranked.first.source ?? 'rules',
+                          ),
+                    icon: const Icon(Icons.timeline),
+                    label: const Text('View full ranking'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: detailState.busy
+                      ? null
+                      : () => detailController.rank(context, jobId, cvs),
+                  icon: const Icon(Icons.psychology),
+                  label: const Text('Rank CVs'),
                 ),
               ),
-            ),
-            error: (e, _) => const SizedBox.shrink(),
-            data: (ranked) {
-              if (ranked.isEmpty) {
-                if (cvs.isEmpty) return const SizedBox.shrink();
-                return const _NotRankedHint();
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  BucketDonut(buckets: bucketCounts(ranked)),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.center,
-                    child: TextButton.icon(
-                      onPressed: () => detailController.viewRankings(
-                        jobId,
-                        jobTitle,
-                        ranked.first.source ?? 'rules',
-                      ),
-                      icon: const Icon(Icons.timeline),
-                      label: const Text('View full ranking'),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: detailState.busy
-                ? null
-                : () => detailController.rank(context, jobId, cvs),
-            icon: const Icon(Icons.psychology),
-            label: const Text('Rank CVs'),
+            ],
           ),
         ],
       ),

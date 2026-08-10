@@ -28,6 +28,25 @@ class JobRepositoryImpl:
             last_page=not has_more
         )
 
+    async def search_jobs(self, keyword: str, page: int, page_size: int) -> Page[Job]:
+        offset = (page - 1) * page_size
+        limit = page_size + 1
+
+        entities = await self.datasource.search(
+            keyword=keyword,
+            limit=limit,
+            offset=offset,
+        )
+
+        has_more = len(entities) > page_size
+        domains = [Job.from_entity(row) for row in entities[:page_size]]
+        return Page(
+            page=page,
+            page_size=page_size,
+            data=domains,
+            last_page=not has_more
+        )
+
     async def get_by_id(self, job_id: str) -> Job | None:
         entity = await self.datasource.find_by_id(job_id)
         if entity:

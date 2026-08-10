@@ -22,12 +22,14 @@ import 'domain/repositories/job_repository.dart' as _i324;
 import 'domain/usecases/create_job.dart' as _i146;
 import 'domain/usecases/delete_candidate.dart' as _i17;
 import 'domain/usecases/delete_job.dart' as _i34;
+import 'domain/usecases/get_import_status.dart' as _i743;
 import 'domain/usecases/get_job.dart' as _i621;
 import 'domain/usecases/get_rankings.dart' as _i692;
 import 'domain/usecases/list_cvs.dart' as _i542;
 import 'domain/usecases/list_jobs.dart' as _i111;
 import 'domain/usecases/rank_cv.dart' as _i51;
 import 'domain/usecases/rank_job.dart' as _i404;
+import 'domain/usecases/search_jobs.dart' as _i309;
 import 'domain/usecases/upload_cvs.dart' as _i364;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -49,6 +51,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i17.DeleteCandidate>(
       () => _i17.DeleteCandidate(gh<_i1049.CandidateRepository>()),
+    );
+    gh.factory<_i743.GetImportStatus>(
+      () => _i743.GetImportStatus(gh<_i1049.CandidateRepository>()),
     );
     gh.factory<_i692.GetRankings>(
       () => _i692.GetRankings(gh<_i1049.CandidateRepository>()),
@@ -74,6 +79,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i34.DeleteJob>(() => _i34.DeleteJob(gh<_i324.JobRepository>()));
     gh.factory<_i621.GetJob>(() => _i621.GetJob(gh<_i324.JobRepository>()));
     gh.factory<_i111.ListJobs>(() => _i111.ListJobs(gh<_i324.JobRepository>()));
+    gh.factory<_i309.SearchJobs>(
+      () => _i309.SearchJobs(gh<_i324.JobRepository>()),
+    );
     return this;
   }
 }
