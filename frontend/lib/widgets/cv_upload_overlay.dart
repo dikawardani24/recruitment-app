@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../controllers/upload_controller.dart';
+import '../controllers/upload/upload_controller.dart';
+import '../controllers/upload/upload_state.dart';
 
 /// Shows upload progress while CV files are submitted in batches. Closes once
 /// the recruiter taps Done — background processing continues on the backend.

@@ -4,32 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../di.dart';
-import '../domain/models.dart';
-import '../domain/usecases/create_job.dart';
-import '../providers.dart';
-
-/// A job description file chosen by the user, plus the description text read
-/// out of it when the file is a text/markdown document.
-class PickedJdFile {
-  final File file;
-  final String name;
-  final String? description;
-
-  const PickedJdFile({
-    required this.file,
-    required this.name,
-    this.description,
-  });
-}
-
-/// UI-busy state for the job form screen.
-class JobFormState {
-  final bool submitting;
-  final String? loadingMessage;
-
-  const JobFormState({this.submitting = false, this.loadingMessage});
-}
+import '../../di.dart';
+import '../../domain/models.dart';
+import '../../domain/usecases/create_job.dart';
+import '../../providers.dart';
+import 'job_form_state.dart';
+import 'picked_jd_file.dart';
 
 /// Owns the job creation action. File picking, the API call, feedback, and
 /// navigation are all handled here; the screen only binds form fields.

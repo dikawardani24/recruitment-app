@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_ats/controllers/upload_controller.dart';
+import 'package:ai_ats/controllers/upload/upload_controller.dart';
 import 'package:ai_ats/di.dart';
 import 'package:ai_ats/domain/models/import_result.dart';
 import 'package:ai_ats/domain/usecases/upload_cvs.dart';

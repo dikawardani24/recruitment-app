@@ -10,7 +10,7 @@ import '../../providers.dart';
 import '../../screens/action_result_screen.dart';
 import '../../screens/delete_confirm_screen.dart';
 import '../../widgets/cv_upload_overlay.dart';
-import '../upload_controller.dart';
+import '../upload/upload_controller.dart';
 import 'job_detail_notifier.dart';
 
 /// Owns every job detail action end to end: confirmations, API calls (via
