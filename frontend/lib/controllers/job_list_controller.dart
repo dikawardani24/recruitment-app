@@ -42,7 +42,34 @@ class JobListController {
     }
     if (!context.mounted) return false;
 
-    final confirmed = await showDeleteConfirm(
+    final confirmed = await _confirmDeleteJob(context, job, candidates);
+    if (!confirmed) return false;
+
+    try {
+      await removeJob(job.id);
+      if (!context.mounted) return false;
+      await _showJobDeleted(context, job);
+      return true;
+    } catch (e) {
+      if (!context.mounted) return false;
+      await _showJobDeleteFailed(context, e);
+      return false;
+    }
+  }
+
+  /// Deletes the job server-side, then reloads the list from page 1.
+  Future<void> removeJob(String jobId) async {
+    await getIt<DeleteJob>()(jobId);
+    await refresh();
+  }
+
+  /// Confirm dialog before deleting a whole job.
+  Future<bool> _confirmDeleteJob(
+    BuildContext context,
+    Job job,
+    List<CandidateResult> candidates,
+  ) {
+    return showDeleteConfirm(
       context,
       title: 'Delete this job?',
       message: candidates.isEmpty
@@ -53,34 +80,26 @@ class JobListController {
       details: [jobDeleteDetails(job, candidates)],
       confirmLabel: 'Delete job',
     );
-    if (!confirmed) return false;
-
-    try {
-      await removeJob(job.id);
-      if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: true,
-        title: 'Job deleted',
-        message: "'${job.title}' was permanently removed.",
-      );
-      return true;
-    } catch (e) {
-      if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: false,
-        title: 'Delete failed',
-        message: '$e',
-      );
-      return false;
-    }
   }
 
-  /// Deletes the job server-side, then reloads the list from page 1.
-  Future<void> removeJob(String jobId) async {
-    await getIt<DeleteJob>()(jobId);
-    await refresh();
+  /// Result page after a successful job deletion.
+  Future<void> _showJobDeleted(BuildContext context, Job job) {
+    return showActionResult(
+      context,
+      success: true,
+      title: 'Job deleted',
+      message: "'${job.title}' was permanently removed.",
+    );
+  }
+
+  /// Result page after a failed job deletion.
+  Future<void> _showJobDeleteFailed(BuildContext context, Object error) {
+    return showActionResult(
+      context,
+      success: false,
+      title: 'Delete failed',
+      message: '$error',
+    );
   }
 
   void openSettings() => _ref.read(navigatorProvider).goToSettings();

@@ -60,12 +60,22 @@ class JobFormController extends Notifier<JobFormState> {
         jdFile: jdFile,
         jdFileName: jdFileName,
       );
-      messenger.showSnackBar(SnackBar(content: Text('Created "${job.title}"')));
+      _showJobCreated(messenger, job);
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to create job: $e')),
-      );
+      _showJobCreateFailed(messenger, e);
     }
+  }
+
+  /// Snackbar confirming the job was created.
+  void _showJobCreated(ScaffoldMessengerState messenger, Job job) {
+    messenger.showSnackBar(SnackBar(content: Text('Created "${job.title}"')));
+  }
+
+  /// Snackbar reporting a failed job creation.
+  void _showJobCreateFailed(ScaffoldMessengerState messenger, Object error) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Failed to create job: $error')),
+    );
   }
 
   Future<Job> createJob({

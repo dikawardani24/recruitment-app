@@ -36,47 +36,13 @@ class JobDetailController {
     final messenger = ScaffoldMessenger.of(context);
 
     if (cvs.isEmpty) {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('No candidates to rank'),
-          content: const Text(
-            'Add CVs first, then tap "Rank CVs" to score the candidates.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      await _showNoCandidatesDialog(context);
       return;
     }
 
     final allRanked = cvs.every((c) => c.status == 'ranked');
     if (allRanked) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Re-rank all candidates?'),
-          content: Text(
-            'All ${cvs.length} '
-            '${cvs.length == 1 ? 'candidate has' : 'candidates have'} '
-            'already been ranked. Re-run ranking on all of them?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Re-rank all'),
-            ),
-          ],
-        ),
-      );
+      final confirmed = await _showReRankConfirmDialog(context, cvs.length);
       if (confirmed != true) return;
     }
 
@@ -85,22 +51,7 @@ class JobDetailController {
     );
     if (!hasReady) {
       if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Ranking unavailable'),
-          content: const Text(
-            'No candidates are ready to rank yet. Wait until CV processing '
-            'finishes before ranking.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      await _showRankingUnavailableDialog(context);
       return;
     }
 
@@ -134,21 +85,10 @@ class JobDetailController {
     final cvId = cv.cvId;
     if (!ready || cvId == null) {
       if (!context.mounted) return false;
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Ranking unavailable'),
-          content: const Text(
-            'This candidate is not ready to rank yet. Wait until CV '
+      await _showRankingUnavailableDialog(
+        context,
+        message: 'This candidate is not ready to rank yet. Wait until CV '
             'processing finishes before ranking.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
       );
       return false;
     }
@@ -183,35 +123,15 @@ class JobDetailController {
     Job job,
     List<CandidateResult> candidates,
   ) async {
-    final confirmed = await showDeleteConfirm(
-      context,
-      title: 'Delete this job?',
-      message: candidates.isEmpty
-          ? 'This job has no candidates. It will be permanently removed.'
-          : 'This job and its ${candidates.length} '
-                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                'will be permanently removed.',
-      details: [jobDeleteDetails(job, candidates)],
-      confirmLabel: 'Delete job',
-    );
+    final confirmed = await _confirmDeleteJob(context, job, candidates);
     if (!confirmed) return;
     try {
       await _notifier.deleteJob(jobId);
       if (!context.mounted) return;
-      await showActionResult(
-        context,
-        success: true,
-        title: 'Job deleted',
-        message: "'${job.title}' was permanently removed.",
-      );
+      await _showJobDeleted(context, job);
     } catch (e) {
       if (!context.mounted) return;
-      await showActionResult(
-        context,
-        success: false,
-        title: 'Delete failed',
-        message: '$e',
-      );
+      await _showJobDeleteFailed(context, e);
       return;
     }
     if (!context.mounted) return;
@@ -228,32 +148,16 @@ class JobDetailController {
     final cvId = cv.cvId;
     if (cvId == null) return false;
     final name = cv.candidateName ?? cv.fileName;
-    final confirmed = await showDeleteConfirm(
-      context,
-      title: 'Delete this candidate?',
-      message: 'This candidate and their CV will be permanently removed.',
-      details: [candidateDeleteDetails(cv)],
-      confirmLabel: 'Delete candidate',
-    );
+    final confirmed = await _confirmDeleteCv(context, cv);
     if (!confirmed) return false;
     try {
       await _notifier.deleteCv(jobId, cvId);
       if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: true,
-        title: 'Candidate deleted',
-        message: "'$name' and their CV were permanently removed.",
-      );
+      await _showCvDeleted(context, name);
       return true;
     } catch (e) {
       if (!context.mounted) return false;
-      await showActionResult(
-        context,
-        success: false,
-        title: 'Delete failed',
-        message: '$e',
-      );
+      await _showCvDeleteFailed(context, e);
       return false;
     }
   }
@@ -305,6 +209,142 @@ class JobDetailController {
         .goToRankings(
           RankingsScreenData(jobId: jobId, jobTitle: jobTitle, source: source),
         );
+  }
+
+  /// Info dialog shown when there are no CVs to rank yet.
+  Future<void> _showNoCandidatesDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('No candidates to rank'),
+        content: const Text(
+          'Add CVs first, then tap "Rank CVs" to score the candidates.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Confirm dialog shown before re-ranking a set that is already fully
+  /// ranked. Resolves to `true` when the user wants to re-rank.
+  Future<bool?> _showReRankConfirmDialog(BuildContext context, int count) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Re-rank all candidates?'),
+        content: Text(
+          'All $count '
+          '${count == 1 ? 'candidate has' : 'candidates have'} '
+          'already been ranked. Re-run ranking on all of them?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Re-rank all'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Info dialog shown when nothing is ready to rank yet.
+  Future<void> _showRankingUnavailableDialog(
+    BuildContext context, {
+    String message = 'No candidates are ready to rank yet. Wait until CV '
+        'processing finishes before ranking.',
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ranking unavailable'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Confirm dialog before deleting a whole job.
+  Future<bool> _confirmDeleteJob(
+    BuildContext context,
+    Job job,
+    List<CandidateResult> candidates,
+  ) {
+    return showDeleteConfirm(
+      context,
+      title: 'Delete this job?',
+      message: candidates.isEmpty
+          ? 'This job has no candidates. It will be permanently removed.'
+          : 'This job and its ${candidates.length} '
+                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                'will be permanently removed.',
+      details: [jobDeleteDetails(job, candidates)],
+      confirmLabel: 'Delete job',
+    );
+  }
+
+  /// Confirm dialog before deleting a single candidate.
+  Future<bool> _confirmDeleteCv(BuildContext context, CandidateResult cv) {
+    return showDeleteConfirm(
+      context,
+      title: 'Delete this candidate?',
+      message: 'This candidate and their CV will be permanently removed.',
+      details: [candidateDeleteDetails(cv)],
+      confirmLabel: 'Delete candidate',
+    );
+  }
+
+  /// Result page after a successful job deletion.
+  Future<void> _showJobDeleted(BuildContext context, Job job) {
+    return showActionResult(
+      context,
+      success: true,
+      title: 'Job deleted',
+      message: "'${job.title}' was permanently removed.",
+    );
+  }
+
+  /// Result page after a failed job deletion.
+  Future<void> _showJobDeleteFailed(BuildContext context, Object error) {
+    return showActionResult(
+      context,
+      success: false,
+      title: 'Delete failed',
+      message: '$error',
+    );
+  }
+
+  /// Result page after a successful candidate deletion.
+  Future<void> _showCvDeleted(BuildContext context, String name) {
+    return showActionResult(
+      context,
+      success: true,
+      title: 'Candidate deleted',
+      message: "'$name' and their CV were permanently removed.",
+    );
+  }
+
+  /// Result page after a failed candidate deletion.
+  Future<void> _showCvDeleteFailed(BuildContext context, Object error) {
+    return showActionResult(
+      context,
+      success: false,
+      title: 'Delete failed',
+      message: '$error',
+    );
   }
 }
 
