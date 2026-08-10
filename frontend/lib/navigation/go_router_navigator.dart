@@ -15,20 +15,20 @@ class GoRouterNavigator implements AppNavigator {
   void goToJobs() => _router.go(AppRoute.jobs.path);
 
   @override
-  void goToJobForm() => _router.go(AppRoute.jobForm.path);
+  void goToJobForm() => _router.push(AppRoute.jobForm.path);
 
   @override
-  void goToSettings() => _router.go(AppRoute.settings.path);
+  void goToSettings() => _router.push(AppRoute.settings.path);
 
   @override
-  void goToSearchJobs() => _router.go(AppRoute.searchJobs.path);
+  void goToSearchJobs() => _router.push(AppRoute.searchJobs.path);
 
   @override
   void goToJobDetail(String jobId) =>
-      _router.go(AppRoute.jobDetail.withJobId(jobId));
+      _router.push(AppRoute.jobDetail.withJobId(jobId));
 
   @override
-  void goToCandidateDetail(String jobId, CandidateResult candidate) => _router.go(
+  void goToCandidateDetail(String jobId, CandidateResult candidate) => _router.push(
         AppRoute.candidateDetail.withCandidate(
           jobId,
           candidate.cvId ?? 'none',
@@ -37,7 +37,7 @@ class GoRouterNavigator implements AppNavigator {
       );
 
   @override
-  void goToRankings(RankingsScreenData data) => _router.go(
+  void goToRankings(RankingsScreenData data) => _router.push(
         AppRoute.rankings.withJobId(data.jobId),
         extra: data,
       );

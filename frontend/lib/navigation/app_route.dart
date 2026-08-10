@@ -6,12 +6,12 @@ enum AppRoute {
   jobs('/jobs'),
   jobForm('/jobs/new'),
   settings('/jobs/settings'),
-  searchJobs('/search'),
+  searchJobs('/jobs/search'),
   jobDetail('/jobs/:jobId'),
   candidateDetail('/jobs/:jobId/candidate/:cvId'),
   rankings('/jobs/:jobId/rankings'),
-  deleteConfirm('/delete-confirm'),
-  actionResult('/action-result');
+  deleteConfirm('/jobs/delete-confirm'),
+  actionResult('/jobs/action-result');
 
   const AppRoute(this.path);
 

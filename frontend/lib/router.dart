@@ -35,6 +35,10 @@ class AppRouter {
               builder: (context, state) => const SettingsScreen(),
             ),
             GoRoute(
+              path: 'search',
+              builder: (context, state) => const SearchJobScreen(),
+            ),
+            GoRoute(
               path: ':jobId',
               builder: (context, state) =>
                   JobDetailScreen(jobId: state.pathParameters['jobId']!),
@@ -60,27 +64,23 @@ class AppRouter {
                 ),
               ],
             ),
+            GoRoute(
+              path: 'delete-confirm',
+              builder: (context, state) => DeleteConfirmScreen(
+                args: state.extra as DeleteConfirmArgs? ??
+                    const DeleteConfirmArgs(
+                      data: DeleteConfirmData(title: '', message: ''),
+                    ),
+              ),
+            ),
+            GoRoute(
+              path: 'action-result',
+              builder: (context, state) => ActionResultScreen(
+                data: state.extra as ActionResultData? ??
+                    const ActionResultData(success: true, title: ''),
+              ),
+            ),
           ],
-        ),
-        GoRoute(
-          path: AppRoute.searchJobs.path,
-          builder: (context, state) => const SearchJobScreen(),
-        ),
-        GoRoute(
-          path: AppRoute.deleteConfirm.path,
-          builder: (context, state) => DeleteConfirmScreen(
-            args: state.extra as DeleteConfirmArgs? ??
-                const DeleteConfirmArgs(
-                  data: DeleteConfirmData(title: '', message: ''),
-                ),
-          ),
-        ),
-        GoRoute(
-          path: AppRoute.actionResult.path,
-          builder: (context, state) => ActionResultScreen(
-            data: state.extra as ActionResultData? ??
-                const ActionResultData(success: true, title: ''),
-          ),
         ),
       ],
     );

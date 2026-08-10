@@ -74,7 +74,7 @@ class SearchJobScreen extends HookConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Back',
-          onPressed: () => ref.read(navigatorProvider).goToJobs(),
+          onPressed: () => ref.read(navigatorProvider).pop(),
         ),
         titleSpacing: 0,
         title: Padding(
