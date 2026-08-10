@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/rankings_controller.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/accent_chip.dart';
 import '../widgets/candidate_detail_sheet.dart';
+import '../widgets/card_shape.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/rankings_summary.dart';
@@ -25,6 +27,7 @@ class RankingsScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rankingsAsync = ref.watch(rankingsProvider(jobId));
+    final rankingsController = ref.read(rankingsControllerProvider);
 
     return Scaffold(
       appBar: AppBar(),
@@ -62,7 +65,14 @@ class RankingsScreen extends HookConsumerWidget {
                   ],
                 );
               }
-              return _RankedCard(candidate: results[index - 1], rank: index);
+              return _RankedCard(
+                candidate: results[index - 1],
+                rank: index,
+                onShowDetails: () => rankingsController.openCandidateDetails(
+                  context,
+                  results[index - 1],
+                ),
+              );
             },
           );
         },
@@ -74,8 +84,13 @@ class RankingsScreen extends HookConsumerWidget {
 class _RankedCard extends StatelessWidget {
   final CandidateResult candidate;
   final int rank;
+  final VoidCallback onShowDetails;
 
-  const _RankedCard({required this.candidate, required this.rank});
+  const _RankedCard({
+    required this.candidate,
+    required this.rank,
+    required this.onShowDetails,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +162,7 @@ class _RankedCard extends StatelessWidget {
                 runSpacing: 6,
                 children: c.strengths
                     .map(
-                      (skill) =>
-                          AccentChip(label: skill, accent: Colors.green),
+                      (skill) => AccentChip(label: skill, accent: Colors.green),
                     )
                     .toList(),
               ),
@@ -165,9 +179,7 @@ class _RankedCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: c.skillGaps
-                    .map(
-                      (gap) => AccentChip(label: gap, accent: Colors.red),
-                    )
+                    .map((gap) => AccentChip(label: gap, accent: Colors.red))
                     .toList(),
               ),
             ],
@@ -178,7 +190,7 @@ class _RankedCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => showCandidateDetailSheet(context, c),
+                  onPressed: onShowDetails,
                   icon: const Icon(Icons.info_outline),
                   label: const Text('Show reasoning'),
                 ),

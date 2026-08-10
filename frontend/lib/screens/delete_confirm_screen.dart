@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
 import '../widgets/bucket_donut.dart';
-import '../widgets/gradient_header.dart';
+import '../widgets/section_card.dart';
 import 'job_list_screen.dart' show formatCreatedAt;
 
 /// Pushes [DeleteConfirmScreen] and resolves to `true` only when the user
@@ -37,10 +37,7 @@ Widget jobDeleteDetails(Job job, List<CandidateResult> candidates) {
       .toList();
   return DeleteDetailsCard(
     title: job.title,
-    rows: [
-      ('Status', job.status),
-      ('Created', formatCreatedAt(job.createdAt)),
-    ],
+    rows: [('Status', job.status), ('Created', formatCreatedAt(job.createdAt))],
     names: names,
     namesTitle: candidates.length == 1 ? 'Candidate' : 'Candidates',
   );
@@ -101,11 +98,7 @@ class DeleteConfirmScreen extends StatelessWidget {
                   color: errorColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.delete_outline,
-                  size: 40,
-                  color: errorColor,
-                ),
+                child: Icon(Icons.delete_outline, size: 40, color: errorColor),
               ),
             ),
             const SizedBox(height: 16),
@@ -124,10 +117,7 @@ class DeleteConfirmScreen extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            if (details.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              ...details,
-            ],
+            if (details.isNotEmpty) ...[const SizedBox(height: 20), ...details],
             const SizedBox(height: 24),
             Row(
               children: [
@@ -179,91 +169,73 @@ class DeleteDetailsCard extends StatelessWidget {
     final muted = theme.colorScheme.onSurfaceVariant;
     const previewLimit = 10;
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: cardShape(theme),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return SectionCard(
+      title: title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rows.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            for (final (label, value) in rows)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 110,
+                      child: Text(
+                        label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(value, style: theme.textTheme.bodyMedium),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          if (names.isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
+              '$namesTitle (${names.length})',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: muted,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (rows.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              for (final (label, value) in rows)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 110,
-                        child: Text(
-                          label,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
-                        ),
+            const SizedBox(height: 4),
+            for (final name in names.take(previewLimit))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_outline, size: 16, color: muted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
                       ),
-                      Expanded(
-                        child: Text(
-                          value,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-            if (names.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                '$namesTitle (${names.length})',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: muted,
-                  fontWeight: FontWeight.w600,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              for (final name in names.take(previewLimit))
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 16,
-                        color: muted,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+            if (names.length > previewLimit)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'and ${names.length - previewLimit} more',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
                 ),
-              if (names.length > previewLimit)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'and ${names.length - previewLimit} more',
-                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                  ),
-                ),
-            ],
+              ),
           ],
-        ),
+        ],
       ),
     );
   }

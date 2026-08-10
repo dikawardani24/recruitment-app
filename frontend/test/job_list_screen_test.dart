@@ -130,11 +130,10 @@ class _FakeJobListController extends JobListController {
   final deletedJobs = <String>[];
 
   @override
-  Future<List<CandidateResult>> candidatesFor(String jobId) async =>
-      candidates;
+  Future<List<CandidateResult>> candidatesFor(String jobId) async => candidates;
 
   @override
-  Future<void> deleteJob(String jobId) async {
+  Future<void> removeJob(String jobId) async {
     deletedJobs.add(jobId);
     _notifier.removeById(jobId);
     await refresh();
@@ -174,9 +173,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          jobsProvider.overrideWith(
-            () => _PendingJobListNotifier(completer),
-          ),
+          jobsProvider.overrideWith(() => _PendingJobListNotifier(completer)),
         ],
         child: const MaterialApp(home: JobListScreen()),
       ),
@@ -268,18 +265,13 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    final page1 = List.generate(
-      20,
-      (i) => _job('p1-$i', 'Job $i'),
-    );
+    final page1 = List.generate(20, (i) => _job('p1-$i', 'Job $i'));
     final page2 = [_job('p2', 'Job 20')];
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          jobsProvider.overrideWith(
-            () => _FakeJobListNotifier([page1, page2]),
-          ),
+          jobsProvider.overrideWith(() => _FakeJobListNotifier([page1, page2])),
         ],
         child: const MaterialApp(home: JobListScreen()),
       ),
@@ -306,18 +298,13 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    final page1 = List.generate(
-      20,
-      (i) => _job('p1-$i', 'Job $i'),
-    );
+    final page1 = List.generate(20, (i) => _job('p1-$i', 'Job $i'));
     final page2 = List.generate(20, (i) => _job('p2-$i', 'Job ${i + 20}'));
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          jobsProvider.overrideWith(
-            () => _FakeJobListNotifier([page1, page2]),
-          ),
+          jobsProvider.overrideWith(() => _FakeJobListNotifier([page1, page2])),
         ],
         child: const MaterialApp(home: JobListScreen()),
       ),
@@ -383,8 +370,11 @@ void main() {
           overrides: [
             jobsProvider.overrideWith(() => notifier),
             jobListControllerProvider.overrideWith(
-              (ref) => controller =
-                  _FakeJobListController(ref, notifier, candidates),
+              (ref) => controller = _FakeJobListController(
+                ref,
+                notifier,
+                candidates,
+              ),
             ),
           ],
           child: const MaterialApp(home: JobListScreen()),
@@ -402,9 +392,11 @@ void main() {
         _job('j1', 'Backend Engineer', candidates: 1),
         _job('j2', 'Mobile Dev', candidates: 0),
       ]);
-      await pumpList(tester, notifier: notifier, candidates: [
-        candidate('c1', 'John Doe'),
-      ]);
+      await pumpList(
+        tester,
+        notifier: notifier,
+        candidates: [candidate('c1', 'John Doe')],
+      );
 
       await tester.fling(
         find.text('Backend Engineer'),
@@ -430,9 +422,11 @@ void main() {
         _job('j1', 'Backend Engineer', candidates: 1),
         _job('j2', 'Mobile Dev', candidates: 0),
       ]);
-      final controller = await pumpList(tester, notifier: notifier, candidates: [
-        candidate('c1', 'John Doe'),
-      ]);
+      final controller = await pumpList(
+        tester,
+        notifier: notifier,
+        candidates: [candidate('c1', 'John Doe')],
+      );
 
       await tester.fling(
         find.text('Backend Engineer'),
@@ -455,9 +449,11 @@ void main() {
         _job('j1', 'Backend Engineer', candidates: 1),
         _job('j2', 'Mobile Dev', candidates: 0),
       ]);
-      final controller = await pumpList(tester, notifier: notifier, candidates: [
-        candidate('c1', 'John Doe'),
-      ]);
+      final controller = await pumpList(
+        tester,
+        notifier: notifier,
+        candidates: [candidate('c1', 'John Doe')],
+      );
 
       await tester.fling(
         find.text('Backend Engineer'),

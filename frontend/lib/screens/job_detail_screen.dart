@@ -1,27 +1,22 @@
-import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/job_detail_controller.dart';
-import '../controllers/upload_controller.dart';
 import '../domain/models.dart';
-import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
-import '../widgets/candidate_detail_sheet.dart';
-import '../widgets/cv_upload_overlay.dart';
+import '../widgets/card_shape.dart';
+import '../widgets/delete_background.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/rank_engine_chip.dart';
 import '../widgets/score_color.dart';
-import 'action_result_screen.dart';
-import 'delete_confirm_screen.dart';
+import '../widgets/section_card.dart';
 
 class JobDetailScreen extends HookConsumerWidget {
   final String jobId;
@@ -32,10 +27,9 @@ class JobDetailScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final jobAsync = ref.watch(jobProvider(jobId));
     final cvsAsync = ref.watch(cvsProvider(jobId));
-    final rankingsAsync = ref.watch(rankingsProvider(jobId));
 
-    final detailState = ref.watch(jobDetailControllerProvider);
-    final detailController = ref.read(jobDetailControllerProvider.notifier);
+    final detailState = ref.watch(jobDetailStateProvider);
+    final detailController = ref.read(jobDetailControllerProvider);
 
     final polledCvs = cvsAsync.value ?? const <CandidateResult>[];
     final hasPendingProcessing = polledCvs.any(
@@ -43,250 +37,26 @@ class JobDetailScreen extends HookConsumerWidget {
     );
     // Poll while candidates are still being processed in the background so the
     // list refreshes on its own. No WebSocket required.
-    useEffect(
-      () {
-        if (!hasPendingProcessing) return null;
-        Timer? timer;
-        timer = Timer.periodic(const Duration(seconds: 3), (_) {
-          final current =
-              ref.read(cvsProvider(jobId)).value ?? const <CandidateResult>[];
-          final stillPending = current.any(
-            (c) => c.status == 'uploaded' || c.status == 'processing',
-          );
-          if (!stillPending) {
-            timer?.cancel();
-            return;
-          }
-          ref.invalidate(cvsProvider(jobId));
-        });
-        return timer.cancel;
-      },
-      [jobId, hasPendingProcessing, polledCvs.length],
-    );
-
-    Future<void> pickCvs() async {
-      final messenger = ScaffoldMessenger.of(context);
-      final result = await FilePicker.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx', 'doc', 'txt'],
-      );
-      if (result == null || result.files.isEmpty) return;
-      final files = result.files
-          .where((f) => f.path != null)
-          .map((f) => File(f.path!))
-          .toList();
-      if (files.isEmpty) return;
-      if (!context.mounted) return;
-
-      // Uploads run in batches and are tracked by [uploadControllerProvider];
-      // the overlay closes once the user is done, but extraction continues on
-      // the backend regardless.
-      ref.read(uploadControllerProvider.notifier).start(jobId, files);
-      await showCvUploadOverlay(context, jobId);
-      if (!context.mounted) return;
-      await detailController.refreshCvs(jobId);
-      if (!context.mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '${files.length} CV(s) submitted. Processing continues in the background.',
-          ),
-        ),
-      );
-    }
-
-    Future<void> rank() async {
-      final messenger = ScaffoldMessenger.of(context);
-      final cvs = cvsAsync.value ?? [];
-
-      if (cvs.isEmpty) {
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('No candidates to rank'),
-            content: const Text(
-              'Add CVs first, then tap "Rank CVs" to score the candidates.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+    useEffect(() {
+      if (!hasPendingProcessing) return null;
+      Timer? timer;
+      timer = Timer.periodic(const Duration(seconds: 3), (_) {
+        final current =
+            ref.read(cvsProvider(jobId)).value ?? const <CandidateResult>[];
+        final stillPending = current.any(
+          (c) => c.status == 'uploaded' || c.status == 'processing',
         );
-        return;
-      }
-
-      final allRanked = cvs.every((c) => c.status == 'ranked');
-      if (allRanked) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Re-rank all candidates?'),
-            content: Text(
-              'All ${cvs.length} '
-              '${cvs.length == 1 ? 'candidate has' : 'candidates have'} '
-              'already been ranked. Re-run ranking on all of them?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Re-rank all'),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-      }
-
-      final hasReady = cvs.any(
-        (c) => c.status == 'completed' || c.status == 'ranked',
-      );
-      if (!hasReady) {
-        if (!context.mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Ranking unavailable'),
-            content: const Text(
-              'No candidates are ready to rank yet. Wait until CV processing '
-              'finishes before ranking.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-
-      try {
-        await detailController.rank(jobId);
-      } catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text('Ranking failed: $e')));
-      }
-    }
-
-    Future<bool> rankSingle(CandidateResult cv) async {
-      final ready = cv.status == 'completed' || cv.status == 'ranked';
-      final cvId = cv.cvId;
-      if (!ready || cvId == null) {
-        if (!context.mounted) return false;
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Ranking unavailable'),
-            content: const Text(
-              'This candidate is not ready to rank yet. Wait until CV '
-              'processing finishes before ranking.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-        return false;
-      }
-      try {
-        await detailController.rankCv(jobId, cvId);
-        return true;
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ranking failed: $e')),
-          );
+        if (!stillPending) {
+          timer?.cancel();
+          return;
         }
-        return false;
-      }
-    }
-
-    Future<void> deleteJob() async {
-      final candidates = cvsAsync.value ?? [];
-      final confirmed = await showDeleteConfirm(
-        context,
-        title: 'Delete this job?',
-        message: candidates.isEmpty
-            ? 'This job has no candidates. It will be permanently removed.'
-            : 'This job and its ${candidates.length} '
-                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                  'will be permanently removed.',
-        details: [jobDeleteDetails(jobAsync.value!, candidates)],
-        confirmLabel: 'Delete job',
-      );
-      if (!confirmed) return;
-      try {
-        await detailController.deleteJob(jobId);
-        if (!context.mounted) return;
-        await showActionResult(
-          context,
-          success: true,
-          title: 'Job deleted',
-          message:
-              "'${jobAsync.value?.title ?? 'Job'}' was permanently removed.",
-        );
-      } catch (e) {
-        if (!context.mounted) return;
-        await showActionResult(
-          context,
-          success: false,
-          title: 'Delete failed',
-          message: '$e',
-        );
-        return;
-      }
-      if (!context.mounted) return;
-      ref.read(navigatorProvider).goToJobs();
-    }
-
-    Future<bool> confirmDeleteCv(CandidateResult cv) async {
-      final cvId = cv.cvId;
-      if (cvId == null) return false;
-      final name = cv.candidateName ?? cv.fileName;
-      final confirmed = await showDeleteConfirm(
-        context,
-        title: 'Delete this candidate?',
-        message: 'This candidate and their CV will be permanently removed.',
-        details: [candidateDeleteDetails(cv)],
-        confirmLabel: 'Delete candidate',
-      );
-      if (!confirmed) return false;
-      try {
-        await detailController.deleteCv(jobId, cvId);
-        if (!context.mounted) return false;
-        await showActionResult(
-          context,
-          success: true,
-          title: 'Candidate deleted',
-          message: "'$name' and their CV were permanently removed.",
-        );
-        return true;
-      } catch (e) {
-        if (!context.mounted) return false;
-        await showActionResult(
-          context,
-          success: false,
-          title: 'Delete failed',
-          message: '$e',
-        );
-        return false;
-      }
-    }
+        ref.invalidate(cvsProvider(jobId));
+      });
+      return timer.cancel;
+    }, [jobId, hasPendingProcessing, polledCvs.length]);
 
     final job = jobAsync.value;
-    final cvs = [...cvsAsync.value ?? const <CandidateResult>[]]
-      ..sort(_byRank);
+    final cvs = [...cvsAsync.value ?? const <CandidateResult>[]]..sort(_byRank);
 
     if (jobAsync.hasError) {
       return Scaffold(
@@ -318,7 +88,14 @@ class JobDetailScreen extends HookConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Delete job',
-                onPressed: detailState.busy ? null : deleteJob,
+                onPressed: detailState.busy
+                    ? null
+                    : () => detailController.deleteJob(
+                        context,
+                        jobId,
+                        job,
+                        cvsAsync.value ?? const [],
+                      ),
               ),
             ],
           ),
@@ -327,161 +104,257 @@ class JobDetailScreen extends HookConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                GradientHeader(
-                  icon: Icons.work_outline,
-                  title: job.title,
-                  subtitle: '${cvs.length} CVs uploaded',
-                ),
+                _JobHeader(job: job, cvsCount: cvs.length),
                 const SizedBox(height: 16),
-                Card(
-                  elevation: 0,
-                  shape: cardShape(Theme.of(context)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Description',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        if (job.description.isEmpty)
-                          const Text('No description')
-                        else
-                          _ExpandableSection(
-                            maxLines: 10,
-                            lineHeight: 22,
-                            lineSpacing: 0,
-                            child: _DescriptionView(
-                              description: job.description,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                _JobDescriptionSection(job: job),
                 if (job.requirements != null) ...[
                   const SizedBox(height: 16),
-                  _RequirementsView(requirements: job.requirements!),
+                  _RequirementsSection(requirements: job.requirements!),
                 ],
                 const SizedBox(height: 24),
-                Card(
-                  elevation: 0,
-                  shape: cardShape(Theme.of(context)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Ranking',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 12),
-                        rankingsAsync.when(
-                          loading: () => const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                          ),
-                          error: (e, _) => const SizedBox.shrink(),
-                          data: (ranked) {
-                            if (ranked.isEmpty) {
-                              if (cvs.isEmpty) return const SizedBox.shrink();
-                              return const _NotRankedHint();
-                            }
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                BucketDonut(buckets: bucketCounts(ranked)),
-                                const SizedBox(height: 4),
-                                Align(
-                                  alignment: Alignment.center,
-                                  child: TextButton.icon(
-                                    onPressed: () => ref
-                                        .read(navigatorProvider)
-                                        .goToRankings(
-                                          RankingsScreenData(
-                                            jobId: jobId,
-                                            jobTitle: job.title,
-                                            source: ranked.first.source ?? 'rules',
-                                          ),
-                                        ),
-                                    icon: const Icon(Icons.timeline),
-                                    label: const Text('View full ranking'),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: detailState.busy ? null : rank,
-                          icon: const Icon(Icons.psychology),
-                          label: const Text('Rank CVs'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _RankingSection(jobId: jobId, jobTitle: job.title),
                 const SizedBox(height: 24),
-                Text(
-                  'Candidates (${cvs.length})',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (cvs.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _CandidateStatusSummary(cvs: cvs),
-                ],
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: detailState.busy ? null : pickCvs,
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Add CVs'),
-                ),
-                const SizedBox(height: 12),
-                if (cvs.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text('No CVs uploaded yet. Tap "Add CVs".'),
-                    ),
-                  )
-                else
-                  ...cvs.map(
-                    (cv) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Dismissible(
-                        key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
-                        direction: DismissDirection.endToStart,
-                        confirmDismiss: (_) => confirmDeleteCv(cv),
-                        background: _DeleteBackground(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        child: _CandidateTile(
-                          cv: cv,
-                          onRank: cv.cvId == null
-                              ? null
-                              : () => rankSingle(cv),
-                        ),
-                      ),
-                    ),
-                  ),
+                _CandidatesSection(jobId: jobId),
               ],
             ),
           ),
         ),
         if (detailState.busy)
           LoadingOverlay(message: detailState.loadingMessage ?? 'Loading…'),
+      ],
+    );
+  }
+}
+
+/// 1. Header — the job's gradient hero with the uploaded-CV count.
+class _JobHeader extends StatelessWidget {
+  final Job job;
+  final int cvsCount;
+
+  const _JobHeader({required this.job, required this.cvsCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return GradientHeader(
+      icon: Icons.work_outline,
+      title: job.title,
+      subtitle: '$cvsCount CVs uploaded',
+    );
+  }
+}
+
+/// 2. Job Description — the markdown/JSON description in a collapsible card.
+class _JobDescriptionSection extends StatelessWidget {
+  final Job job;
+
+  const _JobDescriptionSection({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      title: 'Description',
+      child: job.description.isEmpty
+          ? const Text('No description')
+          : _ExpandableSection(
+              maxLines: 10,
+              lineHeight: 22,
+              lineSpacing: 0,
+              child: _DescriptionView(description: job.description),
+            ),
+    );
+  }
+}
+
+/// 3. Required Skills — the parsed job requirements as labelled chip groups.
+class _RequirementsSection extends StatelessWidget {
+  final JobRequirements requirements;
+
+  const _RequirementsSection({required this.requirements});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget section(String title, List<String> items) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: items
+                  .map(
+                    (s) => Chip(
+                      label: Text(s),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SectionCard(
+      title: 'Requirements',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          section('Required skills', requirements.requiredSkills),
+          section('Preferred skills', requirements.preferredSkills),
+          if (requirements.minYears > 0)
+            Text('Min ${requirements.minYears.round()} years experience'),
+          if (requirements.education != null)
+            Text('Education: ${requirements.education}'),
+          section('Certifications', requirements.certifications),
+        ],
+      ),
+    );
+  }
+}
+
+/// 4. Ranking — the bucket donut (or a "not ranked yet" hint) and the
+/// "Rank CVs" action.
+class _RankingSection extends ConsumerWidget {
+  final String jobId;
+  final String jobTitle;
+
+  const _RankingSection({required this.jobId, required this.jobTitle});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rankingsAsync = ref.watch(rankingsProvider(jobId));
+    final cvs =
+        ref.watch(cvsProvider(jobId)).value ?? const <CandidateResult>[];
+    final detailState = ref.watch(jobDetailStateProvider);
+    final detailController = ref.read(jobDetailControllerProvider);
+
+    return SectionCard(
+      title: 'Ranking',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          rankingsAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (e, _) => const SizedBox.shrink(),
+            data: (ranked) {
+              if (ranked.isEmpty) {
+                if (cvs.isEmpty) return const SizedBox.shrink();
+                return const _NotRankedHint();
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  BucketDonut(buckets: bucketCounts(ranked)),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.center,
+                    child: TextButton.icon(
+                      onPressed: () => detailController.viewRankings(
+                        jobId,
+                        jobTitle,
+                        ranked.first.source ?? 'rules',
+                      ),
+                      icon: const Icon(Icons.timeline),
+                      label: const Text('View full ranking'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: detailState.busy
+                ? null
+                : () => detailController.rank(context, jobId, cvs),
+            icon: const Icon(Icons.psychology),
+            label: const Text('Rank CVs'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 5. Candidates — the "Candidates (n)" header, status summary, "Add CVs"
+/// button, and the swipe-to-delete candidate tiles.
+class _CandidatesSection extends ConsumerWidget {
+  final String jobId;
+
+  const _CandidatesSection({required this.jobId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cvsAsync = ref.watch(cvsProvider(jobId));
+    final cvs = [...cvsAsync.value ?? const <CandidateResult>[]]..sort(_byRank);
+    final detailState = ref.watch(jobDetailStateProvider);
+    final detailController = ref.read(jobDetailControllerProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Candidates (${cvs.length})',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        if (cvs.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _CandidateStatusSummary(cvs: cvs),
+        ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: detailState.busy
+              ? null
+              : () => detailController.pickCvs(context, jobId),
+          icon: const Icon(Icons.upload_file),
+          label: const Text('Add CVs'),
+        ),
+        const SizedBox(height: 12),
+        if (cvs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('No CVs uploaded yet. Tap "Add CVs".')),
+          )
+        else
+          ...cvs.map(
+            (cv) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Dismissible(
+                key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
+                direction: DismissDirection.endToStart,
+                confirmDismiss: (_) =>
+                    detailController.deleteCv(context, jobId, cv),
+                background: DeleteBackground(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                child: _CandidateTile(
+                  cv: cv,
+                  onShowDetails: () => detailController.openCandidateDetails(
+                    context,
+                    cv,
+                    onRank: cv.cvId == null
+                        ? null
+                        : () => detailController.rankCv(context, jobId, cv),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -571,60 +444,6 @@ class _DescriptionView extends StatelessWidget {
       return MarkdownBody(data: md, selectable: true);
     }
     return MarkdownBody(data: description);
-  }
-}
-
-class _RequirementsView extends StatelessWidget {
-  final JobRequirements requirements;
-
-  const _RequirementsView({required this.requirements});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget section(String title, List<String> items) {
-      if (items.isEmpty) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: items
-                  .map(
-                    (s) => Chip(
-                      label: Text(s),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        section('Required skills', requirements.requiredSkills),
-        section('Preferred skills', requirements.preferredSkills),
-        if (requirements.minYears > 0)
-          Text('Min ${requirements.minYears.round()} years experience'),
-        if (requirements.education != null)
-          Text('Education: ${requirements.education}'),
-        section('Certifications', requirements.certifications),
-      ],
-    );
-
-    return Card(
-      elevation: 0,
-      shape: cardShape(Theme.of(context)),
-      child: Padding(padding: const EdgeInsets.all(16), child: content),
-    );
   }
 }
 
@@ -727,9 +546,9 @@ int _byRank(CandidateResult a, CandidateResult b) {
 
 class _CandidateTile extends StatelessWidget {
   final CandidateResult cv;
-  final Future<bool> Function()? onRank;
+  final VoidCallback onShowDetails;
 
-  const _CandidateTile({required this.cv, this.onRank});
+  const _CandidateTile({required this.cv, required this.onShowDetails});
 
   @override
   Widget build(BuildContext context) {
@@ -745,7 +564,7 @@ class _CandidateTile extends StatelessWidget {
       shape: cardShape(theme),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        onTap: () => showCandidateDetailSheet(context, cv, onRank: onRank),
+        onTap: onShowDetails,
         leading: Container(
           width: 44,
           height: 44,
@@ -934,26 +753,6 @@ class _StatusChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Red swipe-reveal background shown behind a candidate tile during a swipe.
-class _DeleteBackground extends StatelessWidget {
-  final Color color;
-
-  const _DeleteBackground({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Icon(Icons.delete_outline, color: Colors.white),
     );
   }
 }
