@@ -92,7 +92,6 @@ class JobDetailScreen extends HookConsumerWidget {
                 onPressed: detailState.busy
                     ? null
                     : () => detailController.deleteJob(
-                        context,
                         jobId,
                         job,
                         cvsAsync.value ?? const [],
@@ -339,7 +338,7 @@ class _CandidatesSection extends ConsumerWidget {
                 key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
                 direction: DismissDirection.endToStart,
                 confirmDismiss: (_) =>
-                    detailController.deleteCv(context, jobId, cv),
+                    detailController.deleteCv(jobId, cv),
                 background: DeleteBackground(
                   color: Theme.of(context).colorScheme.error,
                 ),

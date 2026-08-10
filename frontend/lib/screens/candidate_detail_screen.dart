@@ -62,11 +62,7 @@ class CandidateDetailScreen extends HookConsumerWidget {
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Delete candidate',
               onPressed: () async {
-                final deleted = await detailController.deleteCv(
-                  context,
-                  jobId,
-                  cv,
-                );
+                final deleted = await detailController.deleteCv(jobId, cv);
                 if (deleted && context.mounted) {
                   ref.read(navigatorProvider).pop();
                 }

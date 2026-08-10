@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../domain/models.dart';
 
 /// Data passed to the rankings screen when navigating to it.
@@ -10,6 +12,34 @@ class RankingsScreenData {
     required this.jobId,
     required this.jobTitle,
     required this.source,
+  });
+}
+
+/// Data passed to the delete confirmation screen when navigating to it.
+class DeleteConfirmData {
+  final String title;
+  final String message;
+  final List<Widget> details;
+  final String confirmLabel;
+
+  const DeleteConfirmData({
+    required this.title,
+    required this.message,
+    this.details = const [],
+    this.confirmLabel = 'Confirm',
+  });
+}
+
+/// Data passed to the action result screen when navigating to it.
+class ActionResultData {
+  final bool success;
+  final String title;
+  final String? message;
+
+  const ActionResultData({
+    required this.success,
+    required this.title,
+    this.message,
   });
 }
 
@@ -30,6 +60,13 @@ abstract class AppNavigator {
   void goToCandidateDetail(String jobId, CandidateResult candidate);
 
   void goToRankings(RankingsScreenData data);
+
+  /// Pushes the delete confirmation screen; resolves to `true` only when the
+  /// user confirms the deletion.
+  Future<bool> pushDeleteConfirm(DeleteConfirmData data);
+
+  /// Pushes the action result screen; resolves once the user dismisses it.
+  Future<void> pushActionResult(ActionResultData data);
 
   void pop();
 }

@@ -40,5 +40,14 @@ class GoRouterNavigator implements AppNavigator {
       );
 
   @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmData data) => _router
+      .push<bool>(AppRoute.deleteConfirm.path, extra: data)
+      .then((confirmed) => confirmed ?? false);
+
+  @override
+  Future<void> pushActionResult(ActionResultData data) =>
+      _router.push(AppRoute.actionResult.path, extra: data);
+
+  @override
   void pop() => _router.pop();
 }

@@ -6,10 +6,14 @@ import 'package:ai_ats/controllers/jobDetail/job_detail_notifier.dart';
 import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
+import 'package:ai_ats/screens/action_result_screen.dart';
+import 'package:ai_ats/screens/delete_confirm_screen.dart';
 import 'package:ai_ats/screens/job_detail_screen.dart';
 
-/// Navigator that records navigation calls instead of touching go_router.
+/// Navigator that records navigation calls and pushes the real confirm/result
+/// screens onto the test widget tree.
 class _FakeNavigator implements AppNavigator {
+  final navigatorKey = GlobalKey<NavigatorState>();
   final wentToJobs = <String>[];
   final wentToCandidateDetail = <String>[];
 
@@ -31,6 +35,29 @@ class _FakeNavigator implements AppNavigator {
 
   @override
   void goToRankings(RankingsScreenData data) {}
+
+  @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return false;
+    return await navigator.push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => DeleteConfirmScreen(data: data),
+          ),
+        ) ??
+        false;
+  }
+
+  @override
+  Future<void> pushActionResult(ActionResultData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    await navigator.push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ActionResultScreen(data: data),
+      ),
+    );
+  }
 
   @override
   void pop() {}
@@ -106,6 +133,7 @@ void main() {
     _FakeDetailNotifier? detailNotifier,
     _FakeNavigator? navigator,
   }) {
+    final nav = navigator ?? _FakeNavigator();
     return ProviderScope(
       overrides: [
         jobProvider('job-1').overrideWith((ref) async => job),
@@ -113,9 +141,12 @@ void main() {
         rankingsProvider('job-1').overrideWith((ref) async => rankings),
         if (detailNotifier != null)
           jobDetailStateProvider.overrideWith(() => detailNotifier),
-        navigatorProvider.overrideWithValue(navigator ?? _FakeNavigator()),
+        navigatorProvider.overrideWithValue(nav),
       ],
-      child: const MaterialApp(home: JobDetailScreen(jobId: 'job-1')),
+      child: MaterialApp(
+        navigatorKey: nav.navigatorKey,
+        home: const JobDetailScreen(jobId: 'job-1'),
+      ),
     );
   }
 
@@ -336,7 +367,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Delete this candidate?'), findsOneWidget);
-      expect(find.text('Delete candidate'), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
       expect(find.text('Alice'), findsWidgets);
       expect(find.text('Alice.pdf'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
@@ -372,7 +403,7 @@ void main() {
       await tester.fling(find.text('Alice'), const Offset(-500, 0), 1000);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Delete candidate'));
+      await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
       expect(controller.deletedCvs, ['cv-1']);
@@ -419,7 +450,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Delete job'));
+      await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
       expect(controller.deletedJobs, ['job-1']);

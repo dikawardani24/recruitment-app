@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models.dart';
 import '../../navigation/app_navigator.dart';
 import '../../providers.dart';
-import '../../screens/action_result_screen.dart';
 import '../../screens/delete_confirm_screen.dart';
 import '../../widgets/cv_upload_overlay.dart';
 import '../upload/upload_controller.dart';
@@ -117,47 +116,33 @@ class JobDetailController {
 
   /// Deletes the whole job: confirms, calls the API, shows a result page, then
   /// navigates back to the job list.
-  Future<void> deleteJob(
-    BuildContext context,
-    String jobId,
-    Job job,
-    List<CandidateResult> candidates,
-  ) async {
-    final confirmed = await _confirmDeleteJob(context, job, candidates);
+  Future<void> deleteJob(String jobId, Job job, List<CandidateResult> candidates) async {
+    final confirmed = await _confirmDeleteJob(job, candidates);
     if (!confirmed) return;
     try {
       await _notifier.deleteJob(jobId);
-      if (!context.mounted) return;
-      await _showJobDeleted(context, job);
+      await _showJobDeleted(job);
     } catch (e) {
-      if (!context.mounted) return;
-      await _showJobDeleteFailed(context, e);
+      await _showJobDeleteFailed(e);
       return;
     }
-    if (!context.mounted) return;
     _ref.read(navigatorProvider).goToJobs();
   }
 
   /// Deletes a single candidate: confirms, calls the API, shows a result page.
   /// Resolves to `true` on success so the swipe can complete.
-  Future<bool> deleteCv(
-    BuildContext context,
-    String jobId,
-    CandidateResult cv,
-  ) async {
+  Future<bool> deleteCv(String jobId, CandidateResult cv) async {
     final cvId = cv.cvId;
     if (cvId == null) return false;
     final name = cv.candidateName ?? cv.fileName;
-    final confirmed = await _confirmDeleteCv(context, cv);
+    final confirmed = await _confirmDeleteCv(cv);
     if (!confirmed) return false;
     try {
       await _notifier.deleteCv(jobId, cvId);
-      if (!context.mounted) return false;
-      await _showCvDeleted(context, name);
+      await _showCvDeleted(name);
       return true;
     } catch (e) {
-      if (!context.mounted) return false;
-      await _showCvDeleteFailed(context, e);
+      await _showCvDeleteFailed(e);
       return false;
     }
   }
@@ -279,71 +264,74 @@ class JobDetailController {
 
   /// Confirm dialog before deleting a whole job.
   Future<bool> _confirmDeleteJob(
-    BuildContext context,
     Job job,
     List<CandidateResult> candidates,
   ) {
-    return showDeleteConfirm(
-      context,
-      title: 'Delete this job?',
-      message: candidates.isEmpty
-          ? 'This job has no candidates. It will be permanently removed.'
-          : 'This job and its ${candidates.length} '
-                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                'will be permanently removed.',
-      details: [jobDeleteDetails(job, candidates)],
-      confirmLabel: 'Delete job',
+    return _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmData(
+        title: 'Delete this job?',
+        message: candidates.isEmpty
+            ? 'This job has no candidates. It will be permanently removed.'
+            : 'This job and its ${candidates.length} '
+                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                  'will be permanently removed.',
+        details: [jobDeleteDetails(job, candidates)],
+      ),
     );
   }
 
   /// Confirm dialog before deleting a single candidate.
-  Future<bool> _confirmDeleteCv(BuildContext context, CandidateResult cv) {
-    return showDeleteConfirm(
-      context,
-      title: 'Delete this candidate?',
-      message: 'This candidate and their CV will be permanently removed.',
-      details: [candidateDeleteDetails(cv)],
-      confirmLabel: 'Delete candidate',
+  Future<bool> _confirmDeleteCv(CandidateResult cv) {
+    return _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmData(
+        title: 'Delete this candidate?',
+        message: 'This candidate and their CV will be permanently removed.',
+        details: [candidateDeleteDetails(cv)],
+      ),
     );
   }
 
   /// Result page after a successful job deletion.
-  Future<void> _showJobDeleted(BuildContext context, Job job) {
-    return showActionResult(
-      context,
-      success: true,
-      title: 'Job deleted',
-      message: "'${job.title}' was permanently removed.",
+  Future<void> _showJobDeleted(Job job) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      ),
     );
   }
 
   /// Result page after a failed job deletion.
-  Future<void> _showJobDeleteFailed(BuildContext context, Object error) {
-    return showActionResult(
-      context,
-      success: false,
-      title: 'Delete failed',
-      message: '$error',
+  Future<void> _showJobDeleteFailed(Object error) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: false,
+        title: 'Delete failed',
+        message: '$error',
+      ),
     );
   }
 
   /// Result page after a successful candidate deletion.
-  Future<void> _showCvDeleted(BuildContext context, String name) {
-    return showActionResult(
-      context,
-      success: true,
-      title: 'Candidate deleted',
-      message: "'$name' and their CV were permanently removed.",
+  Future<void> _showCvDeleted(String name) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: true,
+        title: 'Candidate deleted',
+        message: "'$name' and their CV were permanently removed.",
+      ),
     );
   }
 
   /// Result page after a failed candidate deletion.
-  Future<void> _showCvDeleteFailed(BuildContext context, Object error) {
-    return showActionResult(
-      context,
-      success: false,
-      title: 'Delete failed',
-      message: '$error',
+  Future<void> _showCvDeleteFailed(Object error) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: false,
+        title: 'Delete failed',
+        message: '$error',
+      ),
     );
   }
 }

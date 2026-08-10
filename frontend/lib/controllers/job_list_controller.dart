@@ -1,12 +1,11 @@
 import 'package:chucker_flutter/chucker_flutter.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../di.dart';
 import '../domain/models.dart';
 import '../domain/usecases/delete_job.dart';
+import '../navigation/app_navigator.dart';
 import '../providers.dart';
-import '../screens/action_result_screen.dart';
 import '../screens/delete_confirm_screen.dart';
 
 /// Owns the job list actions. The list has no busy/loading UI state, so this
@@ -33,26 +32,23 @@ class JobListController {
   /// Deletes [job] end to end: fetches its candidates, asks for confirmation,
   /// deletes it server-side, and shows a result page. Resolves to `true` only
   /// when the job was actually deleted.
-  Future<bool> deleteJob(BuildContext context, Job job) async {
+  Future<bool> deleteJob(Job job) async {
     List<CandidateResult> candidates;
     try {
       candidates = await candidatesFor(job.id);
     } catch (_) {
       candidates = const [];
     }
-    if (!context.mounted) return false;
 
-    final confirmed = await _confirmDeleteJob(context, job, candidates);
+    final confirmed = await _confirmDeleteJob(job, candidates);
     if (!confirmed) return false;
 
     try {
       await removeJob(job.id);
-      if (!context.mounted) return false;
-      await _showJobDeleted(context, job);
+      await _showJobDeleted(job);
       return true;
     } catch (e) {
-      if (!context.mounted) return false;
-      await _showJobDeleteFailed(context, e);
+      await _showJobDeleteFailed(e);
       return false;
     }
   }
@@ -65,40 +61,41 @@ class JobListController {
 
   /// Confirm dialog before deleting a whole job.
   Future<bool> _confirmDeleteJob(
-    BuildContext context,
     Job job,
     List<CandidateResult> candidates,
   ) {
-    return showDeleteConfirm(
-      context,
-      title: 'Delete this job?',
-      message: candidates.isEmpty
-          ? 'This job has no candidates. It will be permanently removed.'
-          : 'This job and its ${candidates.length} '
-                '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                'will be permanently removed.',
-      details: [jobDeleteDetails(job, candidates)],
-      confirmLabel: 'Delete job',
+    return _ref.read(navigatorProvider).pushDeleteConfirm(
+      DeleteConfirmData(
+        title: 'Delete this job?',
+        message: candidates.isEmpty
+            ? 'This job has no candidates. It will be permanently removed.'
+            : 'This job and its ${candidates.length} '
+                  '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                  'will be permanently removed.',
+        details: [jobDeleteDetails(job, candidates)],
+      ),
     );
   }
 
   /// Result page after a successful job deletion.
-  Future<void> _showJobDeleted(BuildContext context, Job job) {
-    return showActionResult(
-      context,
-      success: true,
-      title: 'Job deleted',
-      message: "'${job.title}' was permanently removed.",
+  Future<void> _showJobDeleted(Job job) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: true,
+        title: 'Job deleted',
+        message: "'${job.title}' was permanently removed.",
+      ),
     );
   }
 
   /// Result page after a failed job deletion.
-  Future<void> _showJobDeleteFailed(BuildContext context, Object error) {
-    return showActionResult(
-      context,
-      success: false,
-      title: 'Delete failed',
-      message: '$error',
+  Future<void> _showJobDeleteFailed(Object error) {
+    return _ref.read(navigatorProvider).pushActionResult(
+      ActionResultData(
+        success: false,
+        title: 'Delete failed',
+        message: '$error',
+      ),
     );
   }
 

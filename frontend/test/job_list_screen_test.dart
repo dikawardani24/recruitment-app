@@ -6,9 +6,62 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_ats/controllers/job_list_controller.dart';
 import 'package:ai_ats/domain/models.dart';
+import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
+import 'package:ai_ats/screens/action_result_screen.dart';
+import 'package:ai_ats/screens/delete_confirm_screen.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
 import 'package:ai_ats/widgets/shimmer.dart';
+
+/// Navigator that pushes the real confirm/result screens onto the test widget
+/// tree and records job-list navigation.
+class _FakeNavigator implements AppNavigator {
+  final navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void goToJobs() {}
+
+  @override
+  void goToJobForm() {}
+
+  @override
+  void goToSettings() {}
+
+  @override
+  void goToJobDetail(String jobId) {}
+
+  @override
+  void goToCandidateDetail(String jobId, CandidateResult candidate) {}
+
+  @override
+  void goToRankings(RankingsScreenData data) {}
+
+  @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return false;
+    return await navigator.push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => DeleteConfirmScreen(data: data),
+          ),
+        ) ??
+        false;
+  }
+
+  @override
+  Future<void> pushActionResult(ActionResultData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    await navigator.push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ActionResultScreen(data: data),
+      ),
+    );
+  }
+
+  @override
+  void pop() {}
+}
 
 /// Notifier whose refresh stays pending until the test completes it, so the
 /// shimmer can be asserted while reloading.
@@ -364,6 +417,7 @@ void main() {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
+      final navigator = _FakeNavigator();
       late final _FakeJobListController controller;
       await tester.pumpWidget(
         ProviderScope(
@@ -376,8 +430,12 @@ void main() {
                 candidates,
               ),
             ),
+            navigatorProvider.overrideWithValue(navigator),
           ],
-          child: const MaterialApp(home: JobListScreen()),
+          child: MaterialApp(
+            navigatorKey: navigator.navigatorKey,
+            home: const JobListScreen(),
+          ),
         ),
       );
       await tester.pump();
@@ -411,7 +469,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('John Doe'), findsOneWidget);
-      expect(find.text('Delete job'), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
     });
 
@@ -462,7 +520,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Delete job'));
+      await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
       expect(controller.deletedJobs, ['j1']);

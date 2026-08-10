@@ -6,10 +6,14 @@ import 'package:ai_ats/controllers/jobDetail/job_detail_notifier.dart';
 import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
+import 'package:ai_ats/screens/action_result_screen.dart';
 import 'package:ai_ats/screens/candidate_detail_screen.dart';
+import 'package:ai_ats/screens/delete_confirm_screen.dart';
 
-/// Navigator that records pops (used after a successful delete).
+/// Navigator that records pops and pushes the real confirm/result screens onto
+/// the test widget tree.
 class _FakeNavigator implements AppNavigator {
+  final navigatorKey = GlobalKey<NavigatorState>();
   int pops = 0;
 
   @override
@@ -29,6 +33,29 @@ class _FakeNavigator implements AppNavigator {
 
   @override
   void goToRankings(RankingsScreenData data) {}
+
+  @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return false;
+    return await navigator.push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => DeleteConfirmScreen(data: data),
+          ),
+        ) ??
+        false;
+  }
+
+  @override
+  Future<void> pushActionResult(ActionResultData data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    await navigator.push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ActionResultScreen(data: data),
+      ),
+    );
+  }
 
   @override
   void pop() => pops++;
@@ -91,14 +118,16 @@ void main() {
     required _FakeDetailNotifier notifier,
     _FakeNavigator? navigator,
   }) {
+    final nav = navigator ?? _FakeNavigator();
     return ProviderScope(
       overrides: [
         cvsProvider('job-1').overrideWith((ref) async => notifier.cvs),
         jobDetailStateProvider.overrideWith(() => notifier),
-        navigatorProvider.overrideWithValue(navigator ?? _FakeNavigator()),
+        navigatorProvider.overrideWithValue(nav),
       ],
-      child: const MaterialApp(
-        home: CandidateDetailScreen(
+      child: MaterialApp(
+        navigatorKey: nav.navigatorKey,
+        home: const CandidateDetailScreen(
           jobId: 'job-1',
           cvId: 'cv-1',
           initial: null,
@@ -265,7 +294,7 @@ void main() {
     expect(find.text('Alice'), findsWidgets);
     expect(find.text('Alice.pdf'), findsOneWidget);
 
-    await tester.tap(find.text('Delete candidate'));
+    await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
     expect(notifier.deletedCvs, ['cv-1']);

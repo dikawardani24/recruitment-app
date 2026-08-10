@@ -122,7 +122,7 @@ class JobListScreen extends HookConsumerWidget {
                       key: ValueKey('job-${entry.value.id}'),
                       direction: DismissDirection.endToStart,
                       confirmDismiss: (_) =>
-                          jobListController.deleteJob(context, entry.value),
+                          jobListController.deleteJob(entry.value),
                       background: DeleteBackground(
                         color: theme.colorScheme.error,
                       ),

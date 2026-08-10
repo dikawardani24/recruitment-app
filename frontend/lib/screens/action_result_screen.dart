@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../navigation/app_navigator.dart';
+
 /// Full-screen result page shown after a delete attempt: a green check for
 /// success or a red error for failure, with a single Done button that pops.
 class ActionResultScreen extends StatelessWidget {
-  final bool success;
-  final String title;
-  final String? message;
-  final String buttonLabel;
+  final ActionResultData data;
 
   const ActionResultScreen({
     super.key,
-    required this.success,
-    required this.title,
-    this.message,
-    this.buttonLabel = 'Done',
+    required this.data,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = success ? Colors.green : theme.colorScheme.error;
+    final color = data.success ? Colors.green : theme.colorScheme.error;
     return Scaffold(
       appBar: AppBar(automaticallyImplyLeading: false),
       body: SafeArea(
@@ -35,23 +31,25 @@ class ActionResultScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  success ? Icons.check_circle_outline : Icons.error_outline,
+                  data.success
+                      ? Icons.check_circle_outline
+                      : Icons.error_outline,
                   size: 56,
                   color: color,
                 ),
               ),
               const SizedBox(height: 20),
               Text(
-                title,
+                data.title,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              if (message != null) ...[
+              if (data.message != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  message!,
+                  data.message!,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -63,7 +61,7 @@ class ActionResultScreen extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(buttonLabel),
+                  child: const Text('Done'),
                 ),
               ),
             ],
@@ -72,19 +70,4 @@ class ActionResultScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Pushes [ActionResultScreen] and resolves once the user dismisses it.
-Future<void> showActionResult(
-  BuildContext context, {
-  required bool success,
-  required String title,
-  String? message,
-}) {
-  return Navigator.of(context).push<void>(
-    MaterialPageRoute<void>(
-      builder: (_) =>
-          ActionResultScreen(success: success, title: title, message: message),
-    ),
-  );
 }

@@ -8,7 +8,9 @@ enum AppRoute {
   settings('/jobs/settings'),
   jobDetail('/jobs/:jobId'),
   candidateDetail('/jobs/:jobId/candidate/:cvId'),
-  rankings('/jobs/:jobId/rankings');
+  rankings('/jobs/:jobId/rankings'),
+  deleteConfirm('/delete-confirm'),
+  actionResult('/action-result');
 
   const AppRoute(this.path);
 

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'domain/models.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/app_route.dart';
+import 'screens/action_result_screen.dart';
 import 'screens/candidate_detail_screen.dart';
+import 'screens/delete_confirm_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
@@ -58,6 +60,20 @@ class AppRouter {
               ],
             ),
           ],
+        ),
+        GoRoute(
+          path: AppRoute.deleteConfirm.path,
+          builder: (context, state) => DeleteConfirmScreen(
+            data: state.extra as DeleteConfirmData? ??
+                const DeleteConfirmData(title: '', message: ''),
+          ),
+        ),
+        GoRoute(
+          path: AppRoute.actionResult.path,
+          builder: (context, state) => ActionResultScreen(
+            data: state.extra as ActionResultData? ??
+                const ActionResultData(success: true, title: ''),
+          ),
         ),
       ],
     );

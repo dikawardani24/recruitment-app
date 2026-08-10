@@ -1,32 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
+import '../navigation/app_navigator.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/section_card.dart';
 import 'job_list_screen.dart' show formatCreatedAt;
-
-/// Pushes [DeleteConfirmScreen] and resolves to `true` only when the user
-/// confirms the deletion.
-Future<bool> showDeleteConfirm(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required List<Widget> details,
-  required String confirmLabel,
-}) {
-  return Navigator.of(context)
-      .push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => DeleteConfirmScreen(
-            title: title,
-            message: message,
-            details: details,
-            confirmLabel: confirmLabel,
-          ),
-        ),
-      )
-      .then((result) => result ?? false);
-}
 
 /// Affected-data preview for deleting a whole job: the job's attributes plus
 /// the names of every candidate that will be removed with it.
@@ -65,19 +43,14 @@ Widget candidateDeleteDetails(CandidateResult cv) {
 
 /// Full-screen confirmation shown before a destructive delete. Pops with
 /// `true` when the user taps the delete button and `false` on cancel or back.
-/// The [details] list renders the affected-data preview (what will be lost).
+/// The [data.details] list renders the affected-data preview (what will be
+/// lost).
 class DeleteConfirmScreen extends StatelessWidget {
-  final String title;
-  final String message;
-  final List<Widget> details;
-  final String confirmLabel;
+  final DeleteConfirmData data;
 
   const DeleteConfirmScreen({
     super.key,
-    required this.title,
-    required this.message,
-    required this.details,
-    this.confirmLabel = 'Delete',
+    required this.data,
   });
 
   @override
@@ -103,7 +76,7 @@ class DeleteConfirmScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              title,
+              data.title,
               textAlign: TextAlign.center,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -111,13 +84,14 @@ class DeleteConfirmScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              message,
+              data.message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            if (details.isNotEmpty) ...[const SizedBox(height: 20), ...details],
+            if (data.details.isNotEmpty)
+              ...[const SizedBox(height: 20), ...data.details],
             const SizedBox(height: 24),
             Row(
               children: [
@@ -135,7 +109,7 @@ class DeleteConfirmScreen extends StatelessWidget {
                       foregroundColor: theme.colorScheme.onError,
                     ),
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(confirmLabel),
+                    child: Text(data.confirmLabel),
                   ),
                 ),
               ],
