@@ -42,6 +42,7 @@ class JobDetailNotifier extends Notifier<JobDetailState> {
 
   Future<void> refreshCvs(String jobId) async {
     ref.invalidate(cvsProvider(jobId));
+    ref.invalidate(jobsProvider);
     await ref.read(cvsProvider(jobId).future);
   }
 
@@ -72,6 +73,7 @@ class JobDetailNotifier extends Notifier<JobDetailState> {
     await getIt<DeleteCandidate>()(jobId, cvId);
     ref.invalidate(cvsProvider(jobId));
     ref.invalidate(rankingsProvider(jobId));
+    ref.invalidate(jobsProvider);
     await ref.read(cvsProvider(jobId).future);
   }
 
