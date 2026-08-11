@@ -42,6 +42,9 @@ class ChatRepositoryImpl implements ChatRepository {
       topK: topK,
     )) {
       yield switch (event) {
+        ChatStreamStartedDto() => const ChatStreamStarted(),
+        ChatStreamStatusDto(:final stage, :final message) =>
+          ChatStreamStatus(stage: stage, message: message),
         ChatStreamTextDto(:final content) => ChatStreamText(content),
         ChatStreamToolDto(:final name) => ChatStreamTool(name),
         ChatStreamDoneDto(:final response) => ChatStreamDone(_toResponse(response)),

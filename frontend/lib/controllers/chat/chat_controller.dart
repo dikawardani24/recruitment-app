@@ -33,12 +33,20 @@ class ChatController extends Notifier<ChatState> {
         history: history,
       )) {
         switch (event) {
+          case ChatStreamStarted():
+            break;
+          case ChatStreamStatus(:final message):
+            state = state.copyWith(statusMessage: message);
           case ChatStreamText(:final content):
             state = state.copyWith(
               streamingText: '${state.streamingText}$content',
+              statusMessage: null,
             );
           case ChatStreamTool():
-            state = state.copyWith(usingTools: true);
+            state = state.copyWith(
+              usingTools: true,
+              statusMessage: 'Consulting workspace data…',
+            );
           case ChatStreamDone(:final response):
             state = ChatState(
               messages: [

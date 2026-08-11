@@ -117,6 +117,13 @@ class ChatApiDataSource {
     }
 
     switch (json['type']) {
+      case 'started':
+        return const ChatStreamStartedDto();
+      case 'status':
+        return ChatStreamStatusDto(
+          stage: json['stage'] as String? ?? '',
+          message: json['message'] as String? ?? '',
+        );
       case 'text':
         final content = json['content'] as String? ?? '';
         return content.isEmpty ? null : ChatStreamTextDto(content);

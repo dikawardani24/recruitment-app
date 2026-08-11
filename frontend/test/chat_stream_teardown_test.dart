@@ -12,18 +12,24 @@ import 'package:ai_ats/domain/usecases/ask_chat.dart';
 import 'package:ai_ats/screens/chat_screen.dart';
 
 class _FakeRepo implements ChatRepository {
-  _FakeRepo({this.done = false}) : controller = StreamController.broadcast() {
-    controller
-      ..add(ChatStreamTool('retrieve'))
-      ..add(const ChatStreamText('Here are the requirements for a '))
-      ..add(const ChatStreamText('**junior Android developer**:\n'))
-      ..add(const ChatStreamText('- Kotlin basics\n'))
-      ..add(const ChatStreamText('- Android SDK\n'))
-      ..add(const ChatStreamText('- Jetpack Compose'));
+  _FakeRepo() {
+    controller = StreamController<ChatStreamEvent>.broadcast(onListen: () {
+      for (final event in _events) {
+        controller.add(event);
+      }
+    });
   }
 
-  final bool done;
-  final StreamController<ChatStreamEvent> controller;
+  static const _events = <ChatStreamEvent>[
+    ChatStreamTool('retrieve'),
+    ChatStreamText('Here are the requirements for a '),
+    ChatStreamText('**junior Android developer**:\n'),
+    ChatStreamText('- Kotlin basics\n'),
+    ChatStreamText('- Android SDK\n'),
+    ChatStreamText('- Jetpack Compose'),
+  ];
+
+  late final StreamController<ChatStreamEvent> controller;
 
   @override
   Future<ChatResponse> ask({

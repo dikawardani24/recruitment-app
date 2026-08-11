@@ -13,6 +13,11 @@ class ChatState {
   /// rendered for it; it becomes a finalized [ChatMessage] on [ChatStreamDone].
   final String streamingText;
 
+  /// Latest progress message from the backend (e.g. "Searching relevant
+  /// candidates..."). Shown while no answer text has arrived yet; cleared as
+  /// soon as tokens start streaming.
+  final String? statusMessage;
+
   /// Whether the copilot is currently querying workspace records (tools).
   final bool usingTools;
 
@@ -21,6 +26,7 @@ class ChatState {
     this.isLoading = false,
     this.configured = true,
     this.streamingText = '',
+    this.statusMessage,
     this.usingTools = false,
   });
 
@@ -29,6 +35,7 @@ class ChatState {
     bool? isLoading,
     bool? configured,
     String? streamingText,
+    Object? statusMessage = _unset,
     bool? usingTools,
   }) {
     return ChatState(
@@ -36,7 +43,12 @@ class ChatState {
       isLoading: isLoading ?? this.isLoading,
       configured: configured ?? this.configured,
       streamingText: streamingText ?? this.streamingText,
+      statusMessage: identical(statusMessage, _unset)
+          ? this.statusMessage
+          : statusMessage as String?,
       usingTools: usingTools ?? this.usingTools,
     );
   }
 }
+
+const _unset = Object();

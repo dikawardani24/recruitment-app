@@ -58,6 +58,7 @@ class ChatScreen extends HookConsumerWidget {
                       if (index == chatState.messages.length) {
                         return _StreamingBubble(
                           streamingText: chatState.streamingText,
+                          statusMessage: chatState.statusMessage,
                           usingTools: chatState.usingTools,
                         );
                       }
@@ -300,18 +301,22 @@ class _SourceChip extends StatelessWidget {
 }
 
 class _StreamingBubble extends StatelessWidget {
-  const _StreamingBubble({required this.streamingText, required this.usingTools});
+  const _StreamingBubble({
+    required this.streamingText,
+    required this.statusMessage,
+    required this.usingTools,
+  });
 
   final String streamingText;
+  final String? statusMessage;
   final bool usingTools;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasText = streamingText.isNotEmpty;
-    final placeholder = usingTools
-        ? 'Consulting workspace data…'
-        : 'Thinking…';
+    final message = statusMessage ??
+        (usingTools ? 'Consulting workspace data…' : 'Thinking…');
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -329,11 +334,27 @@ class _StreamingBubble extends StatelessWidget {
                 data: streamingText,
                 styleSheet: MarkdownStyleSheet.fromTheme(theme),
               )
-            : Text(
-                placeholder,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
       ),
     );

@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 
 from app.config import Settings
+from app.llm._gate import bounded_retry, rate_capped_wait
 
 
 class ChatError(Exception):
@@ -55,6 +56,29 @@ class ChatClient:
             kwargs["tools"] = tools
         return kwargs
 
+    async def _create(self, client, messages: list[dict], tools: list[dict] | None):
+        """One Gemini request: rate-capped, with bounded backoff on transient
+        provider errors. A single call, never a loop."""
+        await rate_capped_wait(self.settings.llm_min_interval_ms / 1000.0)
+        return await bounded_retry(
+            lambda: client.chat.completions.create(**self._kwargs(messages, tools)),
+            max_retries=self.settings.llm_max_retries,
+            base_delay_s=self.settings.llm_retry_base_ms / 1000.0,
+        )
+
+    async def _create_stream(self, client, messages: list[dict], tools: list[dict] | None):
+        """Like [_create] but for SSE streaming; still exactly one model request."""
+        await rate_capped_wait(self.settings.llm_min_interval_ms / 1000.0)
+        return await bounded_retry(
+            lambda: client.chat.completions.create(
+                stream=True,
+                stream_options={"include_usage": True},
+                **self._kwargs(messages, tools),
+            ),
+            max_retries=self.settings.llm_max_retries,
+            base_delay_s=self.settings.llm_retry_base_ms / 1000.0,
+        )
+
     async def complete(
         self,
         system: str,
@@ -71,9 +95,7 @@ class ChatClient:
         ]
         for _ in range(MAX_TOOL_ROUNDS):
             try:
-                response = await client.chat.completions.create(
-                    **self._kwargs(messages, tools)
-                )
+                response = await self._create(client, messages, tools)
             except Exception as exc:  # network, auth, quota, etc.
                 raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
             choice = response.choices[0].message
@@ -120,11 +142,7 @@ class ChatClient:
         ]
         for _ in range(MAX_TOOL_ROUNDS):
             try:
-                stream = await client.chat.completions.create(
-                    stream=True,
-                    stream_options={"include_usage": True},
-                    **self._kwargs(messages, tools),
-                )
+                stream = await self._create_stream(client, messages, tools)
             except Exception as exc:  # network, auth, quota, etc.
                 raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
 

@@ -40,6 +40,10 @@ class Settings:
     llm_base_url: str | None = os.getenv("ATS_LLM__BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
     llm_model: str = os.getenv("ATS_LLM__MODEL", "gemini-flash-latest")
     llm_timeout_ms: int = int(os.getenv("ATS_LLM__TIMEOUT_MS", "20000"))
+    # Provider throttling: hard per-minute request cap and bounded retries.
+    llm_max_retries: int = int(os.getenv("ATS_LLM__MAX_RETRIES", "3"))
+    llm_retry_base_ms: int = int(os.getenv("ATS_LLM__RETRY_BASE_MS", "1500"))
+    llm_min_interval_ms: int = int(os.getenv("ATS_LLM__MIN_INTERVAL_MS", "12000"))
 
     # Recruiter-copilot chat (optional). Reuses the LLM key/base URL above, but
     # can point at its own model. The chatbot uses a dedicated recruitment-scoped

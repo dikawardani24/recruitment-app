@@ -5,6 +5,16 @@ sealed class ChatStreamEventDto {
   const ChatStreamEventDto();
 }
 
+class ChatStreamStartedDto extends ChatStreamEventDto {
+  const ChatStreamStartedDto();
+}
+
+class ChatStreamStatusDto extends ChatStreamEventDto {
+  final String stage;
+  final String message;
+  const ChatStreamStatusDto({required this.stage, required this.message});
+}
+
 class ChatStreamTextDto extends ChatStreamEventDto {
   final String content;
   const ChatStreamTextDto(this.content);

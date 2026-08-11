@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.config import Settings
-from app.chat import ToolCall, ToolError, ToolRegistry
+from app.chat import ChatError, QueryRouter, ToolCall, ToolError, ToolRegistry
 from app.domain.candidate import Candidate
 from app.domain.job import Job
 from app.domain.page import Page
@@ -20,6 +20,7 @@ from app.usecase.ask import Ask
 from app.usecase.reindex_embeddings import ReindexEmbeddings
 from app.usecase.save_job import SaveJob
 from app.usecase.semantic_search import SemanticSearch
+from app.chat import QueryRouter
 
 DIM = 384
 
@@ -363,6 +364,30 @@ class FakeStreamingChatClient(FakeChatClient):
             yield item
 
 
+class ExplodingChatClient:
+    """Package-only fake: raises if Gemini is ever called (used to prove that
+    deterministic queries complete with ZERO Gemini requests)."""
+
+    async def complete(self, system, user, tools=None, execute_tool=None):
+        raise AssertionError("Gemini should not have been called")
+
+    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+        raise AssertionError("Gemini should not have been called")
+        yield None  # pragma: no cover
+
+
+class FailingChatClient:
+    def __init__(self, error: str):
+        self.error = error
+
+    async def complete(self, system, user, tools=None, execute_tool=None):
+        raise ChatError(self.error)
+
+    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+        raise ChatError(self.error)
+        yield None  # pragma: no cover
+
+
 def _chat_settings() -> Settings:
     s = _settings()
     s.llm_api_key = "test-key"
@@ -531,18 +556,103 @@ async def test_ask_stream_emits_text_and_done():
     assert done["configured"] is True
 
 
-async def test_ask_stream_reports_tool_and_executes():
+async def test_ask_stream_progress_events_and_gemini_budget():
+    """Every route emits started + routing first, then human-friendly status
+    events that map to real stages, and preserves the Gemini request budget
+    (chitchat=0, deterministic=0, rag_reasoning=1, general=1)."""
+    valid_stages = {"routing", "retrieving", "preparing", "reasoning", "answering"}
     registry = _registry()
-    client = FakeStreamingChatClient(
-        [ToolCall("get_job_detail", '{"job_id": "job-1"}'), "Job: Flutter Developer"]
+
+    async def stages_and_calls(mode, question):
+        if mode == "rag_reasoning":
+            client = FakeStreamingChatClient(["Jane meets most requirements [1]."])
+            ask = Ask(_chat_settings(), client, None, registry)
+        elif mode == "general":
+            client = FakeStreamingChatClient(["Flutter is a UI toolkit."])
+            ask = Ask(_chat_settings(), client, None, None)
+        else:
+            client = ExplodingChatClient()
+            ask = Ask(_chat_settings(), client, None, registry)
+        events = [
+            event async for event in ask.stream(question, history=[])
+        ]
+        return events, client
+
+    async def assert_flow(mode, question, expected_stages):
+        events, client = await stages_and_calls(mode, question)
+        assert events[0]["type"] == "started"
+        statuses = [e for e in events if e["type"] == "status"]
+        assert statuses and statuses[0]["stage"] == "routing"
+        assert [e["stage"] for e in statuses] == expected_stages
+        for e in statuses:
+            assert e["stage"] in valid_stages
+            assert isinstance(e["message"], str) and e["message"]
+        assert any(e["type"] == "text" for e in events)
+        done = [e for e in events if e["type"] == "done"][0]
+        assert done["configured"] is True
+        return events, client
+
+    _, client = await assert_flow(
+        "chitchat",
+        "hi",
+        ["routing", "answering"],
     )
+    assert isinstance(client, ExplodingChatClient)  # 0 Gemini (would raise)
+
+    _, client = await assert_flow(
+        "deterministic",
+        "who is the best candidate?",
+        ["routing", "retrieving", "preparing"],
+    )
+    assert isinstance(client, ExplodingChatClient)  # 0 Gemini (would raise)
+
+    _, client = await assert_flow(
+        "rag_reasoning",
+        "Does this candidate meet the requirements of job-1?",
+        ["routing", "retrieving", "preparing", "reasoning"],
+    )
+    assert len(client.calls) == 1  # rag_reasoning -> exactly 1 Gemini
+
+    _, client = await assert_flow(
+        "general",
+        "What is Flutter?",
+        ["routing", "reasoning"],
+    )
+    assert len(client.calls) == 1  # general -> exactly 1 Gemini
+
+
+async def test_ask_ranking_answered_deterministically_no_gemini():
+    """'Who is best' resolves through API tools to stored rankings -> ZERO Gemini."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+    result = await ask.execute("who is the best candidate?")
+    assert result["configured"] is True
+    assert "Jane Doe" in result["answer"]
+    assert "0.90" in result["answer"]
+
+
+async def test_ask_reasoning_prefetches_records_single_gemini_call():
+    """Reasoning turns pre-fetch workspace records and make exactly ONE Gemini
+    call; Gemini is never offered the tool loop."""
+    registry = _registry()
+    client = FakeStreamingChatClient(["Jane meets most requirements [1]."])
     ask = Ask(_chat_settings(), client, None, registry)
-    events = [event async for event in ask.stream("details please", history=[])]
+    events = [
+        event
+        async for event in ask.stream(
+            "Does this candidate meet the requirements of job-1?", history=[]
+        )
+    ]
+    texts = [e["content"] for e in events if e["type"] == "text"]
     tool_events = [e for e in events if e["type"] == "tool"]
-    assert tool_events == [{"type": "tool", "name": "get_job_detail"}]
-    assert client.tool_calls == [("get_job_detail", '{"job_id": "job-1"}')]
     done = [e for e in events if e["type"] == "done"][0]
-    assert done["answer"].startswith("Job: Flutter Developer")
+    assert tool_events == []
+    assert "".join(texts) == done["answer"]
+    assert len(client.calls) == 1  # exactly one Gemini request
+    system, user = client.calls[0]
+    assert "recruiter copilot" in system.lower()
+    assert "WORKSPACE RECORDS" in user  # data pre-fetched by orchestration
+    assert "job-1" in user
 
 
 async def test_ask_stream_not_configured_errors():
@@ -551,6 +661,189 @@ async def test_ask_stream_not_configured_errors():
     events = [event async for event in Ask(s, FakeChatClient(), None).stream("hi")]
     assert events[0]["type"] == "error"
     assert "not configured" in events[0]["message"]
+
+
+async def test_ask_stream_errors_are_human_friendly():
+    """Stream error events must not leak provider/class names (e.g.
+    RateLimitError) onto the wire."""
+    rate_limited = FailingChatClient("chat_call_failed:RateLimitError")
+    events = [
+        event
+        async for event in Ask(_chat_settings(), rate_limited, None).stream(
+            "What is Flutter?"
+        )
+    ]
+    err = [e for e in events if e["type"] == "error"][0]
+    assert "RateLimitError" not in err["message"]
+    assert "rate limit" in err["message"].lower() or "limit" in err["message"].lower()
+
+    generic = FailingChatClient("chat_call_failed:SomethingBroke")
+    events = [
+        event
+        async for event in Ask(_chat_settings(), generic, None).stream("What is Flutter?")
+    ]
+    err = [e for e in events if e["type"] == "error"][0]
+    assert "SomethingBroke" not in err["message"]
+    assert "technical issue" in err["message"].lower()
+
+
+class _SpecCase:
+    def __init__(self, question, intent, mode):
+        self.question, self.intent, self.mode = question, intent, mode
+
+
+def test_router_spec_examples():
+    cases = [
+        _SpecCase("Do we have any applicant for Flutter?", "candidate_search", "deterministic"),
+        _SpecCase("Do we have any Flutter developer?", "job_search", "deterministic"),
+        _SpecCase("How many applicants do we have?", "application_statistics", "deterministic"),
+        _SpecCase("Who applied for this job?", "candidate_search", "deterministic"),
+        _SpecCase("Show me applicants with Flutter experience.", "candidate_search", "deterministic"),
+        _SpecCase("Which candidates know Dart?", "candidate_search", "deterministic"),
+        _SpecCase("Who has more than 3 years of Flutter experience?", "candidate_search", "deterministic"),
+        _SpecCase("Which applicant is the best match for this job?", "candidate_ranking", "deterministic"),
+        _SpecCase("Compare the candidates for this position.", "candidate_comparison", "rag_reasoning"),
+        _SpecCase("Why is John ranked higher than Sarah?", "candidate_ranking", "deterministic"),
+        _SpecCase("Does this candidate meet the job requirements?", "job_requirement_matching", "rag_reasoning"),
+        _SpecCase("Find candidates with React and TypeScript experience.", "candidate_search", "deterministic"),
+        _SpecCase(
+            "find me flutter developer with score more than 70",
+            "candidate_search",
+            "deterministic",
+        ),
+        _SpecCase(
+            "find flutter developers above 70",
+            "candidate_search",
+            "deterministic",
+        ),
+        _SpecCase("What experience does this candidate have?", "candidate_detail", "rag_reasoning"),
+        _SpecCase("Which candidates match this job description?", "candidate_ranking", "deterministic"),
+        _SpecCase("What is Flutter?", "general_question", "general"),
+        _SpecCase("What is the difference between Flutter and React Native?", "general_question", "general"),
+        _SpecCase("How does Dart work?", "general_question", "general"),
+        _SpecCase("What is REST API?", "general_question", "general"),
+        _SpecCase("Explain dependency injection.", "general_question", "general"),
+        _SpecCase("How should I write a good Flutter job description?", "general_question", "general"),
+        _SpecCase("What skills should a junior Flutter developer have?", "general_question", "general"),
+    ]
+    for case in cases:
+        route = QueryRouter.route(case.question)
+        assert route.intent == case.intent, (
+            f"{case.question!r}: intent {route.intent!r} != {case.intent!r}"
+        )
+        assert route.mode == case.mode, (
+            f"{case.question!r}: mode {route.mode!r} != {case.mode!r}"
+        )
+
+
+async def test_ask_deterministic_queries_skip_gemini():
+    """Existential / statistics / skill-filter questions are answered from the
+    API tools with ZERO Gemini requests."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    result = await ask.execute("Do we have any applicant for Flutter?")
+    assert result["configured"] is True
+    assert "Jane Doe" in result["answer"]
+    assert "Kotlin" not in result["answer"]
+
+    result = await ask.execute("How many applicants do we have?")
+    assert "2 applicants" in result["answer"]
+
+    result = await ask.execute("Do we have any Dart developer?")
+    assert "job posting" in result["answer"]
+
+    # Streaming path equally stays off-Gemini and emits text + done.
+    events = [
+        event
+        async for event in ask.stream("who applied for job-1?", history=[])
+    ]
+    assert any(e["type"] == "text" for e in events)
+    done = [e for e in events if e["type"] == "done"][0]
+    assert "Jane Doe" in done["answer"]
+
+
+async def test_ask_followup_answers_deterministically_from_tools():
+    """A pronoun follow-up after a data turn carries the intent forward and is
+    answered from the API tools with ZERO Gemini calls."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+    history = [
+        {"role": "user", "content": "Do we have candidate?"},
+        {"role": "assistant", "content": "Yes, there are 2 applicants."},
+    ]
+    result = await ask.execute("What are their skills?", history=history)
+    assert result["configured"] is True
+    assert "Jane Doe" in result["answer"]
+    assert "Flutter" in result["answer"]
+    assert "John Roe" in result["answer"]
+    assert "Kotlin" in result["answer"]
+
+
+async def test_ask_score_filter_filters_by_rank():
+    """'candidates above 80' filters the deterministic result by ranking score
+    (>= 0.80) and never calls Gemini."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    names = ["Reyhan", "Fathan", "Rangga", "Rizki"]
+    cands = [
+        _candidate(f"cv-{i}", "job-1", name, ["Flutter", "Dart"])
+        for i, name in enumerate(names, start=1)
+    ]
+    for cand, score in zip(cands, [0.75, 0.82, 0.90, 0.64]):
+        cand.overall_score = score
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo(cands))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    result = await ask.execute("i need candidate flutter please give candidate above 80")
+    assert result["configured"] is True
+    assert "Fathan" in result["answer"] and "Rangga" in result["answer"]
+    assert "Reyhan" not in result["answer"] and "Rizki" not in result["answer"]
+
+    below = await ask.execute("show flutter candidates above 95")
+    assert "No applicants" in below["answer"]
+
+
+async def test_ask_score_threshold_more_than_is_strict():
+    """'find me flutter developer with score more than 70' must route to
+    candidate search (not job search), apply the threshold strictly (> 0.70),
+    and never call Gemini. 'above 70' stays inclusive (>= 0.70)."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    names = ["A", "B", "C", "D", "E"]
+    cands = [
+        _candidate(f"cv-{i}", "job-1", name, ["Flutter", "Dart"])
+        for i, name in enumerate(names, start=1)
+    ]
+    for cand, score in zip(cands, [0.61, 0.70, 0.63, 0.80, 0.71]):
+        cand.overall_score = score
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo(cands))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    route = QueryRouter.route("find me flutter developer with score more than 70")
+    assert route.intent == "candidate_search"
+    assert route.mode == "deterministic"
+    assert route.score_filter == (">", 0.70)
+
+    strict = await ask.execute("find me flutter developer with score more than 70")
+    assert strict["configured"] is True
+    assert "D" in strict["answer"] and "E" in strict["answer"]
+    assert "B" not in strict["answer"]
+
+    inclusive = await ask.execute("find flutter developers above 70")
+    assert "B" in inclusive["answer"]
+
+
+async def test_ask_general_question_single_gemini_no_tools():
+    """General-knowledge questions go straight to one Gemini call with no tools
+    and no retrieval."""
+    client = FakeChatClient()
+    ask = Ask(_chat_settings(), client, None, None)
+    result = await ask.execute("What is Flutter?")
+    assert result["configured"] is True
+    assert result["answer"] == "Jane Doe matches the Flutter role [1]."
+    assert len(client.calls) == 1
+    system, user = client.calls[0]
+    assert "recruiter copilot" not in system.lower()
+    assert "NO WORKSPACE DATA WAS RETRIEVED" not in user
 
 
 def test_api_chat_disabled(client):

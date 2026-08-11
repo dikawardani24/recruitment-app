@@ -5,6 +5,16 @@ sealed class ChatStreamEvent {
   const ChatStreamEvent();
 }
 
+class ChatStreamStarted extends ChatStreamEvent {
+  const ChatStreamStarted();
+}
+
+class ChatStreamStatus extends ChatStreamEvent {
+  final String stage;
+  final String message;
+  const ChatStreamStatus({required this.stage, required this.message});
+}
+
 class ChatStreamText extends ChatStreamEvent {
   final String content;
   const ChatStreamText(this.content);

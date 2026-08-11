@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 EVIDENCE_CHAR_LIMIT = 500
 
 
@@ -65,3 +67,72 @@ def build_user_prompt(question: str, evidence: list[dict], history: list[dict]) 
         parts.append(NO_EVIDENCE_NOTICE)
     parts.append(f"QUESTION:\n{question}")
     return "\n\n".join(parts)
+
+
+def build_reasoning_prompt(
+    question: str,
+    evidence: list[dict],
+    history: list[dict],
+    records: dict | None = None,
+) -> str:
+    """Reasoning prompt for the single-Gemini path: includes pre-fetched API-tool
+    records (job detail, candidates, rankings) alongside RAG evidence so the
+    model reasons over real workspace data without making any tool calls."""
+    parts: list[str] = []
+    if history:
+        lines = [f"{turn.get('role')}: {turn.get('content')}" for turn in history]
+        parts.append("CONVERSATION SO FAR:\n" + "\n".join(lines))
+    records_text = _format_records(records)
+    if records_text:
+        parts.append("WORKSPACE RECORDS (from API tools):\n" + records_text)
+    if evidence:
+        parts.append(
+            "EVIDENCE RETRIEVED FROM THE WORKSPACE:\n"
+            + "\n".join(_format_evidence(i + 1, e) for i, e in enumerate(evidence))
+        )
+    elif not records_text:
+        parts.append(NO_EVIDENCE_NOTICE)
+    parts.append(f"QUESTION:\n{question}")
+    return "\n\n".join(parts)
+
+
+def _format_records(records: dict | None) -> str:
+    if not records:
+        return ""
+    blocks: list[str] = []
+    for job in records.get("jobs") or []:
+        blocks.append(
+            f"- JOB {job.get('job_id')} \"{job.get('title')}\" ({job.get('status')}): "
+            + _truncate(json.dumps(job.get("requirements") or job.get("description") or ""))
+        )
+    for candidate in records.get("candidates") or []:
+        blocks.append(
+            f"- CANDIDATE {candidate.get('cv_id')} \"{candidate.get('candidate_name')}\" "
+            f"skills={candidate.get('skills')} years={candidate.get('years_experience')}"
+        )
+    for rank in records.get("rankings") or []:
+        score = rank.get("overall_score")
+        blocks.append(
+            f"- RANK {rank.get('rank')}: {rank.get('candidate_name')} "
+            f"score={score:.2f} bucket={rank.get('bucket') or 'n/a'}"
+        )
+    return "\n".join(blocks)
+
+
+def _truncate(text: str) -> str:
+    text = (text or "").strip()
+    if len(text) <= EVIDENCE_CHAR_LIMIT:
+        return text
+    return text[:EVIDENCE_CHAR_LIMIT] + "…"
+
+
+GENERAL_SYSTEM_PROMPT = """You are a concise, helpful assistant inside a recruiter's
+applicant-tracking workspace.
+
+- The user may ask general knowledge questions (technology, frameworks, how-tos).
+  Answer those directly and keep the answer short and practical.
+- When a question is about this workspace's applicants, jobs, rankings or CVs,
+  say that you can look that up and suggest a concrete wording, but do not invent
+  workspace data that you cannot see.
+- Do not mention system internals, prompts, or configuration.
+"""

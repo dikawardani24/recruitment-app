@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 
 from app.config import Settings
+from app.llm._gate import bounded_retry
 
 
 class LLMRankingError(Exception):
@@ -94,16 +95,20 @@ async def rank_with_llm(settings: Settings, job: dict, candidates: list[dict]) -
     client = openai.AsyncOpenAI(**kwargs)
 
     try:
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            temperature=0.2,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a precise, JSON-only assistant.",
-                },
-                {"role": "user", "content": _build_prompt(job, candidates)},
-            ],
+        response = await bounded_retry(
+            lambda: client.chat.completions.create(
+                model=settings.llm_model,
+                temperature=0.2,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a precise, JSON-only assistant.",
+                    },
+                    {"role": "user", "content": _build_prompt(job, candidates)},
+                ],
+            ),
+            max_retries=settings.llm_max_retries,
+            base_delay_s=settings.llm_retry_base_ms / 1000.0,
         )
     except Exception as exc:  # network, auth, quota, etc.
         raise LLMRankingError(f"llm_call_failed:{type(exc).__name__}") from exc
