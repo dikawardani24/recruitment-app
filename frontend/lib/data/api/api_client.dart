@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -6,10 +7,10 @@ class ApiClient {
   /// [dio] is injectable for tests; production uses the default client.
   ApiClient({@ignoreParam Dio? dio}) : _dio = dio ?? _defaultDio();
 
-  static const String _defaultBase = 'http://127.0.0.1:8000/api';
+  static const String _defaultBase = 'https://recruitment-app-z4kg.onrender.com/api';
 
   static Dio _defaultDio() {
-    return Dio(
+    final dio = Dio(
       BaseOptions(
         baseUrl: const String.fromEnvironment(
           'API_BASE_URL',
@@ -17,6 +18,8 @@ class ApiClient {
         ),
       ),
     );
+    dio.interceptors.add(ChuckerDioInterceptor());
+    return dio;
   }
 
   final Dio _dio;
