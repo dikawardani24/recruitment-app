@@ -106,6 +106,30 @@ class CandidatePageResponseMapper {
   }
 }
 
+class UnifiedSearchResponseMapper {
+  UnifiedSearchResponseMapper._();
+
+  static UnifiedSearchResponse fromJson(Map<String, dynamic> json) {
+    final jobsData = json['jobs'] as Map<String, dynamic>? ?? const {};
+    final cvsData = json['candidates'] as Map<String, dynamic>? ?? const {};
+
+    final jobs = ((jobsData['data'] as List?) ?? [])
+        .map((e) => JobResponseMapper.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final candidates = ((cvsData['data'] as List?) ?? [])
+        .map((e) => CandidateResponseMapper.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    return UnifiedSearchResponse(
+      keyword: (json['keyword'] as String?) ?? '',
+      jobs: jobs,
+      jobsHasMore: (jobsData['has_more'] as bool?) ?? false,
+      candidates: candidates,
+      candidatesHasMore: (cvsData['has_more'] as bool?) ?? false,
+    );
+  }
+}
+
 class RankResponseMapper {
   RankResponseMapper._();
 

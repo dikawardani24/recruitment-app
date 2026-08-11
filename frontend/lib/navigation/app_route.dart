@@ -8,6 +8,7 @@ enum AppRoute {
   settings('/jobs/settings'),
   searchJobs('/jobs/search'),
   searchCandidates('/candidates/search'),
+  search('/search'),
   jobDetail('/jobs/:jobId'),
   candidateDetail('/jobs/:jobId/candidate/:cvId'),
   rankings('/jobs/:jobId/rankings'),

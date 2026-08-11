@@ -24,6 +24,7 @@ from app.usecase.rank_cv import RankCv
 from app.usecase.get_rankings import GetRankings
 from app.usecase.semantic_search import SemanticSearch
 from app.usecase.reindex_embeddings import ReindexEmbeddings
+from app.usecase.unified_search import UnifiedSearch
 from app.usecase.ask import Ask
 from app.chat import ChatClient, ToolRegistry
 from app.rag import EmbeddingIndexer, LocalEmbedder, VectorStore
@@ -89,6 +90,9 @@ def get_rankings_use_case() -> GetRankings:
 
 def semantic_search_use_case() -> SemanticSearch:
     return SemanticSearch(_embedding_indexer(), __job_repo(), __cv_repo())
+
+def unified_search_use_case() -> UnifiedSearch:
+    return UnifiedSearch(__job_repo(), __cv_repo())
 
 def reindex_embeddings_use_case() -> ReindexEmbeddings:
     return ReindexEmbeddings(_embedding_indexer(), __job_repo(), __cv_repo())

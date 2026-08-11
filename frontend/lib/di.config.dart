@@ -16,12 +16,15 @@ import 'data/api/api_client.dart' as _i625;
 import 'data/data_sources/candidate_api_data_source.dart' as _i603;
 import 'data/data_sources/chat_api_data_source.dart' as _i864;
 import 'data/data_sources/job_api_data_source.dart' as _i188;
+import 'data/data_sources/search_api_data_source.dart' as _i252;
 import 'data/repositories/candidate_repository_impl.dart' as _i1019;
 import 'data/repositories/chat_repository_impl.dart' as _i48;
 import 'data/repositories/job_repository_impl.dart' as _i271;
+import 'data/repositories/search_repository_impl.dart' as _i409;
 import 'domain/repositories/candidate_repository.dart' as _i1049;
 import 'domain/repositories/chat_repository.dart' as _i952;
 import 'domain/repositories/job_repository.dart' as _i324;
+import 'domain/repositories/search_repository.dart' as _i844;
 import 'domain/usecases/ask_chat.dart' as _i745;
 import 'domain/usecases/create_job.dart' as _i146;
 import 'domain/usecases/delete_candidate.dart' as _i17;
@@ -35,6 +38,7 @@ import 'domain/usecases/rank_cv.dart' as _i51;
 import 'domain/usecases/rank_job.dart' as _i404;
 import 'domain/usecases/search_candidates.dart' as _i581;
 import 'domain/usecases/search_jobs.dart' as _i309;
+import 'domain/usecases/unified_search.dart' as _i375;
 import 'domain/usecases/upload_cvs.dart' as _i364;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -53,6 +57,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i188.JobApiDataSource>(
       () => _i188.JobApiDataSource(gh<_i625.ApiClient>()),
+    );
+    gh.factory<_i252.SearchApiDataSource>(
+      () => _i252.SearchApiDataSource(gh<_i625.ApiClient>()),
     );
     gh.factory<_i1049.CandidateRepository>(
       () => _i1019.CandidateRepositoryImpl(gh<_i603.CandidateApiDataSource>()),
@@ -87,6 +94,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i952.ChatRepository>(
       () => _i48.ChatRepositoryImpl(gh<_i864.ChatApiDataSource>()),
     );
+    gh.factory<_i844.SearchRepository>(
+      () => _i409.SearchRepositoryImpl(gh<_i252.SearchApiDataSource>()),
+    );
     gh.factory<_i745.AskChat>(() => _i745.AskChat(gh<_i952.ChatRepository>()));
     gh.factory<_i146.CreateJob>(
       () => _i146.CreateJob(gh<_i324.JobRepository>()),
@@ -96,6 +106,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i111.ListJobs>(() => _i111.ListJobs(gh<_i324.JobRepository>()));
     gh.factory<_i309.SearchJobs>(
       () => _i309.SearchJobs(gh<_i324.JobRepository>()),
+    );
+    gh.factory<_i375.UnifiedSearch>(
+      () => _i375.UnifiedSearch(gh<_i844.SearchRepository>()),
     );
     return this;
   }

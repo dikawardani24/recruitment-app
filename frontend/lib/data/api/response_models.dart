@@ -108,6 +108,22 @@ class CandidatePageResponse {
   });
 }
 
+class UnifiedSearchResponse {
+  final String keyword;
+  final List<JobResponse> jobs;
+  final bool jobsHasMore;
+  final List<CandidateResponse> candidates;
+  final bool candidatesHasMore;
+
+  const UnifiedSearchResponse({
+    required this.keyword,
+    required this.jobs,
+    required this.jobsHasMore,
+    required this.candidates,
+    required this.candidatesHasMore,
+  });
+}
+
 class ImportResponseDto {
   final String importId;
   final String jobId;

@@ -9,6 +9,7 @@ import 'domain/usecases/list_cvs.dart';
 import 'domain/usecases/list_jobs.dart';
 import 'domain/usecases/search_candidates.dart';
 import 'domain/usecases/search_jobs.dart';
+import 'domain/usecases/unified_search.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/go_router_navigator.dart';
 
@@ -234,6 +235,40 @@ final searchCandidatesProvider = AsyncNotifierProvider.family<
   CandidateListState,
   String
 >(CandidateSearchNotifier.new);
+
+class UnifiedSearchNotifier extends AsyncNotifier<UnifiedSearchResult> {
+  UnifiedSearchNotifier(this.keyword);
+
+  final String keyword;
+
+  @override
+  Future<UnifiedSearchResult> build() async {
+    if (keyword.isEmpty) {
+      return const UnifiedSearchResult(
+        keyword: '',
+        jobs: [],
+        jobsHasMore: false,
+        candidates: [],
+        candidatesHasMore: false,
+      );
+    }
+    return getIt<UnifiedSearch>()(keyword: keyword);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      state = AsyncValue.data(await getIt<UnifiedSearch>()(keyword: keyword));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final unifiedSearchProvider =
+    AsyncNotifierProvider.family<UnifiedSearchNotifier, UnifiedSearchResult, String>(
+      UnifiedSearchNotifier.new,
+    );
 
 /// Recent search keywords, most recent first. Kept in memory only so it
 /// survives navigation within the session but is lost on app restart.

@@ -14,6 +14,7 @@ import 'screens/job_list_screen.dart';
 import 'screens/rankings_screen.dart';
 import 'screens/search_candidate_screen.dart';
 import 'screens/search_job_screen.dart';
+import 'screens/unified_search_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Builds the app's [GoRouter]. Route patterns are derived from [AppRoute]
@@ -91,6 +92,10 @@ class AppRouter {
         GoRoute(
           path: AppRoute.searchCandidates.path,
           builder: (context, state) => const SearchCandidateScreen(),
+        ),
+        GoRoute(
+          path: AppRoute.search.path,
+          builder: (context, state) => const UnifiedSearchScreen(),
         ),
       ],
     );
