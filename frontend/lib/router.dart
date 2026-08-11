@@ -12,6 +12,7 @@ import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
 import 'screens/rankings_screen.dart';
+import 'screens/search_candidate_screen.dart';
 import 'screens/search_job_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -86,6 +87,10 @@ class AppRouter {
               ],
             ),
           ],
+        ),
+        GoRoute(
+          path: AppRoute.searchCandidates.path,
+          builder: (context, state) => const SearchCandidateScreen(),
         ),
       ],
     );

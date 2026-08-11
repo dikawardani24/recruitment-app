@@ -632,6 +632,136 @@ async def test_ask_ranking_answered_deterministically_no_gemini():
     assert "0.90" in result["answer"]
 
 
+async def test_deterministic_sources_carry_status_and_ranked_by():
+    """Candidate sources on both the search and ranking paths expose the enriched
+    tool fields (status, ranked_by) to the frontend."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    c1 = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])
+    c2 = _candidate("cv-2", "job-1", "John Roe", ["Kotlin"])
+    c1.overall_score = 0.9
+    c1.ranked_by = "admin@ruangguru.com"
+    c2.overall_score = 0.7
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo([c1, c2]))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    search = await ask.execute("who applied for job-1?")
+    search_sources = search["sources"]
+    assert any(source["entity_type"] == "candidate" for source in search_sources)
+    for source in search_sources:
+        assert source["status"] == "completed"
+        assert "ranked_by" in source
+
+    ranking = await ask.execute("who is the best candidate?")
+    ranking_sources = ranking["sources"]
+    assert any(source["entity_type"] == "candidate" for source in ranking_sources)
+    by_id = {source["entity_id"]: source for source in ranking_sources}
+    assert by_id["cv-1"]["ranked_by"] == "admin@ruangguru.com"
+    assert all(source["status"] == "completed" for source in ranking_sources)
+
+
+async def test_deterministic_answers_carry_list_cards():
+    """List answers expose structured cards the chat UI renders as tappable
+    job/candidate tiles; non-list answers carry an empty cards list."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    c1 = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])
+    c1.overall_score = 0.9
+    c1.bucket = "strong_match"
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo([c1]))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    jobs = await ask.execute("which jobs do we have?")
+    assert jobs["cards"] == [
+        {
+            "type": "job",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "title": "Flutter Developer",
+                    "status": "open",
+                    "candidate_count": 1,
+                    "created_at": job.created_at.isoformat(),
+                }
+            ],
+        }
+    ]
+
+    candidates = await ask.execute("who applied?")
+    assert candidates["cards"] == [
+        {
+            "type": "candidate",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "cv_id": "cv-1",
+                    "name": "Jane Doe",
+                    "file_name": "cv-1.txt",
+                    "status": "completed",
+                    "overall_score": 0.9,
+                    "bucket": "strong_match",
+                    "ranked_by": None,
+                }
+            ],
+        }
+    ]
+
+    ranking = await ask.execute("who is the best candidate?")
+    assert ranking["cards"][0]["type"] == "candidate"
+    assert ranking["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+    stats = await ask.execute("how many jobs do we have?")
+    assert stats["cards"] == []
+
+
+async def test_hiring_need_routes_to_candidate_search_with_cards():
+    """'i need 2 flutter developer' (a recruiting need) routes to the
+    deterministic candidate_search and emits candidate cards, never calling
+    Gemini."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    result = await ask.execute("i need 2 flutter developer")
+    assert result["configured"] is True
+    assert "Jane Doe" in result["answer"]
+    assert result["cards"] == [
+        {
+            "type": "candidate",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "cv_id": "cv-1",
+                    "name": "Jane Doe",
+                    "file_name": "cv-1.txt",
+                    "status": "completed",
+                    "overall_score": 0.9,
+                    "bucket": None,
+                    "ranked_by": None,
+                }
+            ],
+        }
+    ]
+
+    events = [
+        event
+        async for event in ask.stream("i need 2 flutter developer", history=[])
+    ]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert done["cards"][0]["type"] == "candidate"
+    assert done["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+
+async def test_ask_stream_done_emits_cards():
+    """The deterministic SSE `done` frame includes the list cards payload."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+    events = [
+        event
+        async for event in ask.stream("who applied for job-1?", history=[])
+    ]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert done["cards"][0]["type"] == "candidate"
+    assert done["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+
 async def test_ask_reasoning_prefetches_records_single_gemini_call():
     """Reasoning turns pre-fetch workspace records and make exactly ONE Gemini
     call; Gemini is never offered the tool loop."""
@@ -718,6 +848,9 @@ def test_router_spec_examples():
             "candidate_search",
             "deterministic",
         ),
+        _SpecCase("i need 2 flutter developer", "candidate_search", "deterministic"),
+        _SpecCase("We need 3 backend engineers", "candidate_search", "deterministic"),
+        _SpecCase("I am looking for a Flutter developer", "candidate_search", "deterministic"),
         _SpecCase("What experience does this candidate have?", "candidate_detail", "rag_reasoning"),
         _SpecCase("Which candidates match this job description?", "candidate_ranking", "deterministic"),
         _SpecCase("What is Flutter?", "general_question", "general"),
@@ -802,7 +935,8 @@ async def test_ask_score_filter_filters_by_rank():
     assert "Reyhan" not in result["answer"] and "Rizki" not in result["answer"]
 
     below = await ask.execute("show flutter candidates above 95")
-    assert "No applicants" in below["answer"]
+    assert "There are no candidates matching" in below["answer"]
+    assert "create a job and add candidates" in below["answer"]
 
 
 async def test_ask_score_threshold_more_than_is_strict():

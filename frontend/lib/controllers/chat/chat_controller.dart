@@ -81,6 +81,7 @@ class ChatController extends Notifier<ChatState> {
                   role: ChatRole.assistant,
                   content: response.answer,
                   sources: response.sources,
+                  cards: response.cards,
                 ),
               ],
               configured: response.configured,

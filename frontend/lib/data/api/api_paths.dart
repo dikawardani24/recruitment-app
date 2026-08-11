@@ -5,6 +5,8 @@ class ApiPaths {
 
   static const String searchJobs = '/jobs/search';
 
+  static const String searchCandidates = '/candidates/search';
+
   static String job(String jobId) => '/jobs/$jobId';
 
   static String cvs(String jobId) => '/jobs/$jobId/cvs';

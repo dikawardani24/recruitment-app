@@ -87,6 +87,39 @@ class ChatRepositoryImpl implements ChatRepository {
               ),
             )
             .toList(),
+        cards: dto.cards
+            .map(
+              (c) => ChatCardGroup(
+                type: c.type,
+                jobs: c.jobs
+                    .map(
+                      (j) => Job(
+                        id: j.jobId,
+                        title: j.title,
+                        description: j.description,
+                        status: j.status,
+                        createdAt: j.createdAt,
+                        candidateCount: j.cvCount,
+                      ),
+                    )
+                    .toList(),
+                candidates: c.candidates
+                    .map(
+                      (cand) => CandidateResult(
+                        cvId: cand.cvId,
+                        jobId: cand.jobId,
+                        fileName: cand.fileName,
+                        status: cand.status,
+                        candidateName: cand.candidateName,
+                        overallScore: cand.overallScore,
+                        bucket: cand.bucket,
+                        rankedBy: cand.rankedBy,
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+            .toList(),
         retrievalEnabled: dto.retrievalEnabled,
         retrievalCount: dto.retrievalCount,
       );

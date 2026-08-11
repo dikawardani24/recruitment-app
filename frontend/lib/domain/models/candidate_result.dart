@@ -1,5 +1,6 @@
 class CandidateResult {
   final String? cvId;
+  final String? jobId;
   final String fileName;
   final String status;
   final String? candidateName;
@@ -21,6 +22,7 @@ class CandidateResult {
 
   const CandidateResult({
     this.cvId,
+    this.jobId,
     required this.fileName,
     required this.status,
     this.candidateName,

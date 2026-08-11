@@ -1,4 +1,6 @@
+export 'models/candidate_page.dart';
 export 'models/candidate_result.dart';
+export 'models/chat_card.dart';
 export 'models/chat_message.dart';
 export 'models/chat_model.dart';
 export 'models/chat_response.dart';

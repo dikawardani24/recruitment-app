@@ -79,6 +79,26 @@ class CandidateApiDataSource {
     return _client.delete(ApiPaths.cv(jobId, cvId));
   }
 
+  Future<CandidatePageResponse> searchCandidates({
+    required String keyword,
+    required int page,
+    required int limit,
+  }) {
+    return _client.get(
+      ApiPaths.searchCandidates,
+      query: {
+        'keyword': keyword,
+        'page': page,
+        'limit': limit,
+      },
+      parse: (data) => CandidatePageResponseMapper.fromJson(
+        data as Map<String, dynamic>,
+        fallbackPage: page,
+        fallbackLimit: limit,
+      ),
+    );
+  }
+
   static List<CandidateResponse> _resultList(dynamic data) {
     final results = (data as Map<String, dynamic>)['results'] as List;
     return results

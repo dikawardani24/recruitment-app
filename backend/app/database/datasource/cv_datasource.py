@@ -223,6 +223,24 @@ class CvDatasource:
         """
         await self.db.execute(query, (error, cv_id))
 
+    async def search(
+        self, keyword: str, limit: int, offset: int
+    ) -> list[CvEntity]:
+        like = f"%{keyword}%"
+        query = """
+        SELECT *
+        FROM cvs
+        WHERE candidate_name LIKE ?
+           OR skills LIKE ?
+           OR file_name LIKE ?
+           OR profile_text LIKE ?
+        ORDER BY created_at DESC LIMIT ? OFFSET ?
+        """
+        rows = await self.db.fetchall(
+            query, (like, like, like, like, limit, offset)
+        )
+        return [CvEntity.from_row(row) for row in rows]
+
     async def count_by_import(self, import_id: str) -> dict[str, int]:
         query = """
         SELECT status, COUNT(*) AS c

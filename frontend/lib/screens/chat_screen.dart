@@ -7,6 +7,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../controllers/chat/chat_controller.dart';
 import '../controllers/chat/chat_state.dart';
 import '../domain/models.dart';
+import '../providers.dart';
+import '../widgets/candidate_tile.dart';
+import '../widgets/job_card.dart';
 
 class ChatScreen extends HookConsumerWidget {
   const ChatScreen({super.key});
@@ -140,57 +143,34 @@ class _EmptyChat extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends ConsumerWidget {
   const _MessageBubble({required this.message});
 
   final ChatMessage message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isUser = message.isUser;
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.82,
-        ),
-        decoration: BoxDecoration(
-          color: isUser
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
+    if (!isUser) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isUser)
-              SelectableText(
-                message.content,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              )
-            else ...[
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: _CopyButton(
-                    text: message.content,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              MarkdownBody(
-                data: message.content,
-                styleSheet: MarkdownStyleSheet.fromTheme(theme),
-              ),
+            MarkdownBody(
+              data: message.content,
+              styleSheet: MarkdownStyleSheet.fromTheme(theme),
+            ),
+            if (message.cards.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final group in message.cards) ...[
+                _CardGroupList(group: group),
+                const SizedBox(height: 6),
+              ],
             ],
-            if (!isUser && message.sources.isNotEmpty) ...[
+            if (message.sources.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
@@ -201,9 +181,83 @@ class _MessageBubble extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _CopyButton(
+                text: message.content,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: SelectableText(
+          message.content,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onPrimaryContainer,
+          ),
+        ),
       ),
+    );
+  }
+}
+
+/// Renders a structured list payload (jobs or candidates) as tappable cards
+/// that navigate to the entity's detail screen.
+class _CardGroupList extends ConsumerWidget {
+  const _CardGroupList({required this.group});
+
+  final ChatCardGroup group;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final navigator = ref.read(navigatorProvider);
+    if (group.isJobs) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in group.jobs.asMap().entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: JobCard(
+                job: entry.value,
+                index: entry.key,
+                onTap: () => navigator.goToJobDetail(entry.value.id),
+              ),
+            ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final candidate in group.candidates)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: CandidateTile(
+              cv: candidate,
+              onShowDetails: () => navigator.goToCandidateDetail(
+                candidate.jobId ?? '',
+                candidate,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -319,18 +373,10 @@ class _StreamingBubble extends StatelessWidget {
     final hasText = streamingText.isNotEmpty;
     final message = statusMessage ??
         (usingTools ? 'Consulting workspace data…' : 'Thinking…');
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.82,
-        ),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: Alignment.centerLeft,
         child: hasText
             ? MarkdownBody(
                 data: streamingText,

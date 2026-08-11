@@ -24,6 +24,9 @@ class GoRouterNavigator implements AppNavigator {
   void goToSearchJobs() => _router.push(AppRoute.searchJobs.path);
 
   @override
+  void goToSearchCandidates() => _router.push(AppRoute.searchCandidates.path);
+
+  @override
   void goToChat() => _router.push(AppRoute.chat.path);
 
   @override

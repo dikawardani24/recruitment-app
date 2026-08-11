@@ -33,6 +33,7 @@ import 'domain/usecases/list_cvs.dart' as _i542;
 import 'domain/usecases/list_jobs.dart' as _i111;
 import 'domain/usecases/rank_cv.dart' as _i51;
 import 'domain/usecases/rank_job.dart' as _i404;
+import 'domain/usecases/search_candidates.dart' as _i581;
 import 'domain/usecases/search_jobs.dart' as _i309;
 import 'domain/usecases/upload_cvs.dart' as _i364;
 
@@ -76,6 +77,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i364.UploadCvs>(
       () => _i364.UploadCvs(gh<_i1049.CandidateRepository>()),
+    );
+    gh.factory<_i581.SearchCandidates>(
+      () => _i581.SearchCandidates(gh<_i1049.CandidateRepository>()),
     );
     gh.factory<_i324.JobRepository>(
       () => _i271.JobRepositoryImpl(gh<_i188.JobApiDataSource>()),

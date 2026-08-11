@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_ats/data/api/api_client.dart';
 import 'package:ai_ats/data/data_sources/candidate_api_data_source.dart';
 import 'package:ai_ats/data/repositories/candidate_repository_impl.dart';
+import 'package:ai_ats/domain/models/candidate_page.dart';
 import 'package:ai_ats/domain/models/candidate_result.dart';
 import 'package:ai_ats/domain/models/import_result.dart';
 import 'package:ai_ats/domain/models/rank_response.dart';
@@ -189,6 +190,15 @@ class _FakeRepository implements CandidateRepository {
 
   @override
   Future<void> deleteCandidate(String jobId, String cvId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<CandidatePage> searchCandidates({
+    required String keyword,
+    required int page,
+    required int limit,
+  }) {
     throw UnimplementedError();
   }
 }

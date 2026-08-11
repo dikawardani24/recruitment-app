@@ -11,13 +11,11 @@ import '../controllers/jobDetail/job_detail_notifier.dart';
 import '../domain/models.dart';
 import '../providers.dart';
 import '../widgets/bucket_donut.dart';
-import '../widgets/card_shape.dart';
+import '../widgets/candidate_tile.dart';
 import '../widgets/delete_background.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
-import '../widgets/rank_engine_chip.dart';
-import '../widgets/score_color.dart';
 import '../widgets/section_card.dart';
 
 class JobDetailScreen extends ConsumerWidget {
@@ -351,7 +349,7 @@ class _CandidatesSection extends ConsumerWidget {
                 background: DeleteBackground(
                   color: Theme.of(context).colorScheme.error,
                 ),
-                child: _CandidateTile(
+                child: CandidateTile(
                   cv: cv,
                   onShowDetails: () =>
                       detailController.openCandidateDetails(context, jobId, cv),
@@ -548,81 +546,6 @@ int _byRank(CandidateResult a, CandidateResult b) {
   return 0;
 }
 
-class _CandidateTile extends StatelessWidget {
-  final CandidateResult cv;
-  final VoidCallback onShowDetails;
-
-  const _CandidateTile({required this.cv, required this.onShowDetails});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final name = cv.candidateName ?? cv.fileName;
-    final score = cv.overallScore;
-    final color = score == null
-        ? candidateColor(cv.cvId ?? name)
-        : scoreColor(score);
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: cardShape(theme),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        onTap: onShowDetails,
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            name.isEmpty ? '?' : name[0].toUpperCase(),
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: score == null
-            ? Text(
-                _candidateStatusLabel(cv),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            : Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      formatBucket(cv.bucket ?? 'weak_match'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: getBucketColor(cv.bucket ?? 'weak_match'),
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  RankEngineChip(rankedBy: cv.rankedBy),
-                ],
-              ),
-        trailing: score == null
-            ? (cv.status == 'failed' ? const Icon(Icons.error_outline) : null)
-            : Text(
-                '${(score * 100).round()}%',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-      ),
-    );
-  }
-}
-
 class _NotRankedHint extends StatelessWidget {
   const _NotRankedHint();
 
@@ -648,23 +571,6 @@ class _NotRankedHint extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-String _candidateStatusLabel(CandidateResult cv) {
-  switch (cv.status) {
-    case 'completed':
-      return 'Ready to rank';
-    case 'ranked':
-      return 'Ranked';
-    case 'processing':
-      return 'Processing…';
-    case 'uploaded':
-      return 'Queued for processing';
-    case 'failed':
-      return 'Failed: ${cv.error ?? 'unknown error'}';
-    default:
-      return cv.status;
   }
 }
 

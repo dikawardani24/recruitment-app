@@ -103,6 +103,10 @@ class JobListScreen extends HookConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 _SearchJobsCard(onTap: jobListController.openJobSearch),
+                const SizedBox(height: 8),
+                _SearchCandidatesCard(
+                  onTap: jobListController.openCandidateSearch,
+                ),
                 const SizedBox(height: 16),
                 for (final entry in jobs.asMap().entries)
                   Padding(
@@ -156,6 +160,41 @@ class _SearchJobsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Search jobs',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchCandidatesCard extends StatelessWidget {
+  const _SearchCandidatesCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.people, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Search candidates',
                   style: theme.textTheme.titleMedium,
                 ),
               ),

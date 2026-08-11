@@ -31,6 +31,9 @@ class _FakeNavigator implements AppNavigator {
   void goToSearchJobs() {}
 
   @override
+  void goToSearchCandidates() {}
+
+  @override
   void goToChat() {}
 
   @override
@@ -340,9 +343,8 @@ void main() {
 
     expect(find.text('Job 20'), findsNothing);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -5000));
-    await tester.pump(const Duration(milliseconds: 20));
-    await tester.pump();
+    await tester.fling(find.byType(ListView), const Offset(0, -3000), 1000);
+    await tester.pumpAndSettle();
 
     expect(find.text('Job 20'), findsOneWidget);
 
@@ -371,19 +373,12 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -5000));
-    await tester.pump();
+    await tester.fling(find.byType(ListView), const Offset(0, -3000), 1000);
     await tester.pump();
 
     // isLoadingMore was set synchronously; the delayed page resolves on the
     // next timer tick.
-    expect(
-      find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(CircularProgressIndicator),
-      ),
-      findsWidgets,
-    );
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
 
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump();

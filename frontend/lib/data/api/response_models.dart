@@ -40,6 +40,7 @@ class JobResponse {
 
 class CandidateResponse {
   final String? cvId;
+  final String? jobId;
   final String fileName;
   final String status;
   final String? candidateName;
@@ -61,6 +62,7 @@ class CandidateResponse {
 
   const CandidateResponse({
     this.cvId,
+    this.jobId,
     required this.fileName,
     required this.status,
     this.candidateName,
@@ -89,6 +91,18 @@ class JobPageResponse {
 
   const JobPageResponse({
     required this.jobs,
+    required this.page,
+    required this.hasMore,
+  });
+}
+
+class CandidatePageResponse {
+  final List<CandidateResponse> candidates;
+  final int page;
+  final bool hasMore;
+
+  const CandidatePageResponse({
+    required this.candidates,
     required this.page,
     required this.hasMore,
   });
@@ -161,10 +175,25 @@ class ChatSourceResponse {
   });
 }
 
+class ChatCardResponse {
+  final String type;
+  final List<JobResponse> jobs;
+  final List<CandidateResponse> candidates;
+
+  const ChatCardResponse({
+    required this.type,
+    this.jobs = const [],
+    this.candidates = const [],
+  });
+
+  bool get isJobs => type == 'job';
+}
+
 class ChatResponseDto {
   final bool configured;
   final String answer;
   final List<ChatSourceResponse> sources;
+  final List<ChatCardResponse> cards;
   final bool retrievalEnabled;
   final int retrievalCount;
 
@@ -172,6 +201,7 @@ class ChatResponseDto {
     required this.configured,
     required this.answer,
     required this.sources,
+    this.cards = const [],
     required this.retrievalEnabled,
     required this.retrievalCount,
   });
