@@ -1,5 +1,6 @@
-from app.domain.candidate import Candidate
 from app.database.datasource.cv_datasource import CvDatasource
+from app.domain.candidate import Candidate
+from app.domain.page import Page
 
 
 class CvRepositoryImpl:
@@ -64,6 +65,27 @@ class CvRepositoryImpl:
 
     async def count_by_import(self, import_id: str) -> dict[str, int]:
         return await self.datasource.count_by_import(import_id)
+
+    async def search(
+        self, keyword: str, page: int, page_size: int
+    ) -> Page[Candidate]:
+        offset = (page - 1) * page_size
+        limit = page_size + 1
+
+        entities = await self.datasource.search(
+            keyword=keyword,
+            limit=limit,
+            offset=offset,
+        )
+
+        has_more = len(entities) > page_size
+        domains = [Candidate.from_entity(row) for row in entities[:page_size]]
+        return Page(
+            page=page,
+            page_size=page_size,
+            data=domains,
+            last_page=not has_more,
+        )
 
 
 def _dumps(value):

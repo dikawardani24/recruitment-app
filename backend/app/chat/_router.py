@@ -128,6 +128,29 @@ _WORKSPACE_PATTERNS: list[tuple[str, re.Pattern]] = [
             re.I,
         ),
     ),
+    # recruiting needs phrased as people ("I need 2 Flutter developers",
+    # "i need a babysitter") are a candidate search, not a job listing.
+    (
+        "candidate_search",
+        re.compile(
+            r"\b(i|we|you)\s+(need|want|need to hire|want to hire|"
+            r"are looking for|'?re looking for|am looking for|are hiring|hiring|"
+            r"need to recruit|want to recruit)\b"
+            r"\s+(a\s+|an\s+|\d+\s+|one\s+|two\s+|three\s+|some\s+|more\s+)?"
+            r"((senior|junior|mid|midlevel|react|flutter|dart|python|java|kotlin|"
+            r"android|ios|backend|frontend|full[-\s]stack|software|mobile|web|data|"
+            r"baby|babysit|graphic|content|product|project|devops|qa|security|"
+            r"cloud|sales|marketing|hr|admin|ux|ui|api|node|go|ruby|angular|vue|"
+            r"aws|azure|accountant|legal|design|test)\s+){0,4}"
+            r"(developer|developers|engineer|engineers|sitter|sitters|babysitter|"
+            r"babysitters|designer|designers|scientist|scientists|specialist|"
+            r"specialists|analyst|analysts|manager|managers|officer|officers|"
+            r"assistant|assistants|lead|leads|staff|candidate|candidates|"
+            r"applicant|applicants|nurse|nurses|teacher|teachers|accountant|"
+            r"accountants|writer|writers|expert|experts)\b",
+            re.I,
+        ),
+    ),
     # job existence / listing
     (
         "job_search",

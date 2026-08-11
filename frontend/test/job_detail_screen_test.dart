@@ -30,6 +30,9 @@ class _FakeNavigator implements AppNavigator {
   void goToSearchJobs() {}
 
   @override
+  void goToSearchCandidates() {}
+
+  @override
   void goToChat() {}
 
   @override
@@ -256,7 +259,10 @@ void main() {
     await tester.pumpWidget(
       buildApp(
         buildJob(description: 'Short description'),
-        cvs: [buildRankedResult(name: 'Alice', score: 0.9)],
+        cvs: [
+          buildRankedResult(name: 'Alice', score: 0.9),
+          buildRankedResult(name: 'Bob', score: 0.55, bucket: 'possible_match'),
+        ],
         rankings: [
           buildRankedResult(name: 'Alice', score: 0.9),
           buildRankedResult(name: 'Bob', score: 0.55, bucket: 'possible_match'),

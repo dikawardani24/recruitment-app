@@ -18,12 +18,14 @@ class ChatRepositoryImpl implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) async {
     final dto = await _dataSource.ask(
       question: question,
       jobId: jobId,
       history: history,
       topK: topK,
+      model: model,
     );
     return _toResponse(dto);
   }
@@ -34,12 +36,14 @@ class ChatRepositoryImpl implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) async* {
     await for (final event in _dataSource.askStream(
       question: question,
       jobId: jobId,
       history: history,
       topK: topK,
+      model: model,
     )) {
       yield switch (event) {
         ChatStreamStartedDto() => const ChatStreamStarted(),
@@ -51,6 +55,21 @@ class ChatRepositoryImpl implements ChatRepository {
         ChatStreamErrorDto(:final message) => ChatStreamError(message),
       };
     }
+  }
+
+  @override
+  Future<List<ChatModel>> getModels() async {
+    final models = await _dataSource.getModels();
+    return models
+        .map(
+          (m) => ChatModel(
+            id: m.id,
+            label: m.label,
+            provider: m.provider,
+            model: m.model,
+          ),
+        )
+        .toList();
   }
 
   ChatResponse _toResponse(ChatResponseDto dto) => ChatResponse(
@@ -65,6 +84,39 @@ class ChatRepositoryImpl implements ChatRepository {
                 name: s.name,
                 section: s.section,
                 score: s.score,
+              ),
+            )
+            .toList(),
+        cards: dto.cards
+            .map(
+              (c) => ChatCardGroup(
+                type: c.type,
+                jobs: c.jobs
+                    .map(
+                      (j) => Job(
+                        id: j.jobId,
+                        title: j.title,
+                        description: j.description,
+                        status: j.status,
+                        createdAt: j.createdAt,
+                        candidateCount: j.cvCount,
+                      ),
+                    )
+                    .toList(),
+                candidates: c.candidates
+                    .map(
+                      (cand) => CandidateResult(
+                        cvId: cand.cvId,
+                        jobId: cand.jobId,
+                        fileName: cand.fileName,
+                        status: cand.status,
+                        candidateName: cand.candidateName,
+                        overallScore: cand.overallScore,
+                        bucket: cand.bucket,
+                        rankedBy: cand.rankedBy,
+                      ),
+                    )
+                    .toList(),
               ),
             )
             .toList(),

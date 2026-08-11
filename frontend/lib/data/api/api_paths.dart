@@ -5,6 +5,10 @@ class ApiPaths {
 
   static const String searchJobs = '/jobs/search';
 
+  static const String searchCandidates = '/candidates/search';
+
+  static const String unifiedSearch = '/search';
+
   static String job(String jobId) => '/jobs/$jobId';
 
   static String cvs(String jobId) => '/jobs/$jobId/cvs';
@@ -26,4 +30,6 @@ class ApiPaths {
   static const String chat = '/chat';
 
   static const String chatStream = '/chat/stream';
+
+  static const String chatModels = '/chat/models';
 }

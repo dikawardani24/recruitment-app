@@ -20,6 +20,7 @@ class _FakeRepo implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) async {
     return const ChatResponse(
       configured: true,
@@ -36,9 +37,26 @@ class _FakeRepo implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) {
     return controller.stream;
   }
+
+  @override
+  Future<List<ChatModel>> getModels() async => const [
+        ChatModel(
+          id: 'default',
+          label: 'gemini-flash-latest',
+          provider: 'default',
+          model: 'gemini-flash-latest',
+        ),
+        ChatModel(
+          id: 'openrouter:qwen/qwen-2.5-72b-instruct',
+          label: 'Qwen via OpenRouter (qwen/qwen-2.5-72b-instruct)',
+          provider: 'openrouter',
+          model: 'qwen/qwen-2.5-72b-instruct',
+        ),
+      ];
 }
 
 void main() {
@@ -154,5 +172,33 @@ void main() {
     expect(state.messages, hasLength(2));
     expect(state.messages[1].content, 'Our system is facing a technical issue. '
         'Please contact the system administrator or try again later.');
+  });
+
+  test('loads chat models and defaults selection to the first', () async {
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.loadModels();
+
+    final state = container.read(chatControllerProvider);
+    expect(state.models, hasLength(2));
+    expect(state.selectedModel, 'default');
+  });
+
+  test('selectModel switches the chat model and persists across turns',
+      () async {
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.loadModels();
+
+    controller.selectModel('openrouter:qwen/qwen-2.5-72b-instruct');
+    expect(
+      container.read(chatControllerProvider).selectedModel,
+      'openrouter:qwen/qwen-2.5-72b-instruct',
+    );
+
+    controller.clear();
+    expect(
+      container.read(chatControllerProvider).selectedModel,
+      'openrouter:qwen/qwen-2.5-72b-instruct',
+    );
+    expect(container.read(chatControllerProvider).models, hasLength(2));
   });
 }

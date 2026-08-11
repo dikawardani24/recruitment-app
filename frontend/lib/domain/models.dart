@@ -1,5 +1,8 @@
+export 'models/candidate_page.dart';
 export 'models/candidate_result.dart';
+export 'models/chat_card.dart';
 export 'models/chat_message.dart';
+export 'models/chat_model.dart';
 export 'models/chat_response.dart';
 export 'models/chat_source.dart';
 export 'models/chat_stream_event.dart';
@@ -8,3 +11,4 @@ export 'models/job.dart';
 export 'models/job_page.dart';
 export 'models/job_requirements.dart';
 export 'models/rank_response.dart';
+export 'models/unified_search_result.dart';

@@ -105,11 +105,14 @@ async def _handle_list_candidates(registry: ToolRegistry, **kwargs) -> dict:
         "candidates": [
             {
                 "cv_id": candidate.id,
-                "name": candidate.candidate_name,
+                "name": candidate.candidate_name or candidate.file_name,
+                "file_name": candidate.file_name,
+                "status": candidate.status,
                 "years_experience": candidate.years_experience,
                 "skills": candidate.skills,
                 "overall_score": candidate.overall_score,
                 "bucket": candidate.bucket,
+                "ranked_by": candidate.ranked_by,
             }
             for candidate in candidates
         ],

@@ -114,6 +114,7 @@ class Ask:
         job_id: str | None = None,
         history: list[dict] | None = None,
         top_k: int = 10,
+        model_id: str | None = None,
     ) -> dict:
         question = (question or "").strip()
         if not self.settings.chat_enabled:
@@ -128,11 +129,11 @@ class Ask:
             return self._answer(route, answer, [], job_id, question)
 
         if route.mode == "deterministic":
-            return await self._deterministic(route, question, job_id, history)
+            return await self._deterministic(route, question, job_id, history, model_id)
 
         if route.mode == "general":
             answer = await self.chat_client.complete(
-                GENERAL_SYSTEM_PROMPT, question, tools=None
+                GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id
             )
             return self._answer(route, answer, [], job_id, question)
 
@@ -147,7 +148,7 @@ class Ask:
             records,
         )
         answer = await self.chat_client.complete(
-            SYSTEM_PROMPT, user_prompt, tools=None
+            SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
         )
         return self._answer(
             route,
@@ -164,6 +165,7 @@ class Ask:
         job_id: str | None = None,
         history: list[dict] | None = None,
         top_k: int = 10,
+        model_id: str | None = None,
     ) -> AsyncIterator[dict]:
         """Streaming variant of [execute]. Yields SSE event dicts:
           {"type": "started", ...}
@@ -188,7 +190,7 @@ class Ask:
             }
             return
         if not question:
-            yield {"type": "done", "configured": True, "answer": "", "sources": []}
+            yield {"type": "done", "configured": True, "answer": "", "sources": [], "cards": []}
             return
 
         # First SSE event, emitted immediately after the connection is up.
@@ -204,14 +206,20 @@ class Ask:
             yield _status("answering", "Preparing your response...")
             answer = self._chitchat(question)
             yield {"type": "text", "content": answer}
-            yield {"type": "done", "configured": True, "answer": answer, "sources": []}
+            yield {
+                "type": "done",
+                "configured": True,
+                "answer": answer,
+                "sources": [],
+                "cards": [],
+            }
             _log_stream_timing(route, timing, _ms_since(t_request))
             return
 
         if route.mode == "deterministic":
             yield _status("retrieving", "Finding the relevant information...")
             try:
-                answer, sources = await deterministic_answer(route, self.tools)
+                answer, sources, cards = await deterministic_answer(route, self.tools)
             except ToolError:
                 logger.exception(
                     "chat deterministic lookup failed mode=%s intent=%s",
@@ -223,7 +231,13 @@ class Ask:
             timing["collect"] = _ms_since(t_request) - timing.get("routing", 0)
             yield _status("preparing", "Preparing the results...")
             yield {"type": "text", "content": answer}
-            yield {"type": "done", "configured": True, "answer": answer, "sources": sources}
+            yield {
+                "type": "done",
+                "configured": True,
+                "answer": answer,
+                "sources": sources,
+                "cards": cards or [],
+            }
             _log_stream_timing(route, timing, _ms_since(t_request))
             return
 
@@ -232,7 +246,7 @@ class Ask:
             text_parts: list[str] = []
             try:
                 async for item in self.chat_client.complete_stream(
-                    GENERAL_SYSTEM_PROMPT, question, tools=None
+                    GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id
                 ):
                     if item:
                         if not text_parts:
@@ -254,6 +268,7 @@ class Ask:
                 "configured": True,
                 "answer": "".join(text_parts),
                 "sources": [],
+                "cards": [],
             }
             _log_stream_timing(route, timing, _ms_since(t_request))
             return
@@ -276,7 +291,7 @@ class Ask:
         text_parts: list[str] = []
         try:
             async for item in self.chat_client.complete_stream(
-                SYSTEM_PROMPT, user_prompt, tools=None
+                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
             ):
                 if isinstance(item, ToolCall):
                     yield {"type": "tool", "name": item.name}
@@ -300,6 +315,7 @@ class Ask:
             "configured": True,
             "answer": "".join(text_parts),
             "sources": [item.as_dict() for item in evidence],
+            "cards": [],
         }
         _log_stream_timing(route, timing, _ms_since(t_request))
 
@@ -346,16 +362,17 @@ class Ask:
         question: str,
         job_id: str | None,
         history: list[dict] | None,
+        model_id: str | None = None,
     ) -> dict:
         if self.tools is None:
             # No API tools available: fall back to the single-Gemini grounded path.
             user_prompt = build_reasoning_prompt(question, [], history, None)
             answer = await self.chat_client.complete(
-                SYSTEM_PROMPT, user_prompt, tools=None
+                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
             )
             return self._answer(route, answer, [], job_id, question)
-        answer, sources = await deterministic_answer(route, self.tools)
-        return self._answer(route, answer, sources, job_id, question)
+        answer, sources, cards = await deterministic_answer(route, self.tools)
+        return self._answer(route, answer, sources, job_id, question, cards=cards)
 
     def _chitchat(self, question: str) -> str:
         if question.lower().startswith(("thanks", "thank you", "thx", "ty")):
@@ -370,11 +387,13 @@ class Ask:
         job_id: str | None,
         query: str,
         count: int | None = None,
+        cards: list | None = None,
     ) -> dict:
         return {
             "configured": True,
             "answer": answer,
             "sources": sources,
+            "cards": cards or [],
             "retrieval": {
                 "enabled": self._retrieval_enabled,
                 "job_id": job_id,
@@ -391,6 +410,7 @@ class Ask:
                 "GEMINI_API_KEY / OPENAI_API_KEY) to enable the recruiter copilot."
             ),
             "sources": [],
+            "cards": [],
             "retrieval": {"enabled": False, "count": 0},
         }
 
@@ -399,6 +419,7 @@ class Ask:
             "configured": True,
             "answer": "",
             "sources": [],
+            "cards": [],
             "retrieval": {"enabled": self._retrieval_enabled, "count": 0},
         }
 

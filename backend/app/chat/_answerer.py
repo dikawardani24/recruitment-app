@@ -46,6 +46,46 @@ def _score_text(score) -> str:
     return f", {score * 100:.0f}%"
 
 
+def _candidate_card(cand: dict, job_id: str | None) -> dict:
+    """A compact candidate row the chat UI can render as a tappable tile."""
+    return {
+        "job_id": job_id,
+        "cv_id": cand.get("cv_id"),
+        "name": cand.get("name") or cand.get("candidate_name") or cand.get("file_name"),
+        "file_name": cand.get("file_name"),
+        "status": cand.get("status"),
+        "overall_score": cand.get("overall_score"),
+        "bucket": cand.get("bucket"),
+        "ranked_by": cand.get("ranked_by"),
+    }
+
+
+def _candidate_cards(items: list[dict]) -> list[dict]:
+    if not items:
+        return []
+    return [{"type": "candidate", "items": items}]
+
+
+def _job_cards(jobs: list[dict]) -> list[dict]:
+    if not jobs:
+        return []
+    return [
+        {
+            "type": "job",
+            "items": [
+                {
+                    "job_id": job.get("job_id"),
+                    "title": job.get("title"),
+                    "status": job.get("status"),
+                    "candidate_count": job.get("candidate_count"),
+                    "created_at": job.get("created_at"),
+                }
+                for job in jobs
+            ],
+        }
+    ]
+
+
 def _passes_score(score_filter: tuple[str, float] | None, cand: dict) -> bool:
     if score_filter is None:
         return True
@@ -127,10 +167,11 @@ async def answer_candidate_search(
     registry,
     keywords: tuple[str, ...],
     score_filter: tuple[str, float] | None = None,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], list[dict]]:
     jobs = await _all_jobs(registry)
     sources: list[dict] = []
     found: list[tuple[str, str, tuple[str, ...], float | None]] = []
+    card_items: list[dict] = []
     for job in jobs:
         for cand in await _candidates_for(registry, job):
             if not _passes_score(score_filter, cand):
@@ -145,6 +186,7 @@ async def answer_candidate_search(
                         cand.get("overall_score"),
                     )
                 )
+                card_items.append(_candidate_card(cand, job.get("job_id")))
                 sources.append(
                     {
                         "entity_type": "candidate",
@@ -152,25 +194,29 @@ async def answer_candidate_search(
                         "entity_name": cand.get("name"),
                         "section": "skills",
                         "score": float(cand.get("overall_score") or 0.0),
+                        "status": cand.get("status"),
+                        "ranked_by": cand.get("ranked_by"),
                     }
                 )
+    cards = _candidate_cards(card_items)
     if not keywords:
         if not found:
-            return "There are no applicants in this workspace yet.", []
+            return "There are no applicants in this workspace yet.", [], []
         summary = _plural(len(found), "applicant")
         items = [
             f"{name} ({job}): {', '.join(skills) if skills else 'no skills listed'}"
             f"{_score_text(score)}"
             for name, job, skills, score in found
         ]
-        return f"There are {summary}:\n" + "\n".join(f"- {item}" for item in items), sources
+        return f"There are {summary}:\n" + "\n".join(f"- {item}" for item in items), sources, cards
 
     if not found:
         term = " or ".join(keywords)
         note = f" with a score {score_filter[0]} {score_filter[1] * 100:.0f}%" if score_filter else ""
         return (
-            f"No applicants currently have {term} on their CV{note} "
-            "in this workspace.",
+            f"There are no candidates matching {term!r}{note} in this workspace. "
+            "You might need to create a job and add candidates first.",
+            [],
             [],
         )
     if len(found) == 1:
@@ -179,18 +225,19 @@ async def answer_candidate_search(
         return (
             f"Yes. {name} for the {job} position lists: {skills}{_score_text(score)}.",
             sources,
+            cards,
         )
     names = ", ".join(
         f"{name} ({job}{_score_text(score)})"
         f"{(' — ' + ', '.join(matched)) if matched else ''}"
         for name, job, matched, score in found
     )
-    return f"Yes, {len(found)} applicants match: {names}.", sources
+    return f"Yes, {len(found)} applicants match: {names}.", sources, cards
 
 
 async def answer_job_search(
     registry, keywords: tuple[str, ...]
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], list[dict]]:
     jobs = await _all_jobs(registry)
     matched: list[dict] = []
     for job in jobs:
@@ -198,7 +245,7 @@ async def answer_job_search(
             matched.append(job)
     if not matched:
         term = " or ".join(keywords) if keywords else ""
-        return f"No job posting matches{(' ' + term) if term else ''}.", []
+        return f"No job posting matches{(' ' + term) if term else ''}.", [], []
     lines = [
         f"- {job.get('title')} ({job.get('status')}, "
         f"{job.get('candidate_count', 0)} applicants)"
@@ -213,12 +260,12 @@ async def answer_job_search(
             "score": 1.0,
         }
         for job in matched
-    ]
+    ], _job_cards(matched)
 
 
 async def answer_job_detail(
     registry, job_ref: str | None, keywords: tuple[str, ...]
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], list[dict]]:
     job = await _resolve_job(registry, job_ref, keywords)
     if job is None:
         term = " or ".join(keywords) if keywords else ""
@@ -226,10 +273,11 @@ async def answer_job_detail(
             f"I couldn't find that job{(' (' + term + ')') if term else ''} "
             "in the workspace.",
             [],
+            [],
         )
     detail = await _call(registry, "get_job_detail", job_id=job["job_id"])
     if "error" in detail:
-        return f"I couldn't find that job ({detail['error']}).", []
+        return f"I couldn't find that job ({detail['error']}).", [], []
     lines = [f"{detail.get('title')} — {detail.get('status')}"]
     if detail.get("description"):
         lines.append(detail["description"])
@@ -249,7 +297,7 @@ async def answer_job_detail(
             "section": "description",
             "score": 1.0,
         }
-    ]
+    ], []
 
 
 async def answer_rankings(
@@ -257,7 +305,7 @@ async def answer_rankings(
     job_ref: str | None,
     keywords: tuple[str, ...],
     score_filter: tuple[str, float] | None = None,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], list[dict]]:
     job = await _resolve_job(registry, job_ref, keywords)
     if job is None:
         job = await _resolve_job_by_person(registry, keywords)
@@ -267,6 +315,7 @@ async def answer_rankings(
             f"I couldn't find that job{(' (' + term + ')') if term else ''} "
             "in the workspace.",
             [],
+            None,
         )
     payload = await _call(registry, "get_rankings", job_id=job["job_id"])
     if "error" in payload:
@@ -274,6 +323,7 @@ async def answer_rankings(
             f"I couldn't load rankings for {job.get('title')} "
             f"({payload['error']}).",
             [],
+            None,
         )
     results = payload.get("results", [])
     if score_filter:
@@ -287,7 +337,7 @@ async def answer_rankings(
             if score_filter
             else ""
         )
-        return f"No ranked candidates{note} yet for {job.get('title')}.", []
+        return f"No ranked candidates{note} yet for {job.get('title')}.", [], []
     lines = [f"Rankings for {job.get('title')}:"]
     for rank in results:
         score = rank.get("overall_score")
@@ -301,17 +351,25 @@ async def answer_rankings(
             "entity_name": rank.get("candidate_name"),
             "section": "ranking",
             "score": float(rank.get("overall_score") or 0.0),
+            "status": rank.get("status"),
+            "ranked_by": rank.get("ranked_by"),
         }
         for rank in results
-    ]
+    ], _candidate_cards(
+        [_candidate_card(rank, job.get("job_id")) for rank in results]
+    )
 
 
 async def deterministic_answer(
     route: QueryRoute, registry
-) -> tuple[str, list[dict]]:
-    """Runs the routed API tools and formats a plain-text answer. Zero Gemini."""
+) -> tuple[str, list[dict], list[dict]]:
+    """Runs the routed API tools and formats a plain-text answer. Zero Gemini.
+
+    Returns ``(answer, sources, cards)`` where ``cards`` is a structured list
+    payload (``{"type": "job" | "candidate", "items": [...]}``) the chat UI can
+    render as tappable cards, or None when the answer has no list."""
     if route.intent == "application_statistics":
-        return await answer_statistics(registry), []
+        return await answer_statistics(registry), [], []
     if route.intent == "candidate_search":
         return await answer_candidate_search(registry, route.keywords, route.score_filter)
     if route.intent == "job_search":
@@ -321,7 +379,7 @@ async def deterministic_answer(
     if route.intent == "candidate_ranking":
         return await answer_rankings(registry, route.job_ref, route.keywords, route.score_filter)
     # Conservative fallback for an unexpected deterministic label.
-    return "I couldn't determine a direct answer from the workspace data.", []
+    return "I couldn't determine a direct answer from the workspace data.", [], []
 
 
 async def prefetch_records(

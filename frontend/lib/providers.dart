@@ -7,7 +7,9 @@ import 'domain/usecases/get_job.dart';
 import 'domain/usecases/get_rankings.dart';
 import 'domain/usecases/list_cvs.dart';
 import 'domain/usecases/list_jobs.dart';
+import 'domain/usecases/search_candidates.dart';
 import 'domain/usecases/search_jobs.dart';
+import 'domain/usecases/unified_search.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/go_router_navigator.dart';
 
@@ -150,6 +152,124 @@ final searchJobsProvider =
       SearchJobNotifier.new,
     );
 
+class CandidateListState {
+  final List<CandidateResult> candidates;
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
+
+  const CandidateListState({
+    this.candidates = const [],
+    this.page = 1,
+    this.hasMore = true,
+    this.isLoadingMore = false,
+  });
+
+  CandidateListState copyWith({
+    List<CandidateResult>? candidates,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
+  }) {
+    return CandidateListState(
+      candidates: candidates ?? this.candidates,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+}
+
+class CandidateSearchNotifier extends AsyncNotifier<CandidateListState> {
+  CandidateSearchNotifier(this.keyword);
+
+  final String keyword;
+
+  @override
+  Future<CandidateListState> build() => _loadFirstPage();
+
+  Future<CandidateListState> _loadFirstPage() async {
+    final page = await getIt<SearchCandidates>()(keyword: keyword);
+    return CandidateListState(
+      candidates: page.candidates,
+      page: 1,
+      hasMore: page.hasMore,
+    );
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
+    try {
+      final next = await getIt<SearchCandidates>().call(
+        page: current.page + 1,
+        keyword: keyword,
+      );
+      state = AsyncValue.data(
+        current.copyWith(
+          candidates: [...current.candidates, ...next.candidates],
+          page: next.page,
+          hasMore: next.hasMore,
+          isLoadingMore: false,
+        ),
+      );
+    } catch (_) {
+      state = AsyncValue.data(current.copyWith(isLoadingMore: false));
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      state = AsyncValue.data(await _loadFirstPage());
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final searchCandidatesProvider = AsyncNotifierProvider.family<
+  CandidateSearchNotifier,
+  CandidateListState,
+  String
+>(CandidateSearchNotifier.new);
+
+class UnifiedSearchNotifier extends AsyncNotifier<UnifiedSearchResult> {
+  UnifiedSearchNotifier(this.keyword);
+
+  final String keyword;
+
+  @override
+  Future<UnifiedSearchResult> build() async {
+    if (keyword.isEmpty) {
+      return const UnifiedSearchResult(
+        keyword: '',
+        jobs: [],
+        jobsHasMore: false,
+        candidates: [],
+        candidatesHasMore: false,
+      );
+    }
+    return getIt<UnifiedSearch>()(keyword: keyword);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      state = AsyncValue.data(await getIt<UnifiedSearch>()(keyword: keyword));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final unifiedSearchProvider =
+    AsyncNotifierProvider.family<UnifiedSearchNotifier, UnifiedSearchResult, String>(
+      UnifiedSearchNotifier.new,
+    );
+
 /// Recent search keywords, most recent first. Kept in memory only so it
 /// survives navigation within the session but is lost on app restart.
 class SearchHistoryNotifier extends Notifier<List<String>> {
@@ -173,6 +293,11 @@ class SearchHistoryNotifier extends Notifier<List<String>> {
 }
 
 final searchHistoryProvider =
+    NotifierProvider<SearchHistoryNotifier, List<String>>(
+      SearchHistoryNotifier.new,
+    );
+
+final candidateSearchHistoryProvider =
     NotifierProvider<SearchHistoryNotifier, List<String>>(
       SearchHistoryNotifier.new,
     );

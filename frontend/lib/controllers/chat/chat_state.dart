@@ -21,6 +21,12 @@ class ChatState {
   /// Whether the copilot is currently querying workspace records (tools).
   final bool usingTools;
 
+  /// Chat models available from the backend (default provider + OpenRouter).
+  final List<ChatModel> models;
+
+  /// Currently selected chat model id, or null when none loaded yet.
+  final String? selectedModel;
+
   const ChatState({
     this.messages = const [],
     this.isLoading = false,
@@ -28,6 +34,8 @@ class ChatState {
     this.streamingText = '',
     this.statusMessage,
     this.usingTools = false,
+    this.models = const [],
+    this.selectedModel,
   });
 
   ChatState copyWith({
@@ -37,6 +45,8 @@ class ChatState {
     String? streamingText,
     Object? statusMessage = _unset,
     bool? usingTools,
+    List<ChatModel>? models,
+    Object? selectedModel = _unset,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -47,6 +57,10 @@ class ChatState {
           ? this.statusMessage
           : statusMessage as String?,
       usingTools: usingTools ?? this.usingTools,
+      models: models ?? this.models,
+      selectedModel: identical(selectedModel, _unset)
+          ? this.selectedModel
+          : selectedModel as String?,
     );
   }
 }

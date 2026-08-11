@@ -102,7 +102,7 @@ class JobListScreen extends HookConsumerWidget {
                   subtitle: '$totalCandidates candidates · ${jobs.length} jobs',
                 ),
                 const SizedBox(height: 16),
-                _SearchJobsCard(onTap: jobListController.openJobSearch),
+                _UnifiedSearchCard(onTap: () => ref.read(navigatorProvider).goToSearch()),
                 const SizedBox(height: 16),
                 for (final entry in jobs.asMap().entries)
                   Padding(
@@ -133,8 +133,8 @@ class JobListScreen extends HookConsumerWidget {
   }
 }
 
-class _SearchJobsCard extends StatelessWidget {
-  const _SearchJobsCard({required this.onTap});
+class _UnifiedSearchCard extends StatelessWidget {
+  const _UnifiedSearchCard({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -155,11 +155,12 @@ class _SearchJobsCard extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Search jobs',
-                  style: theme.textTheme.titleMedium,
+                  'Search jobs or candidates...',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-              const Icon(Icons.chevron_right),
             ],
           ),
         ),

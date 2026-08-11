@@ -353,6 +353,82 @@ def test_search_jobs_does_not_shadow_job_by_id(client):
     assert client.get("/api/jobs/search").status_code == 422
 
 
+def test_search_candidates_matches_name_across_jobs(client, cv_builder):
+    job_a = create_job(client)
+    job_b = create_job(client)
+    _upload_cv(client, job_a, cv_builder, "john.txt", SENIOR_BACKEND)
+    _upload_cv(client, job_b, cv_builder, "alice.txt", JUNIOR_BACKEND)
+
+    resp = client.get("/api/candidates/search", params={"keyword": "John"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["candidates"]) == 1
+    assert body["candidates"][0]["candidate_name"] == "John Doe"
+    assert body["candidates"][0]["job_id"] == job_a
+    assert body["meta"] == {"page": 1, "limit": 20, "has_more": False}
+
+
+def test_search_candidates_matches_skills_case_insensitively(client, cv_builder):
+    job_id = create_job(client)
+    _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+    _upload_cv(client, job_id, cv_builder, "bob.txt", FRONTEND_ONLY)
+
+    resp = client.get("/api/candidates/search", params={"keyword": "react"})
+    assert resp.status_code == 200
+    names = [c["candidate_name"] for c in resp.json()["candidates"]]
+    assert names == ["Bob Jones"]
+
+
+def test_search_candidates_matches_file_name(client, cv_builder):
+    job_id = create_job(client)
+    _upload_cv(client, job_id, cv_builder, "resume_mira.txt", SENIOR_BACKEND)
+
+    resp = client.get("/api/candidates/search", params={"keyword": "mira"})
+    assert resp.status_code == 200
+    assert len(resp.json()["candidates"]) == 1
+
+
+def test_search_candidates_no_match_returns_empty(client, cv_builder):
+    job_id = create_job(client)
+    _upload_cv(client, job_id, cv_builder, "alice.txt", JUNIOR_BACKEND)
+
+    resp = client.get(
+        "/api/candidates/search", params={"keyword": "zzz-no-such-candidate"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["candidates"] == []
+    assert resp.json()["meta"] == {"page": 1, "limit": 20, "has_more": False}
+
+
+def test_search_candidates_requires_keyword(client):
+    assert client.get("/api/candidates/search").status_code == 422
+
+
+def test_search_candidates_paginates(client, cv_builder):
+    job_id = create_job(client)
+    for i in range(5):
+        _upload_cv(
+            client,
+            job_id,
+            cv_builder,
+            f"cand_{i}.txt",
+            f"Dev {i}\n\nSkills\nPython, Flask\n",
+        )
+
+    first = client.get(
+        "/api/candidates/search", params={"keyword": "Python", "page": 1, "limit": 2}
+    )
+    assert first.status_code == 200
+    assert len(first.json()["candidates"]) == 2
+    assert first.json()["meta"] == {"page": 1, "limit": 2, "has_more": True}
+
+    last = client.get(
+        "/api/candidates/search", params={"keyword": "Python", "page": 3, "limit": 2}
+    )
+    assert len(last.json()["candidates"]) == 1
+    assert last.json()["meta"] == {"page": 3, "limit": 2, "has_more": False}
+
+
 def _upload_cv(client, job_id, cv_builder, name, body):
     resp = upload_cvs_and_wait(client, job_id, cv_builder, (name, body))
     assert resp["status"] == "completed"

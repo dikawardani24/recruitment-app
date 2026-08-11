@@ -344,7 +344,7 @@ class FakeChatClient:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str, tools=None, execute_tool=None):
+    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None):
         self.calls.append((system, user))
         return "Jane Doe matches the Flutter role [1]."
 
@@ -355,7 +355,7 @@ class FakeStreamingChatClient(FakeChatClient):
         self.items = items
         self.tool_calls: list[tuple[str, str]] = []
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         self.calls.append((system, user))
         for item in self.items:
             if isinstance(item, ToolCall):
@@ -368,10 +368,10 @@ class ExplodingChatClient:
     """Package-only fake: raises if Gemini is ever called (used to prove that
     deterministic queries complete with ZERO Gemini requests)."""
 
-    async def complete(self, system, user, tools=None, execute_tool=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise AssertionError("Gemini should not have been called")
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise AssertionError("Gemini should not have been called")
         yield None  # pragma: no cover
 
@@ -380,10 +380,10 @@ class FailingChatClient:
     def __init__(self, error: str):
         self.error = error
 
-    async def complete(self, system, user, tools=None, execute_tool=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise ChatError(self.error)
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise ChatError(self.error)
         yield None  # pragma: no cover
 
@@ -397,6 +397,7 @@ def _chat_settings() -> Settings:
 async def test_ask_disabled_when_no_llm_key():
     s = _settings()
     s.llm_api_key = None
+    s.openrouter_api_key = None
     result = await Ask(s, FakeChatClient(), None).execute("who is best?")
     assert result["configured"] is False
     assert "not configured" in result["answer"]
@@ -631,6 +632,136 @@ async def test_ask_ranking_answered_deterministically_no_gemini():
     assert "0.90" in result["answer"]
 
 
+async def test_deterministic_sources_carry_status_and_ranked_by():
+    """Candidate sources on both the search and ranking paths expose the enriched
+    tool fields (status, ranked_by) to the frontend."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    c1 = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])
+    c2 = _candidate("cv-2", "job-1", "John Roe", ["Kotlin"])
+    c1.overall_score = 0.9
+    c1.ranked_by = "admin@ruangguru.com"
+    c2.overall_score = 0.7
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo([c1, c2]))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    search = await ask.execute("who applied for job-1?")
+    search_sources = search["sources"]
+    assert any(source["entity_type"] == "candidate" for source in search_sources)
+    for source in search_sources:
+        assert source["status"] == "completed"
+        assert "ranked_by" in source
+
+    ranking = await ask.execute("who is the best candidate?")
+    ranking_sources = ranking["sources"]
+    assert any(source["entity_type"] == "candidate" for source in ranking_sources)
+    by_id = {source["entity_id"]: source for source in ranking_sources}
+    assert by_id["cv-1"]["ranked_by"] == "admin@ruangguru.com"
+    assert all(source["status"] == "completed" for source in ranking_sources)
+
+
+async def test_deterministic_answers_carry_list_cards():
+    """List answers expose structured cards the chat UI renders as tappable
+    job/candidate tiles; non-list answers carry an empty cards list."""
+    job = _job("job-1", "Flutter Developer", description="Mobile apps")
+    c1 = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])
+    c1.overall_score = 0.9
+    c1.bucket = "strong_match"
+    registry = ToolRegistry(FakeJobRepo([job]), FakeCvRepo([c1]))
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    jobs = await ask.execute("which jobs do we have?")
+    assert jobs["cards"] == [
+        {
+            "type": "job",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "title": "Flutter Developer",
+                    "status": "open",
+                    "candidate_count": 1,
+                    "created_at": job.created_at.isoformat(),
+                }
+            ],
+        }
+    ]
+
+    candidates = await ask.execute("who applied?")
+    assert candidates["cards"] == [
+        {
+            "type": "candidate",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "cv_id": "cv-1",
+                    "name": "Jane Doe",
+                    "file_name": "cv-1.txt",
+                    "status": "completed",
+                    "overall_score": 0.9,
+                    "bucket": "strong_match",
+                    "ranked_by": None,
+                }
+            ],
+        }
+    ]
+
+    ranking = await ask.execute("who is the best candidate?")
+    assert ranking["cards"][0]["type"] == "candidate"
+    assert ranking["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+    stats = await ask.execute("how many jobs do we have?")
+    assert stats["cards"] == []
+
+
+async def test_hiring_need_routes_to_candidate_search_with_cards():
+    """'i need 2 flutter developer' (a recruiting need) routes to the
+    deterministic candidate_search and emits candidate cards, never calling
+    Gemini."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+
+    result = await ask.execute("i need 2 flutter developer")
+    assert result["configured"] is True
+    assert "Jane Doe" in result["answer"]
+    assert result["cards"] == [
+        {
+            "type": "candidate",
+            "items": [
+                {
+                    "job_id": "job-1",
+                    "cv_id": "cv-1",
+                    "name": "Jane Doe",
+                    "file_name": "cv-1.txt",
+                    "status": "completed",
+                    "overall_score": 0.9,
+                    "bucket": None,
+                    "ranked_by": None,
+                }
+            ],
+        }
+    ]
+
+    events = [
+        event
+        async for event in ask.stream("i need 2 flutter developer", history=[])
+    ]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert done["cards"][0]["type"] == "candidate"
+    assert done["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+
+async def test_ask_stream_done_emits_cards():
+    """The deterministic SSE `done` frame includes the list cards payload."""
+    registry = _registry()
+    ask = Ask(_chat_settings(), ExplodingChatClient(), None, registry)
+    events = [
+        event
+        async for event in ask.stream("who applied for job-1?", history=[])
+    ]
+    done = [e for e in events if e["type"] == "done"][0]
+    assert done["cards"][0]["type"] == "candidate"
+    assert done["cards"][0]["items"][0]["cv_id"] == "cv-1"
+
+
 async def test_ask_reasoning_prefetches_records_single_gemini_call():
     """Reasoning turns pre-fetch workspace records and make exactly ONE Gemini
     call; Gemini is never offered the tool loop."""
@@ -658,6 +789,7 @@ async def test_ask_reasoning_prefetches_records_single_gemini_call():
 async def test_ask_stream_not_configured_errors():
     s = _settings()
     s.llm_api_key = None
+    s.openrouter_api_key = None
     events = [event async for event in Ask(s, FakeChatClient(), None).stream("hi")]
     assert events[0]["type"] == "error"
     assert "not configured" in events[0]["message"]
@@ -716,6 +848,9 @@ def test_router_spec_examples():
             "candidate_search",
             "deterministic",
         ),
+        _SpecCase("i need 2 flutter developer", "candidate_search", "deterministic"),
+        _SpecCase("We need 3 backend engineers", "candidate_search", "deterministic"),
+        _SpecCase("I am looking for a Flutter developer", "candidate_search", "deterministic"),
         _SpecCase("What experience does this candidate have?", "candidate_detail", "rag_reasoning"),
         _SpecCase("Which candidates match this job description?", "candidate_ranking", "deterministic"),
         _SpecCase("What is Flutter?", "general_question", "general"),
@@ -800,7 +935,8 @@ async def test_ask_score_filter_filters_by_rank():
     assert "Reyhan" not in result["answer"] and "Rizki" not in result["answer"]
 
     below = await ask.execute("show flutter candidates above 95")
-    assert "No applicants" in below["answer"]
+    assert "There are no candidates matching" in below["answer"]
+    assert "create a job and add candidates" in below["answer"]
 
 
 async def test_ask_score_threshold_more_than_is_strict():
@@ -866,3 +1002,34 @@ def test_api_chat_stream_disabled(client):
     assert resp.headers["content-type"].startswith("text/event-stream")
     assert '"type": "error"' in resp.text
     assert "not configured" in resp.text
+
+
+def test_api_chat_models_lists_configured_providers(client):
+    resp = client.get("/api/chat/models")
+    assert resp.status_code == 200
+    assert resp.json()["models"] == []
+
+
+def test_resolve_chat_model_falls_back_to_default():
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = "or-key"
+    s.openrouter_models = ["qwen/qwen-2.5-72b-instruct"]
+
+    options = s.chat_models
+    assert [o.id for o in options] == [
+        "default",
+        "openrouter:qwen/qwen-2.5-72b-instruct",
+    ]
+    default = s.resolve_chat_model(None)
+    assert default.id == "default"
+    assert default.provider == "default"
+    qwen = s.resolve_chat_model("openrouter:qwen/qwen-2.5-72b-instruct")
+    assert qwen.provider == "openrouter"
+    assert qwen.base_url == "https://openrouter.ai/api/v1"
+    assert qwen.model == "qwen/qwen-2.5-72b-instruct"
+    assert s.resolve_chat_model("does-not-exist").id == "default"
+
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+    assert s.resolve_chat_model(None) is None

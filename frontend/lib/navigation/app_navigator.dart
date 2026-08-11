@@ -70,6 +70,10 @@ abstract class AppNavigator {
 
   void goToSearchJobs();
 
+  void goToSearchCandidates();
+
+  void goToSearch();
+
   void goToChat();
 
   void goToJobDetail(String jobId);

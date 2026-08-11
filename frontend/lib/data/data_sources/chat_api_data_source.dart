@@ -21,6 +21,7 @@ class ChatApiDataSource {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) {
     final data = <String, dynamic>{
       'question': question,
@@ -30,6 +31,7 @@ class ChatApiDataSource {
       ],
       'top_k': topK,
       'job_id': ?jobId,
+      'model': ?model,
     };
     return _client.post(
       ApiPaths.chat,
@@ -45,6 +47,7 @@ class ChatApiDataSource {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) {
     final data = <String, dynamic>{
       'question': question,
@@ -54,6 +57,7 @@ class ChatApiDataSource {
       ],
       'top_k': topK,
       'job_id': ?jobId,
+      'model': ?model,
     };
 
     final controller = StreamController<ChatStreamEventDto>();
@@ -97,6 +101,13 @@ class ChatApiDataSource {
 
     controller.onCancel = sub.cancel;
     return controller.stream;
+  }
+
+  Future<List<ChatModelDto>> getModels() {
+    return _client.get(
+      ApiPaths.chatModels,
+      parse: (resp) => ChatModelsMapper.fromJson(resp as Map<String, dynamic>),
+    );
   }
 
   ChatStreamEventDto? _parseFrame(String frame) {

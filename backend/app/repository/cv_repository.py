@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from app.domain.candidate import Candidate
+from app.domain.page import Page
 
 
 class CvRepository(Protocol):
@@ -44,4 +45,9 @@ class CvRepository(Protocol):
         ...
 
     async def count_by_import(self, import_id: str) -> dict[str, int]:
+        ...
+
+    async def search(
+        self, keyword: str, page: int, page_size: int
+    ) -> Page[Candidate]:
         ...

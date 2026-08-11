@@ -11,6 +11,7 @@ from app.repository.import_job_repository import ImportJobRepository
 from app.repository.impl.import_job_repository_impl import ImportJobRepositoryImpl
 from app.usecase.get_job_by_page import GetJobByPage
 from app.usecase.search_jobs import SearchJobs
+from app.usecase.search_candidates import SearchCandidates
 from app.usecase.save_job import SaveJob
 from app.usecase.get_job import GetJob
 from app.usecase.delete_job import DeleteJob
@@ -23,6 +24,7 @@ from app.usecase.rank_cv import RankCv
 from app.usecase.get_rankings import GetRankings
 from app.usecase.semantic_search import SemanticSearch
 from app.usecase.reindex_embeddings import ReindexEmbeddings
+from app.usecase.unified_search import UnifiedSearch
 from app.usecase.ask import Ask
 from app.chat import ChatClient, ToolRegistry
 from app.rag import EmbeddingIndexer, LocalEmbedder, VectorStore
@@ -56,6 +58,9 @@ def get_job_by_page_use_case() -> GetJobByPage:
 def search_jobs_use_case() -> SearchJobs:
     return SearchJobs(__job_repo(), __cv_repo())
 
+def search_candidates_use_case() -> SearchCandidates:
+    return SearchCandidates(__cv_repo())
+
 def get_job_use_case() -> GetJob:
     return GetJob(__job_repo(), __cv_repo())
 
@@ -85,6 +90,9 @@ def get_rankings_use_case() -> GetRankings:
 
 def semantic_search_use_case() -> SemanticSearch:
     return SemanticSearch(_embedding_indexer(), __job_repo(), __cv_repo())
+
+def unified_search_use_case() -> UnifiedSearch:
+    return UnifiedSearch(__job_repo(), __cv_repo())
 
 def reindex_embeddings_use_case() -> ReindexEmbeddings:
     return ReindexEmbeddings(_embedding_indexer(), __job_repo(), __cv_repo())

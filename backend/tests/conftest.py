@@ -16,6 +16,7 @@ def client(tmp_path: Path):
     settings.db_path = tmp_path / "test.db"
     settings.upload_dir = tmp_path / "uploads"
     settings.llm_api_key = None
+    settings.openrouter_api_key = None
     settings.import_poll_interval_ms = 20
     settings.rag_enabled = False
     settings.ensure_dirs()

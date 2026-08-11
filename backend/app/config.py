@@ -11,6 +11,28 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+@dataclass(frozen=True)
+class ChatModelOption:
+    """A chat-completion model a recruiter can pick from.
+
+    ``id`` is the stable identifier used in the API and the chat UI.
+    ``model`` is the model name sent to the provider's OpenAI-compatible
+    endpoint at ``base_url`` using ``api_key``.
+    """
+
+    id: str
+    label: str
+    provider: str
+    base_url: str
+    api_key: str | None
+    model: str
+
+
+def _list_env(name: str, default: str = "") -> list[str]:
+    raw = os.getenv(name, default)
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 @dataclass
 class Settings:
     app_name: str = os.getenv("ATS_APP_NAME", "ai-ats")
@@ -52,6 +74,19 @@ class Settings:
     chat_temperature: float = float(os.getenv("ATS_CHAT__TEMPERATURE", "0.3"))
     chat_max_tokens: int = int(os.getenv("ATS_CHAT__MAX_TOKENS", "800"))
     chat_history_turns: int = int(os.getenv("ATS_CHAT__HISTORY_TURNS", "6"))
+
+    # OpenRouter (optional) — an OpenAI-compatible router hosting many models
+    # (e.g. Qwen). When ATS_OPENROUTER__API_KEY is set, every model in
+    # ATS_OPENROUTER__MODELS becomes selectable in the recruiter-copilot chat.
+    openrouter_api_key: str | None = os.getenv("ATS_OPENROUTER__API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    openrouter_base_url: str = os.getenv(
+        "ATS_OPENROUTER__BASE_URL", "https://openrouter.ai/api/v1"
+    )
+    openrouter_models: list[str] = field(
+        default_factory=lambda: _list_env(
+            "ATS_OPENROUTER__MODELS", "qwen/qwen-2.5-72b-instruct"
+        )
+    )
 
     # Local BERT resume-NER (optional; overrides LLM extraction when enabled).
     ner_enabled: bool = os.getenv("ATS_EXTRACT__NER", "false").lower() in (
@@ -107,7 +142,57 @@ class Settings:
 
     @property
     def chat_enabled(self) -> bool:
-        return bool(self.llm_api_key)
+        return bool(self.llm_api_key or self.openrouter_api_key)
+
+    @property
+    def chat_models(self) -> list[ChatModelOption]:
+        """Every model the recruiter-copilot chat can use, in display order.
+
+        The default endpoint model (Gemini by default) always comes first, then
+        each OpenRouter model. Only providers with an API key are included.
+        """
+        options: list[ChatModelOption] = []
+        if self.llm_api_key:
+            options.append(
+                ChatModelOption(
+                    id="default",
+                    label=self.chat_model,
+                    provider="default",
+                    base_url=self.llm_base_url or "",
+                    api_key=self.llm_api_key,
+                    model=self.chat_model,
+                )
+            )
+        if self.openrouter_api_key:
+            for model in self.openrouter_models:
+                options.append(
+                    ChatModelOption(
+                        id=f"openrouter:{model}",
+                        label=f"Qwen via OpenRouter ({model})",
+                        provider="openrouter",
+                        base_url=self.openrouter_base_url,
+                        api_key=self.openrouter_api_key,
+                        model=model,
+                    )
+                )
+        return options
+
+    def resolve_chat_model(self, model_id: str | None) -> ChatModelOption | None:
+        """Return the [ChatModelOption] for ``model_id``, or None if no provider
+        is configured.
+
+        A missing or unknown ``model_id`` falls back to the first available
+        option (the default provider's model) when any provider is configured.
+        """
+        options = self.chat_models
+        if not options:
+            return None
+        if not model_id:
+            return options[0]
+        for option in options:
+            if option.id == model_id:
+                return option
+        return options[0]
 
 
 settings = Settings()

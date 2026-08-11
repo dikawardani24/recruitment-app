@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../domain/models/candidate_page.dart';
 import '../../domain/models/candidate_result.dart';
 import '../../domain/models/import_result.dart';
 import '../../domain/models/rank_response.dart';
@@ -84,6 +85,24 @@ class CandidateRepositoryImpl implements CandidateRepository {
   @override
   Future<void> deleteCandidate(String jobId, String cvId) =>
       _dataSource.deleteCandidate(jobId, cvId);
+
+  @override
+  Future<CandidatePage> searchCandidates({
+    required String keyword,
+    required int page,
+    required int limit,
+  }) async {
+    final dto = await _dataSource.searchCandidates(
+      keyword: keyword,
+      page: page,
+      limit: limit,
+    );
+    return CandidatePage(
+      candidates: dto.candidates.map(_toCandidate).toList(),
+      page: dto.page,
+      hasMore: dto.hasMore,
+    );
+  }
 
   CandidateResult _toCandidate(CandidateResponse dto) {
     return CandidateResult(

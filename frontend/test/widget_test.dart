@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ai_ats/di.dart';
 import 'package:ai_ats/main.dart';
@@ -10,6 +11,8 @@ import 'package:ai_ats/router.dart';
 import 'package:ai_ats/screens/job_list_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
   setupDependencies();
 
   Widget buildApp() {

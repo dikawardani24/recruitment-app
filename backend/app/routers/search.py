@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.di.injection import (
     reindex_embeddings_use_case,
     semantic_search_use_case,
+    unified_search_use_case,
 )
 from app.rag import EmbeddingError, VectorStoreError
 
@@ -40,6 +41,15 @@ async def semantic_search(payload: SemanticSearchRequest) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("")
+async def unified_search(
+    keyword: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(5, ge=1, le=50),
+) -> dict:
+    """Unified search over jobs and candidates, returns top results for both."""
+    return await unified_search_use_case().execute(keyword=keyword, limit=limit)
 
 
 @router.post("/reindex")
