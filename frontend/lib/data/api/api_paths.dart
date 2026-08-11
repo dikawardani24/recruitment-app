@@ -22,4 +22,8 @@ class ApiPaths {
   static String cvRank(String jobId, String cvId) => '/jobs/$jobId/cvs/$cvId/rank';
 
   static String rankings(String jobId) => '/jobs/$jobId/rankings';
+
+  static const String chat = '/chat';
+
+  static const String chatStream = '/chat/stream';
 }

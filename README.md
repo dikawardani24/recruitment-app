@@ -13,6 +13,7 @@ A simple recruiter tool:
 | Backend | Python FastAPI (single process) |
 | Storage | SQLite + on-disk file uploads — no external services |
 | Ranking | Deterministic rule-based scoring, plus AI reasoning via any OpenAI-compatible LLM when `ATS_LLM__API_KEY` is set |
+| Semantic search (RAG) | Optional, opt-in: local `bge-small-en-v1.5` embeddings + Qdrant (embedded/local mode) |
 | Frontend | Flutter (Material 3) |
 
 ## Backend structure
@@ -51,6 +52,11 @@ backend/app/
 ├── imports/                # Background CV processing
 │   ├── processor.py        # asyncio worker pool; DB acts as the queue
 │   └── pipeline.py         # extract_and_profile orchestration
+├── rag/                    # Semantic search / RAG (opt-in, off by default)
+│   ├── _embedder.py        # local bge-small embeddings (lazy-load, free)
+│   ├── _chunker.py         # candidate + job semantic chunks
+│   ├── _qdrant.py          # Qdrant wrapper (embedded local mode by default)
+│   └── _indexer.py         # idempotent indexing, search, backfill
 └── ranking/                # Scoring, buckets, LLM reasoning
 ```
 
@@ -61,6 +67,7 @@ Each folder is a domain:
 - **extraction/** — pulls structured data from resumes
 - **ranking/** — scores and ranks candidates
 - **imports/** — processes uploaded CVs in the background
+- **rag/** — embeds jobs/CVs and answers semantic searches
 
 ## Quick start
 
@@ -117,5 +124,21 @@ Base URL: `http://localhost:8000/api`
 | POST | `/api/jobs/{id}/rank` | Rank all parsed CVs (LLM reasoning when configured) |
 | POST | `/api/jobs/{id}/cvs/{cv_id}/rank` | Rank a single CV |
 | GET | `/api/jobs/{id}/rankings` | Persisted rankings, best match first |
+| POST | `/api/search/semantic` | Semantic search over jobs or candidates (RAG, opt-in) |
+| POST | `/api/search/reindex` | Build/rebuild the vector index (RAG, opt-in) |
 
 Plus `GET /health` (service health).
+
+## Semantic search (RAG, opt-in)
+
+Off by default. When enabled, jobs and CVs are embedded locally with the free
+`BAAI/bge-small-en-v1.5` model and stored in Qdrant (embedded/local files — no
+server needed; set `ATS_QDRANT__URL` to use a real Qdrant server). Indexing
+happens automatically as jobs/CVs are created and processed; run
+`POST /api/search/reindex` to backfill existing data.
+
+```
+ATS_RAG__ENABLED=true
+```
+
+See [docs/setup-and-testing.md](docs/setup-and-testing.md) for all RAG settings.

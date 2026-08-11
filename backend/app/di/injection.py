@@ -21,6 +21,11 @@ from app.usecase.delete_cv import DeleteCv
 from app.usecase.rank_job import RankJob
 from app.usecase.rank_cv import RankCv
 from app.usecase.get_rankings import GetRankings
+from app.usecase.semantic_search import SemanticSearch
+from app.usecase.reindex_embeddings import ReindexEmbeddings
+from app.usecase.ask import Ask
+from app.chat import ChatClient, ToolRegistry
+from app.rag import EmbeddingIndexer, LocalEmbedder, VectorStore
 from app.imports.processor import CvProcessor
 
 """DATASOURCE"""
@@ -43,7 +48,7 @@ def __import_repo() -> ImportJobRepository:
 
 """USE CASE"""
 def saveJobUseCase() -> SaveJob:
-    return SaveJob(__job_repo())
+    return SaveJob(__job_repo(), _embedding_indexer())
 
 def get_job_by_page_use_case() -> GetJobByPage:
     return GetJobByPage(__job_repo(), __cv_repo())
@@ -55,7 +60,7 @@ def get_job_use_case() -> GetJob:
     return GetJob(__job_repo(), __cv_repo())
 
 def delete_job_use_case() -> DeleteJob:
-    return DeleteJob(__job_repo(), __cv_repo(), __import_repo())
+    return DeleteJob(__job_repo(), __cv_repo(), __import_repo(), _embedding_indexer())
 
 def import_cv_batch_use_case() -> ImportCvBatch:
     return ImportCvBatch(__job_repo(), __cv_repo(), __import_repo(), _settings())
@@ -67,7 +72,7 @@ def get_import_status_use_case() -> GetImportStatus:
     return GetImportStatus(__job_repo(), __cv_repo(), __import_repo())
 
 def delete_cv_use_case() -> DeleteCv:
-    return DeleteCv(__job_repo(), __cv_repo())
+    return DeleteCv(__job_repo(), __cv_repo(), _embedding_indexer())
 
 def rank_job_use_case() -> RankJob:
     return RankJob(__job_repo(), __cv_repo(), _settings())
@@ -78,6 +83,51 @@ def rank_cv_use_case() -> RankCv:
 def get_rankings_use_case() -> GetRankings:
     return GetRankings(__job_repo(), __cv_repo())
 
+def semantic_search_use_case() -> SemanticSearch:
+    return SemanticSearch(_embedding_indexer(), __job_repo(), __cv_repo())
+
+def reindex_embeddings_use_case() -> ReindexEmbeddings:
+    return ReindexEmbeddings(_embedding_indexer(), __job_repo(), __cv_repo())
+
+def ask_use_case() -> Ask:
+    return Ask(_settings(), _chat_client(), _embedding_indexer(), _tool_registry())
+
+
+"""CHAT TOOLS"""
+__tool_registry: ToolRegistry | None = None
+
+def _tool_registry() -> ToolRegistry:
+    global __tool_registry
+    if __tool_registry is None:
+        __tool_registry = ToolRegistry(__job_repo(), __cv_repo())
+    return __tool_registry
+
+
+"""CHAT CLIENT"""
+__chat_client: ChatClient | None = None
+
+def _chat_client() -> ChatClient:
+    global __chat_client
+    if __chat_client is None:
+        __chat_client = ChatClient(_settings())
+    return __chat_client
+
+
+"""RAG INDEXER"""
+__embedding_indexer: EmbeddingIndexer | None = None
+
+def _embedding_indexer() -> EmbeddingIndexer | None:
+    """Lazily build the indexer only when RAG is enabled, so disabled installs
+    never import/construct Qdrant or load embedding models."""
+    global __embedding_indexer
+    if not settings.rag_enabled:
+        return None
+    if __embedding_indexer is None:
+        embedder = LocalEmbedder(settings)
+        store = VectorStore(settings)
+        __embedding_indexer = EmbeddingIndexer(settings, embedder, store)
+    return __embedding_indexer
+
 
 """WORKER"""
 __cv_processor: CvProcessor | None = None
@@ -86,7 +136,7 @@ def cv_processor() -> CvProcessor:
     global __cv_processor
     if __cv_processor is None:
         __cv_processor = CvProcessor(
-            _settings(), __cv_repo(), __import_repo()
+            _settings(), __cv_repo(), __import_repo(), _embedding_indexer()
         )
     return __cv_processor
 

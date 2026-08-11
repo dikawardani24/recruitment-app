@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from uuid import uuid4
@@ -10,13 +11,15 @@ from app.config import settings
 from app.domain.job import Job
 from app.jd import RequirementParser
 from app.parsers import extract_text
+from app.rag._indexer import EmbeddingIndexer
 from app.repository.job_repository import JobRepository
 from app.util.date_util import now
 
 
 class SaveJob:
-    def __init__(self, repo: JobRepository):
+    def __init__(self, repo: JobRepository, indexer: EmbeddingIndexer | None = None):
         self.repo = repo
+        self.indexer = indexer
 
     async def execute(
         self,
@@ -57,8 +60,17 @@ class SaveJob:
             raise ValueError("Job data is not valid")
 
         await self.repo.save(job)
+        await self._index(job)
 
         return {"job": job.to_json()}
+
+    async def _index(self, job: Job) -> None:
+        # Best-effort: a failure to embed must not break job creation; run
+        # POST /api/search/reindex to repair the index.
+        if self.indexer is None or not self.indexer.enabled:
+            return
+        with contextlib.suppress(Exception):
+            await self.indexer.index_job(job)
 
 
 def _save_file(upload_dir: Path, suffix: str, content: bytes) -> str:

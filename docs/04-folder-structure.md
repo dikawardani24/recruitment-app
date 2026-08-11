@@ -35,13 +35,15 @@ backend/
 │   │   ├── save_job, get_job, get_job_by_page, search_jobs, delete_job
 │   │   ├── import_cv_batch, list_cvs, delete_cv
 │   │   ├── rank_job, rank_cv, get_rankings
-│   │   └── get_import_status
+│   │   ├── get_import_status
+│   │   └── semantic_search, reindex_embeddings   # RAG (opt-in)
 │   ├── di/
 │   │   ├── injection.py      # Composition root (manual DI), cv_processor()
 │   │   └── __init__.py
 │   ├── domain/               # Job, Candidate, ImportJob, Page, errors
 │   ├── routers/
-│   │   └── jobs.py           # All /api/jobs/* endpoints
+│   │   ├── jobs.py           # All /api/jobs/* endpoints
+│   │   └── search.py         # /api/search/semantic + /api/search/reindex
 │   ├── parsers/              # File text extraction (_extract.py: PDF/DOCX/TXT)
 │   ├── skills/               # Skill dictionaries + matching (_match.py)
 │   ├── jd/                   # JD → structured requirements (_parser.py, _structure.py)
@@ -52,6 +54,11 @@ backend/
 │   ├── imports/              # Background CV processing
 │   │   ├── processor.py      # asyncio worker pool; DB-as-queue
 │   │   └── pipeline.py       # extract_and_profile orchestration
+│   ├── rag/                  # Semantic search / RAG (opt-in, off by default)
+│   │   ├── _embedder.py      # local bge-small embeddings (lazy-load)
+│   │   ├── _chunker.py       # candidate + job semantic chunks
+│   │   ├── _qdrant.py        # Qdrant wrapper (embedded/local mode by default)
+│   │   └── _indexer.py       # idempotent indexing, search, backfill
 │   ├── ranking/              # Scoring, buckets, LLM reasoning
 │   │   ├── _scoring.py       # score_profile, bucket_for, rule_reasoning
 │   │   ├── _llm.py           # LLM-powered reasoning
@@ -63,7 +70,8 @@ backend/
     ├── test_imports.py       # background import flow
     ├── test_jd_skills.py     # JD structuring + skill matching
     ├── test_llm_extract.py   # LLM extraction (mocked)
-    └── test_ner_extract.py   # NER extraction (mocked)
+    ├── test_ner_extract.py   # NER extraction (mocked)
+    └── test_rag.py           # chunking, indexing, semantic search (fake embedder)
 ```
 
 ## 3. Frontend (Flutter) — Detailed

@@ -15,6 +15,7 @@ from app.domain.import_job import (
     derive_import_status,
 )
 from app.imports.pipeline import extract_and_profile
+from app.rag._indexer import EmbeddingIndexer
 from app.repository.cv_repository import CvRepository
 from app.repository.import_job_repository import ImportJobRepository
 
@@ -32,10 +33,12 @@ class CvProcessor:
         settings: Settings,
         cv_repo: CvRepository,
         import_repo: ImportJobRepository,
+        indexer: EmbeddingIndexer | None = None,
     ):
         self.settings = settings
         self.cv_repo = cv_repo
         self.import_repo = import_repo
+        self.indexer = indexer
 
     async def reset_stale_processing(self) -> None:
         """Recover documents stuck in PROCESSING after a restart."""
@@ -129,10 +132,19 @@ class CvProcessor:
                 source=source,
             )
             await self.cv_repo.complete_document(candidate)
+            await self._index(candidate)
         except Exception as exc:
             await self.cv_repo.mark_failed(doc.id, _error_str(exc))
         finally:
             await self._refresh_import(doc.import_job_id)
+
+    async def _index(self, candidate: Candidate) -> None:
+        # Best-effort: a failure to embed must not fail the document; run
+        # POST /api/search/reindex to repair the index.
+        if self.indexer is None or not self.indexer.enabled:
+            return
+        with contextlib.suppress(Exception):
+            await self.indexer.index_candidate(candidate)
 
     async def _refresh_import(self, import_id: str | None) -> None:
         if not import_id:

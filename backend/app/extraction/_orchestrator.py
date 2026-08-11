@@ -8,6 +8,7 @@ from app.config import Settings
 from app.extraction._ner import NERExtractError
 from app.extraction._profile import Profile, extract_profile
 from app.jd import _extract_education
+from app.llm._gate import bounded_retry
 
 
 class LLMExtractError(Exception):
@@ -108,16 +109,20 @@ async def extract_profile_with_llm(settings: Settings, text: str, file_name: str
     fallback = extract_profile(text, file_name)
 
     try:
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            temperature=0.0,
-            messages=[
-                {"role": "system", "content": "You are a precise, JSON-only assistant."},
-                {
-                    "role": "user",
-                    "content": _build_prompt(file_name, text[:MAX_EXTRACT_CHARS]),
-                },
-            ],
+        response = await bounded_retry(
+            lambda: client.chat.completions.create(
+                model=settings.llm_model,
+                temperature=0.0,
+                messages=[
+                    {"role": "system", "content": "You are a precise, JSON-only assistant."},
+                    {
+                        "role": "user",
+                        "content": _build_prompt(file_name, text[:MAX_EXTRACT_CHARS]),
+                    },
+                ],
+            ),
+            max_retries=settings.llm_max_retries,
+            base_delay_s=settings.llm_retry_base_ms / 1000.0,
         )
     except Exception as exc:  # network, auth, quota, etc.
         raise LLMExtractError(f"llm_call_failed:{type(exc).__name__}") from exc

@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,8 @@ import 'theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Keep the HTTP inspector available in release builds too.
+  ChuckerFlutter.showOnRelease = true;
   setupDependencies();
   final prefs = await SharedPreferences.getInstance();
   final router = AppRouter.create();

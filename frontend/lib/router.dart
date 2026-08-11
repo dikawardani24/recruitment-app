@@ -6,6 +6,7 @@ import 'navigation/app_navigator.dart';
 import 'navigation/app_route.dart';
 import 'screens/action_result_screen.dart';
 import 'screens/candidate_detail_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/delete_confirm_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
@@ -37,6 +38,10 @@ class AppRouter {
             GoRoute(
               path: 'search',
               builder: (context, state) => const SearchJobScreen(),
+            ),
+            GoRoute(
+              path: 'chat',
+              builder: (context, state) => const ChatScreen(),
             ),
             GoRoute(
               path: 'delete-confirm',
