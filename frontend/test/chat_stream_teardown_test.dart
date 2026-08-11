@@ -37,6 +37,7 @@ class _FakeRepo implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) async {
     return const ChatResponse(
       configured: true,
@@ -53,9 +54,13 @@ class _FakeRepo implements ChatRepository {
     String? jobId,
     List<ChatMessage> history = const [],
     int topK = 10,
+    String? model,
   }) {
     return controller.stream;
   }
+
+  @override
+  Future<List<ChatModel>> getModels() async => const [];
 }
 
 void main() {

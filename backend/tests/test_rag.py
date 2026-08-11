@@ -344,7 +344,7 @@ class FakeChatClient:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str, tools=None, execute_tool=None):
+    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None):
         self.calls.append((system, user))
         return "Jane Doe matches the Flutter role [1]."
 
@@ -355,7 +355,7 @@ class FakeStreamingChatClient(FakeChatClient):
         self.items = items
         self.tool_calls: list[tuple[str, str]] = []
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         self.calls.append((system, user))
         for item in self.items:
             if isinstance(item, ToolCall):
@@ -368,10 +368,10 @@ class ExplodingChatClient:
     """Package-only fake: raises if Gemini is ever called (used to prove that
     deterministic queries complete with ZERO Gemini requests)."""
 
-    async def complete(self, system, user, tools=None, execute_tool=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise AssertionError("Gemini should not have been called")
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise AssertionError("Gemini should not have been called")
         yield None  # pragma: no cover
 
@@ -380,10 +380,10 @@ class FailingChatClient:
     def __init__(self, error: str):
         self.error = error
 
-    async def complete(self, system, user, tools=None, execute_tool=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise ChatError(self.error)
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
         raise ChatError(self.error)
         yield None  # pragma: no cover
 
@@ -397,6 +397,7 @@ def _chat_settings() -> Settings:
 async def test_ask_disabled_when_no_llm_key():
     s = _settings()
     s.llm_api_key = None
+    s.openrouter_api_key = None
     result = await Ask(s, FakeChatClient(), None).execute("who is best?")
     assert result["configured"] is False
     assert "not configured" in result["answer"]
@@ -658,6 +659,7 @@ async def test_ask_reasoning_prefetches_records_single_gemini_call():
 async def test_ask_stream_not_configured_errors():
     s = _settings()
     s.llm_api_key = None
+    s.openrouter_api_key = None
     events = [event async for event in Ask(s, FakeChatClient(), None).stream("hi")]
     assert events[0]["type"] == "error"
     assert "not configured" in events[0]["message"]
@@ -866,3 +868,34 @@ def test_api_chat_stream_disabled(client):
     assert resp.headers["content-type"].startswith("text/event-stream")
     assert '"type": "error"' in resp.text
     assert "not configured" in resp.text
+
+
+def test_api_chat_models_lists_configured_providers(client):
+    resp = client.get("/api/chat/models")
+    assert resp.status_code == 200
+    assert resp.json()["models"] == []
+
+
+def test_resolve_chat_model_falls_back_to_default():
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = "or-key"
+    s.openrouter_models = ["qwen/qwen-2.5-72b-instruct"]
+
+    options = s.chat_models
+    assert [o.id for o in options] == [
+        "default",
+        "openrouter:qwen/qwen-2.5-72b-instruct",
+    ]
+    default = s.resolve_chat_model(None)
+    assert default.id == "default"
+    assert default.provider == "default"
+    qwen = s.resolve_chat_model("openrouter:qwen/qwen-2.5-72b-instruct")
+    assert qwen.provider == "openrouter"
+    assert qwen.base_url == "https://openrouter.ai/api/v1"
+    assert qwen.model == "qwen/qwen-2.5-72b-instruct"
+    assert s.resolve_chat_model("does-not-exist").id == "default"
+
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+    assert s.resolve_chat_model(None) is None

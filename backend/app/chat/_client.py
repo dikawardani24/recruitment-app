@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from app.config import Settings
+from app.config import ChatModelOption, Settings
 from app.llm._gate import bounded_retry, rate_capped_wait
 
 
@@ -24,8 +24,10 @@ MAX_TOOL_ROUNDS = 3
 
 
 class ChatClient:
-    """OpenAI-compatible chat completions for the recruiter copilot. Reuses the
-    LLM key/base URL; only the model is overridable via ATS_CHAT__MODEL.
+    """OpenAI-compatible chat completions for the recruiter copilot. Each call
+    can target any configured chat model (default provider endpoint, or OpenRouter
+    via ATS_OPENROUTER__MODELS) — the base URL, API key and model name are picked
+    per request from [Settings.resolve_chat_model].
 
     Supports optional function-calling: when [tools] and [execute_tool] are given
     the client runs the model/tool loop (up to [MAX_TOOL_ROUNDS]) so the copilot
@@ -34,20 +36,43 @@ class ChatClient:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def _openai_client(self):
+    def _resolve(self, model_id: str | None) -> ChatModelOption:
+        """Resolve the requested model, raising if it is not configured."""
+        option = self.settings.resolve_chat_model(model_id)
+        if option is None:
+            raise ChatError("chat_not_configured")
+        return option
+
+    def _min_interval_s(self, option: ChatModelOption) -> float:
+        """Minimum gap between calls for this provider.
+
+        The 12s cap exists for the default provider (Gemini's hard ~5 RPM limit).
+        Other providers (e.g. OpenRouter) are not throttled by us, so they get no
+        artificial delay.
+        """
+        if option.provider == "default":
+            return self.settings.llm_min_interval_ms / 1000.0
+        return 0.0
+
+    def _openai_client(self, option: ChatModelOption):
         import openai
 
         kwargs: dict = {
-            "api_key": self.settings.llm_api_key,
+            "api_key": option.api_key,
             "timeout": self.settings.llm_timeout_ms / 1000.0,
         }
-        if self.settings.llm_base_url:
-            kwargs["base_url"] = self.settings.llm_base_url
+        if option.base_url:
+            kwargs["base_url"] = option.base_url
         return openai.AsyncOpenAI(**kwargs)
 
-    def _kwargs(self, messages: list[dict], tools: list[dict] | None) -> dict:
+    def _kwargs(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None,
+        option: ChatModelOption,
+    ) -> dict:
         kwargs: dict = {
-            "model": self.settings.chat_model,
+            "model": option.model,
             "temperature": self.settings.chat_temperature,
             "max_tokens": self.settings.chat_max_tokens,
             "messages": messages,
@@ -56,24 +81,36 @@ class ChatClient:
             kwargs["tools"] = tools
         return kwargs
 
-    async def _create(self, client, messages: list[dict], tools: list[dict] | None):
-        """One Gemini request: rate-capped, with bounded backoff on transient
+    async def _create(
+        self,
+        client,
+        messages: list[dict],
+        tools: list[dict] | None,
+        option: ChatModelOption,
+    ):
+        """One model request: rate-capped, with bounded backoff on transient
         provider errors. A single call, never a loop."""
-        await rate_capped_wait(self.settings.llm_min_interval_ms / 1000.0)
+        await rate_capped_wait(self._min_interval_s(option))
         return await bounded_retry(
-            lambda: client.chat.completions.create(**self._kwargs(messages, tools)),
+            lambda: client.chat.completions.create(**self._kwargs(messages, tools, option)),
             max_retries=self.settings.llm_max_retries,
             base_delay_s=self.settings.llm_retry_base_ms / 1000.0,
         )
 
-    async def _create_stream(self, client, messages: list[dict], tools: list[dict] | None):
+    async def _create_stream(
+        self,
+        client,
+        messages: list[dict],
+        tools: list[dict] | None,
+        option: ChatModelOption,
+    ):
         """Like [_create] but for SSE streaming; still exactly one model request."""
-        await rate_capped_wait(self.settings.llm_min_interval_ms / 1000.0)
+        await rate_capped_wait(self._min_interval_s(option))
         return await bounded_retry(
             lambda: client.chat.completions.create(
                 stream=True,
                 stream_options={"include_usage": True},
-                **self._kwargs(messages, tools),
+                **self._kwargs(messages, tools, option),
             ),
             max_retries=self.settings.llm_max_retries,
             base_delay_s=self.settings.llm_retry_base_ms / 1000.0,
@@ -85,17 +122,19 @@ class ChatClient:
         user: str,
         tools: list[dict] | None = None,
         execute_tool=None,
+        model_id: str | None = None,
     ) -> str:
         if not self.settings.chat_enabled:
             raise ChatError("chat_not_configured")
-        client = self._openai_client()
+        option = self._resolve(model_id)
+        client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
         for _ in range(MAX_TOOL_ROUNDS):
             try:
-                response = await self._create(client, messages, tools)
+                response = await self._create(client, messages, tools, option)
             except Exception as exc:  # network, auth, quota, etc.
                 raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
             choice = response.choices[0].message
@@ -130,19 +169,21 @@ class ChatClient:
         user: str,
         tools: list[dict] | None = None,
         execute_tool=None,
+        model_id: str | None = None,
     ):
         """Like [complete] but streams. Yields either a text delta (str) or a
         [ToolCall] marker just before each tool executes, then the final text."""
         if not self.settings.chat_enabled:
             raise ChatError("chat_not_configured")
-        client = self._openai_client()
+        option = self._resolve(model_id)
+        client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
         for _ in range(MAX_TOOL_ROUNDS):
             try:
-                stream = await self._create_stream(client, messages, tools)
+                stream = await self._create_stream(client, messages, tools, option)
             except Exception as exc:  # network, auth, quota, etc.
                 raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
 

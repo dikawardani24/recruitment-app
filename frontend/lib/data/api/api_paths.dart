@@ -26,4 +26,6 @@ class ApiPaths {
   static const String chat = '/chat';
 
   static const String chatStream = '/chat/stream';
+
+  static const String chatModels = '/chat/models';
 }

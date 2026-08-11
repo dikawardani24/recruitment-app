@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     job_id: str | None = None
     history: list[ChatTurn] = Field(default_factory=list)
     top_k: int = Field(10, ge=1, le=50)
+    model: str | None = None
 
 
 def _history(payload: ChatRequest) -> list[dict]:
@@ -31,6 +32,22 @@ def _history(payload: ChatRequest) -> list[dict]:
         {"role": turn.role, "content": turn.content}
         for turn in payload.history[-settings.chat_history_turns:]
     ]
+
+
+@router.get("/chat/models")
+async def chat_models() -> dict:
+    """Available recruiter-copilot chat models (default endpoint + OpenRouter)."""
+    return {
+        "models": [
+            {
+                "id": option.id,
+                "label": option.label,
+                "provider": option.provider,
+                "model": option.model,
+            }
+            for option in settings.chat_models
+        ]
+    }
 
 
 @router.post("/chat")
@@ -44,6 +61,7 @@ async def chat(payload: ChatRequest) -> dict:
             job_id=payload.job_id,
             history=_history(payload),
             top_k=payload.top_k,
+            model_id=payload.model,
         )
     except ChatError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -61,6 +79,7 @@ async def chat_stream(payload: ChatRequest) -> StreamingResponse:
             job_id=payload.job_id,
             history=_history(payload),
             top_k=payload.top_k,
+            model_id=payload.model,
         ):
             yield f"data: {json.dumps(event)}\n\n"
 

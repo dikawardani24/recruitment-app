@@ -36,6 +36,33 @@ _RETRYABLE_NAMES = frozenset(
 # Transient HTTP statuses as a fallback (OpenAI/Gemini responses).
 _RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
 
+
+def _is_retryable(exc: Exception) -> bool:
+    if type(exc).__name__ in _RETRYABLE_NAMES:
+        return True
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status in _RETRYABLE_STATUSES:
+        return True
+    # OpenRouter returns HTTP 400 "Provider returned error" when an upstream
+    # provider is temporarily unavailable; the JSON body carries provider
+    # metadata (e.g. {"error": {"metadata": {"provider_name": ...}}}). Treat
+    # that as transient too so a flaky upstream does not fail the whole turn.
+    if status == 400 and _has_provider_metadata(exc):
+        return True
+    return False
+
+
+def _has_provider_metadata(exc: Exception) -> bool:
+    try:
+        body = getattr(getattr(exc, "response", None), "json", None)
+        if body is None:
+            return False
+        data = body()
+        metadata = data.get("error", {}).get("metadata")
+        return bool(metadata and isinstance(metadata, dict))
+    except Exception:
+        return False
+
 _RATE_LOCK = asyncio.Lock()
 _last_call_at = 0.0
 
@@ -74,13 +101,6 @@ def _retry_after_seconds(exc: Exception) -> float | None:
     except (TypeError, ValueError):
         pass
     return None
-
-
-def _is_retryable(exc: Exception) -> bool:
-    if type(exc).__name__ in _RETRYABLE_NAMES:
-        return True
-    status = getattr(getattr(exc, "response", None), "status_code", None)
-    return status in _RETRYABLE_STATUSES
 
 
 async def bounded_retry(

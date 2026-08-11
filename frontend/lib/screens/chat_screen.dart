@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/chat/chat_controller.dart';
+import '../controllers/chat/chat_state.dart';
 import '../domain/models.dart';
 
 class ChatScreen extends HookConsumerWidget {
@@ -36,6 +37,7 @@ class ChatScreen extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('Recruiter Copilot'),
         actions: [
+          if (chatState.models.isNotEmpty) _ModelPicker(chatState: chatState),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Clear chat',
@@ -357,6 +359,68 @@ class _StreamingBubble extends StatelessWidget {
                 ],
               ),
       ),
+    );
+  }
+}
+
+class _ModelPicker extends ConsumerWidget {
+  const _ModelPicker({required this.chatState});
+
+  final ChatState chatState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(chatControllerProvider.notifier);
+    final selectedId = chatState.selectedModel;
+    final selected = chatState.models.firstWhere(
+      (m) => m.id == selectedId,
+      orElse: () => chatState.models.first,
+    );
+
+    return PopupMenuButton<String>(
+      tooltip: 'Chat model',
+      icon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.bolt, size: 20),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              selected.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
+        ],
+      ),
+      onSelected: controller.selectModel,
+      itemBuilder: (context) => [
+        for (final model in chatState.models)
+          PopupMenuItem(
+            value: model.id,
+            child: Row(
+              children: [
+                Icon(
+                  model.provider == 'openrouter'
+                      ? Icons.router_outlined
+                      : Icons.auto_awesome,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(model.label)),
+                if (model.id == selectedId)
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

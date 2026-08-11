@@ -176,3 +176,17 @@ class ChatResponseDto {
     required this.retrievalCount,
   });
 }
+
+class ChatModelDto {
+  final String id;
+  final String label;
+  final String provider;
+  final String model;
+
+  const ChatModelDto({
+    required this.id,
+    required this.label,
+    required this.provider,
+    required this.model,
+  });
+}

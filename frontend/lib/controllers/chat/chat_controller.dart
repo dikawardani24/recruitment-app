@@ -10,7 +10,32 @@ import 'chat_state.dart';
 /// assistant bubble, and appends the grounded answer with its cited sources.
 class ChatController extends Notifier<ChatState> {
   @override
-  ChatState build() => const ChatState();
+  ChatState build() {
+    loadModels();
+    return const ChatState();
+  }
+
+  /// Fetches the available chat models from the backend and defaults the
+  /// selection to the first one (the default provider's model).
+  Future<void> loadModels() async {
+    try {
+      final models = await getIt<AskChat>().getModels();
+      if (models.isEmpty) return;
+      state = state.copyWith(
+        models: models,
+        selectedModel: state.selectedModel ?? models.first.id,
+      );
+    } catch (_) {
+      // Leave models empty; the picker stays hidden and chat falls back to
+      // the backend's default model.
+    }
+  }
+
+  void selectModel(String id) {
+    if (state.models.any((m) => m.id == id)) {
+      state = state.copyWith(selectedModel: id);
+    }
+  }
 
   Future<void> send(String text) async {
     final trimmed = text.trim();
@@ -31,6 +56,7 @@ class ChatController extends Notifier<ChatState> {
       await for (final event in getIt<AskChat>().callStream(
         question: trimmed,
         history: history,
+        model: state.selectedModel,
       )) {
         switch (event) {
           case ChatStreamStarted():
@@ -48,7 +74,7 @@ class ChatController extends Notifier<ChatState> {
               statusMessage: 'Consulting workspace data…',
             );
           case ChatStreamDone(:final response):
-            state = ChatState(
+            state = state.copyWith(
               messages: [
                 ...state.messages,
                 ChatMessage(
@@ -58,9 +84,13 @@ class ChatController extends Notifier<ChatState> {
                 ),
               ],
               configured: response.configured,
+              isLoading: false,
+              streamingText: '',
+              statusMessage: null,
+              usingTools: false,
             );
           case ChatStreamError(:final message):
-            state = ChatState(
+            state = state.copyWith(
               messages: [
                 ...state.messages,
                 ChatMessage(
@@ -69,11 +99,15 @@ class ChatController extends Notifier<ChatState> {
                 ),
               ],
               configured: state.configured,
+              isLoading: false,
+              streamingText: '',
+              statusMessage: null,
+              usingTools: false,
             );
         }
       }
     } catch (e) {
-      state = ChatState(
+      state = state.copyWith(
         messages: [
           ...state.messages,
           ChatMessage(
@@ -82,11 +116,20 @@ class ChatController extends Notifier<ChatState> {
           ),
         ],
         configured: state.configured,
+        isLoading: false,
+        streamingText: '',
+        statusMessage: null,
+        usingTools: false,
       );
     }
   }
 
-  void clear() => state = const ChatState();
+  void clear() {
+    state = ChatState(
+      models: state.models,
+      selectedModel: state.selectedModel,
+    );
+  }
 }
 
 String _friendlyError(String raw) {

@@ -164,6 +164,25 @@ class ChatSourceResponseMapper {
   }
 }
 
+class ChatModelsMapper {
+  ChatModelsMapper._();
+
+  static List<ChatModelDto> fromJson(Map<String, dynamic> json) {
+    return ((json['models'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (e) => ChatModelDto(
+            id: (e['id'] as String?) ?? '',
+            label: (e['label'] as String?) ?? '',
+            provider: (e['provider'] as String?) ?? '',
+            model: (e['model'] as String?) ?? '',
+          ),
+        )
+        .where((m) => m.id.isNotEmpty)
+        .toList();
+  }
+}
+
 List<String> _stringList(dynamic value) {
   if (value is List) return value.map((e) => e.toString()).toList();
   return const [];
