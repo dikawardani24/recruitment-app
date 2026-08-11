@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -170,11 +171,22 @@ class _MessageBubble extends StatelessWidget {
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
               )
-            else
+            else ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: _CopyButton(
+                    text: message.content,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
               MarkdownBody(
                 data: message.content,
                 styleSheet: MarkdownStyleSheet.fromTheme(theme),
               ),
+            ],
             if (!isUser && message.sources.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
@@ -187,6 +199,40 @@ class _MessageBubble extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CopyButton extends StatelessWidget {
+  const _CopyButton({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Copy response',
+      child: InkWell(
+        onTap: () async {
+          await Clipboard.setData(ClipboardData(text: text));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: const Text('Response copied'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+          }
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(Icons.copy_rounded, size: 16, color: color),
         ),
       ),
     );

@@ -57,7 +57,7 @@ class ChatController extends Notifier<ChatState> {
                 ...state.messages,
                 ChatMessage(
                   role: ChatRole.assistant,
-                  content: 'Sorry, something went wrong: $message',
+                  content: _friendlyError(message),
                 ),
               ],
               configured: state.configured,
@@ -70,7 +70,7 @@ class ChatController extends Notifier<ChatState> {
           ...state.messages,
           ChatMessage(
             role: ChatRole.assistant,
-            content: 'Sorry, something went wrong: $e',
+            content: _friendlyError('$e'),
           ),
         ],
         configured: state.configured,
@@ -79,6 +79,20 @@ class ChatController extends Notifier<ChatState> {
   }
 
   void clear() => state = const ChatState();
+}
+
+String _friendlyError(String raw) {
+  final lower = raw.toLowerCase();
+  final isRateLimit = lower.contains('ratelimit') ||
+      lower.contains('rate_limit') ||
+      lower.contains('429') ||
+      lower.contains('quota') ||
+      lower.contains('too many requests') ||
+      lower.contains('resourceexhausted');
+  return isRateLimit
+      ? 'You have reached the limit, please try again later.'
+      : 'Our system is facing a technical issue. '
+          'Please contact the system administrator or try again later.';
 }
 
 final chatControllerProvider =
