@@ -115,9 +115,10 @@ class Ask:
         history: list[dict] | None = None,
         top_k: int = 10,
         model_id: str | None = None,
+        api_key: str | None = None,
     ) -> dict:
         question = (question or "").strip()
-        if not self.settings.chat_enabled:
+        if not self.settings.chat_enabled_with_key(api_key):
             return self._not_configured()
         if not question:
             return self._empty(question)
@@ -129,11 +130,12 @@ class Ask:
             return self._answer(route, answer, [], job_id, question)
 
         if route.mode == "deterministic":
-            return await self._deterministic(route, question, job_id, history, model_id)
+            return await self._deterministic(route, question, job_id, history, model_id, api_key)
 
         if route.mode == "general":
             answer = await self.chat_client.complete(
-                GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id
+                GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id,
+                runtime_api_key=api_key,
             )
             return self._answer(route, answer, [], job_id, question)
 
@@ -148,7 +150,8 @@ class Ask:
             records,
         )
         answer = await self.chat_client.complete(
-            SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
+            SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id,
+            runtime_api_key=api_key,
         )
         return self._answer(
             route,
@@ -166,6 +169,7 @@ class Ask:
         history: list[dict] | None = None,
         top_k: int = 10,
         model_id: str | None = None,
+        api_key: str | None = None,
     ) -> AsyncIterator[dict]:
         """Streaming variant of [execute]. Yields SSE event dicts:
           {"type": "started", ...}
@@ -180,7 +184,7 @@ class Ask:
         timing: dict[str, int] = {}
         t_request = time.monotonic()
 
-        if not self.settings.chat_enabled:
+        if not self.settings.chat_enabled_with_key(api_key):
             yield {
                 "type": "error",
                 "message": (
@@ -246,7 +250,8 @@ class Ask:
             text_parts: list[str] = []
             try:
                 async for item in self.chat_client.complete_stream(
-                    GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id
+                    GENERAL_SYSTEM_PROMPT, question, tools=None, model_id=model_id,
+                    runtime_api_key=api_key,
                 ):
                     if item:
                         if not text_parts:
@@ -291,7 +296,8 @@ class Ask:
         text_parts: list[str] = []
         try:
             async for item in self.chat_client.complete_stream(
-                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
+                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id,
+                runtime_api_key=api_key,
             ):
                 if isinstance(item, ToolCall):
                     yield {"type": "tool", "name": item.name}
@@ -363,12 +369,14 @@ class Ask:
         job_id: str | None,
         history: list[dict] | None,
         model_id: str | None = None,
+        api_key: str | None = None,
     ) -> dict:
         if self.tools is None:
             # No API tools available: fall back to the single-Gemini grounded path.
             user_prompt = build_reasoning_prompt(question, [], history, None)
             answer = await self.chat_client.complete(
-                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id
+                SYSTEM_PROMPT, user_prompt, tools=None, model_id=model_id,
+                runtime_api_key=api_key,
             )
             return self._answer(route, answer, [], job_id, question)
         answer, sources, cards = await deterministic_answer(route, self.tools)

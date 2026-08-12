@@ -21,6 +21,7 @@ class _FakeRepo implements ChatRepository {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) async {
     return const ChatResponse(
       configured: true,
@@ -38,6 +39,7 @@ class _FakeRepo implements ChatRepository {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) {
     return controller.stream;
   }

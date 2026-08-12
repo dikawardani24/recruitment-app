@@ -15,6 +15,7 @@ class AskChat {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) =>
       _repository.ask(
         question: question,
@@ -22,6 +23,7 @@ class AskChat {
         history: history,
         topK: topK,
         model: model,
+        apiKey: apiKey,
       );
 
   Stream<ChatStreamEvent> callStream({
@@ -30,6 +32,7 @@ class AskChat {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) =>
       _repository.askStream(
         question: question,
@@ -37,6 +40,7 @@ class AskChat {
         history: history,
         topK: topK,
         model: model,
+        apiKey: apiKey,
       );
 
   Future<List<ChatModel>> getModels() => _repository.getModels();

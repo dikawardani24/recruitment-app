@@ -19,6 +19,7 @@ class ChatRepositoryImpl implements ChatRepository {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) async {
     final dto = await _dataSource.ask(
       question: question,
@@ -26,6 +27,7 @@ class ChatRepositoryImpl implements ChatRepository {
       history: history,
       topK: topK,
       model: model,
+      apiKey: apiKey,
     );
     return _toResponse(dto);
   }
@@ -37,6 +39,7 @@ class ChatRepositoryImpl implements ChatRepository {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) async* {
     await for (final event in _dataSource.askStream(
       question: question,
@@ -44,6 +47,7 @@ class ChatRepositoryImpl implements ChatRepository {
       history: history,
       topK: topK,
       model: model,
+      apiKey: apiKey,
     )) {
       yield switch (event) {
         ChatStreamStartedDto() => const ChatStreamStarted(),

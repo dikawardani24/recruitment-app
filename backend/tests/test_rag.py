@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.config import Settings
-from app.chat import ChatError, QueryRouter, ToolCall, ToolError, ToolRegistry
+from app.chat import ChatClient, ChatError, QueryRouter, ToolCall, ToolError, ToolRegistry
 from app.domain.candidate import Candidate
 from app.domain.job import Job
 from app.domain.page import Page
@@ -344,7 +344,7 @@ class FakeChatClient:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         self.calls.append((system, user))
         return "Jane Doe matches the Flutter role [1]."
 
@@ -355,7 +355,7 @@ class FakeStreamingChatClient(FakeChatClient):
         self.items = items
         self.tool_calls: list[tuple[str, str]] = []
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         self.calls.append((system, user))
         for item in self.items:
             if isinstance(item, ToolCall):
@@ -368,10 +368,10 @@ class ExplodingChatClient:
     """Package-only fake: raises if Gemini is ever called (used to prove that
     deterministic queries complete with ZERO Gemini requests)."""
 
-    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise AssertionError("Gemini should not have been called")
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise AssertionError("Gemini should not have been called")
         yield None  # pragma: no cover
 
@@ -380,10 +380,10 @@ class FailingChatClient:
     def __init__(self, error: str):
         self.error = error
 
-    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise ChatError(self.error)
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise ChatError(self.error)
         yield None  # pragma: no cover
 
@@ -401,6 +401,145 @@ async def test_ask_disabled_when_no_llm_key():
     result = await Ask(s, FakeChatClient(), None).execute("who is best?")
     assert result["configured"] is False
     assert "not configured" in result["answer"]
+
+
+async def test_ask_enabled_by_client_api_key_overrides_server_default():
+    """A client-supplied api_key enables chat even when no server key is set,
+    and falls back to the server key when the client key is omitted."""
+    s = _settings()
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+
+    # No client key -> still not configured (falls back to default = none).
+    result = await Ask(s, FakeChatClient(), None).execute("who is best?")
+    assert result["configured"] is False
+
+    # Client supplies its own key -> chat becomes configured.
+    result = await Ask(s, FakeChatClient(), None).execute(
+        "who is best?", api_key="client-key"
+    )
+    assert result["configured"] is True
+    assert result["answer"] == "Jane Doe matches the Flutter role [1]."
+
+
+async def test_chat_client_resolves_openrouter_model_from_client_key():
+    """A client-supplied OpenRouter key enables an OpenRouter model even when
+    the server has no keys configured at startup."""
+    s = _settings()
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+
+    client = ChatClient(s)
+    option = client._resolve(
+        "openrouter:qwen/qwen-2.5-72b-instruct", runtime_api_key="or-client-key"
+    )
+    assert option.provider == "openrouter"
+    assert option.api_key == "or-client-key"
+    assert option.base_url == "https://openrouter.ai/api/v1"
+    assert option.model == "qwen/qwen-2.5-72b-instruct"
+
+    # A plain/unknown id resolves to the default provider with the client key.
+    option = client._resolve(None, runtime_api_key="gemini-client-key")
+    assert option.provider == "default"
+    assert option.api_key == "gemini-client-key"
+    assert option.model == s.chat_model
+
+
+def _dual_provider_settings() -> Settings:
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = "or-key"
+    s.openrouter_models = ["qwen/qwen-2.5-72b-instruct"]
+    return s
+
+
+def test_client_attempts_with_server_key_fail_over_to_other_provider():
+    """With the server's default key each provider gets two attempts and the
+    turn fails over to the other configured provider."""
+    client = ChatClient(_dual_provider_settings())
+    assert [a.provider for a in client._attempts(None, None)] == [
+        "default", "default", "openrouter", "openrouter",
+    ]
+    assert [a.provider for a in client._attempts(
+        "openrouter:qwen/qwen-2.5-72b-instruct", None
+    )] == ["openrouter", "openrouter", "default", "default"]
+
+
+def test_client_attempts_single_provider_when_no_fallback_configured():
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = None
+    client = ChatClient(s)
+    assert [a.provider for a in client._attempts(None, None)] == ["default", "default"]
+
+
+def test_client_attempts_single_when_client_api_key_supplied():
+    """A client-supplied key is tried once and never fails over."""
+    client = ChatClient(_dual_provider_settings())
+    attempts = client._attempts(None, runtime_api_key="client-key")
+    assert len(attempts) == 1
+    assert attempts[0].provider == "default"
+    assert attempts[0].api_key == "client-key"
+
+
+async def test_complete_fails_over_to_second_provider():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        if option.provider == "default":
+            raise ChatError("chat_call_failed:SomeError")
+        return "fallback answer"
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    answer = await client.complete("sys", "user")
+    assert answer == "fallback answer"
+    assert order == ["default", "default", "openrouter"]
+
+
+async def test_complete_raises_after_all_attempts_fail():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        raise ChatError("chat_call_failed:SomeError")
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    with pytest.raises(ChatError):
+        await client.complete("sys", "user")
+    assert order == ["default", "default", "openrouter", "openrouter"]
+
+
+async def test_complete_with_client_key_never_fails_over():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        raise ChatError("chat_call_failed:SomeError")
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    with pytest.raises(ChatError):
+        await client.complete("sys", "user", runtime_api_key="client-key")
+    assert order == ["default"]
+
+
+async def test_complete_stream_fails_over_to_second_provider():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_stream_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        if option.provider == "default":
+            raise ChatError("chat_call_failed:SomeError")
+        yield "streamed answer"
+
+    client._complete_stream_with = _complete_stream_with  # type: ignore[method-assign]
+    events = [item async for item in client.complete_stream("sys", "user")]
+    assert events == ["streamed answer"]
+    assert order == ["default", "default", "openrouter"]
 
 
 async def test_ask_answers_with_grounded_evidence():
@@ -1002,6 +1141,21 @@ def test_api_chat_stream_disabled(client):
     assert resp.headers["content-type"].startswith("text/event-stream")
     assert '"type": "error"' in resp.text
     assert "not configured" in resp.text
+
+
+def test_api_chat_enabled_by_client_api_key(client):
+    """A per-request api_key enables chat even when the server has no key."""
+    resp = client.post(
+        "/api/chat",
+        json={
+            "question": "who is the best flutter candidate?",
+            "history": [],
+            "api_key": "client-key",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["configured"] is True
 
 
 def test_api_chat_models_lists_configured_providers(client):

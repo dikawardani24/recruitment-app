@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di.dart';
 import '../../domain/models.dart';
 import '../../domain/usecases/ask_chat.dart';
+import '../api_key_controller.dart';
 import 'chat_state.dart';
 
 /// Owns the recruiter-copilot conversation. Each turn sends the accumulated
@@ -57,6 +58,7 @@ class ChatController extends Notifier<ChatState> {
         question: trimmed,
         history: history,
         model: state.selectedModel,
+        apiKey: _selectedApiKey(state),
       )) {
         switch (event) {
           case ChatStreamStarted():
@@ -130,6 +132,13 @@ class ChatController extends Notifier<ChatState> {
       models: state.models,
       selectedModel: state.selectedModel,
     );
+  }
+
+  /// The API key for the currently selected model's provider, or null when
+  /// the user has not set one (the backend then uses its default key).
+  String? _selectedApiKey(ChatState state) {
+    final model = state.models.where((m) => m.id == state.selectedModel).firstOrNull;
+    return ref.read(apiKeyProvider)[model?.provider];
   }
 }
 

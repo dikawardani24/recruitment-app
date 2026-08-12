@@ -29,6 +29,9 @@ class _FakeNavigator implements AppNavigator {
   void goToSearch() {}
   @override
   void goToChat() {}
+
+  @override
+  void goToApiKey() {}
   @override
   void goToJobDetail(String jobId) {}
   @override

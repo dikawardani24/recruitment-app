@@ -22,6 +22,7 @@ class _FakeChatDataSource extends ChatApiDataSource {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) async {
     return askResponse;
   }
@@ -33,6 +34,7 @@ class _FakeChatDataSource extends ChatApiDataSource {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) async* {
     for (final event in streamEvents) {
       yield event;

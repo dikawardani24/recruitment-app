@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/api_key_controller.dart';
 import '../controllers/chat/chat_controller.dart';
 import '../controllers/chat/chat_state.dart';
 import '../domain/models.dart';
@@ -20,6 +21,7 @@ class ChatScreen extends HookConsumerWidget {
     final controller = ref.read(chatControllerProvider.notifier);
     final inputController = useTextEditingController();
     final scrollController = useScrollController();
+    final ownKeyProvider = _ownKeyForSelected(ref, chatState);
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -51,6 +53,8 @@ class ChatScreen extends HookConsumerWidget {
       body: Column(
         children: [
           if (!chatState.configured) const _NotConfiguredBanner(),
+          if (ownKeyProvider != null)
+            _OwnKeyBanner(providerLabel: ownKeyProvider.label),
           Expanded(
             child: chatState.messages.isEmpty && !chatState.isLoading
                 ? const _EmptyChat()
@@ -79,6 +83,51 @@ class ChatScreen extends HookConsumerWidget {
   }
 }
 
+/// The provider whose model is selected, when the user has saved their own API
+/// key for it — in which case the copilot uses that key with no server failover.
+ApiKeyProvider? _ownKeyForSelected(WidgetRef ref, ChatState chatState) {
+  final selected = chatState.models
+      .where((m) => m.id == chatState.selectedModel)
+      .firstOrNull;
+  if (selected == null) return null;
+  final provider = ApiKeyProvider.fromId(selected.provider);
+  return ref.watch(apiKeyForProvider(provider)) == null ? null : provider;
+}
+
+class _OwnKeyBanner extends StatelessWidget {
+  const _OwnKeyBanner({required this.providerLabel});
+
+  final String providerLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      color: theme.colorScheme.secondaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(
+            Icons.verified_user_outlined,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Using your saved $providerLabel API key — the copilot will '
+              'not fall back to the server default.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NotConfiguredBanner extends StatelessWidget {
   const _NotConfiguredBanner();
 
@@ -95,8 +144,9 @@ class _NotConfiguredBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'The copilot needs an LLM key (ATS_LLM__API_KEY). '
-              'Enable semantic search (ATS_RAG__ENABLED=true) for grounded answers.',
+              'The copilot is not configured. Set a provider API key in '
+              'Settings to enable answers (the server default is used when '
+              'one is configured).',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onErrorContainer,
               ),

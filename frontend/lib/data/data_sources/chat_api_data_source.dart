@@ -22,6 +22,7 @@ class ChatApiDataSource {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) {
     final data = <String, dynamic>{
       'question': question,
@@ -32,6 +33,7 @@ class ChatApiDataSource {
       'top_k': topK,
       'job_id': ?jobId,
       'model': ?model,
+      'api_key': ?apiKey,
     };
     return _client.post(
       ApiPaths.chat,
@@ -48,6 +50,7 @@ class ChatApiDataSource {
     List<ChatMessage> history = const [],
     int topK = 10,
     String? model,
+    String? apiKey,
   }) {
     final data = <String, dynamic>{
       'question': question,
@@ -58,6 +61,7 @@ class ChatApiDataSource {
       'top_k': topK,
       'job_id': ?jobId,
       'model': ?model,
+      'api_key': ?apiKey,
     };
 
     final controller = StreamController<ChatStreamEventDto>();
