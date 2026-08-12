@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_ats/controllers/candidate_search_controller.dart';
 import 'package:ai_ats/controllers/deleteConfirm/delete_confirm_controller.dart';
 import 'package:ai_ats/controllers/jobDetail/job_detail_controller.dart';
 import 'package:ai_ats/domain/models.dart';
@@ -13,7 +12,6 @@ import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/action_result_screen.dart';
 import 'package:ai_ats/screens/delete_confirm_screen.dart';
 import 'package:ai_ats/screens/search_candidate_screen.dart';
-import 'package:ai_ats/widgets/candidate_tile.dart';
 import 'package:ai_ats/widgets/shimmer.dart';
 
 class _FakeNavigator implements AppNavigator {
@@ -31,6 +29,8 @@ class _FakeNavigator implements AppNavigator {
   void goToSearchJobs() {}
   @override
   void goToSearchCandidates() {}
+  @override
+  void goToSearch() {}
   @override
   void goToChat() {}
   @override

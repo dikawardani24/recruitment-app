@@ -1,16 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_ats/controllers/candidate_search_controller.dart';
-import 'package:ai_ats/controllers/job_list_controller.dart';
 import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/navigation/app_navigator.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/screens/unified_search_screen.dart';
-import 'package:ai_ats/widgets/shimmer.dart';
 
 class _FakeNavigator implements AppNavigator {
   final navigatorKey = GlobalKey<NavigatorState>();

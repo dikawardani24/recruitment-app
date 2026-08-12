@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models.dart';
-import '../navigation/app_navigator.dart';
 import '../providers.dart';
 import 'jobDetail/job_detail_controller.dart';
 

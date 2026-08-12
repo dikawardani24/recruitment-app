@@ -11,7 +11,6 @@ import '../widgets/candidate_tile.dart';
 import '../widgets/delete_background.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/error_view.dart';
-import '../widgets/job_list_footer.dart';
 
 /// Full-page candidate search. Type a keyword and press enter (or let the
 /// debounce fire) to query the backend. Results load with shimmer placeholders

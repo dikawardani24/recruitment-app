@@ -12,7 +12,6 @@ import '../widgets/candidate_tile.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/error_view.dart';
 import '../widgets/job_card.dart';
-import '../widgets/section_card.dart';
 
 class UnifiedSearchScreen extends StatelessWidget {
   const UnifiedSearchScreen({super.key});
