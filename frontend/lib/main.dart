@@ -6,8 +6,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'di.dart';
+import 'navigation/app_route.dart';
 import 'providers.dart';
 import 'router.dart';
+import 'controllers/intro_controller.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -17,7 +19,10 @@ Future<void> main() async {
   ChuckerFlutter.showOnRelease = true;
   setupDependencies();
   final prefs = await SharedPreferences.getInstance();
-  final router = AppRouter.create();
+  final seenIntro = prefs.getBool(introSeenPrefsKey) ?? false;
+  final router = AppRouter.create(
+    initialLocation: seenIntro ? null : AppRoute.intro.path,
+  );
   runApp(
     ProviderScope(
       overrides: [

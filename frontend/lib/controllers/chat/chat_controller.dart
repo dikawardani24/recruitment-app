@@ -58,7 +58,7 @@ class ChatController extends Notifier<ChatState> {
         question: trimmed,
         history: history,
         model: state.selectedModel,
-        apiKey: ref.read(apiKeyProvider),
+        apiKey: _selectedApiKey(state),
       )) {
         switch (event) {
           case ChatStreamStarted():
@@ -132,6 +132,13 @@ class ChatController extends Notifier<ChatState> {
       models: state.models,
       selectedModel: state.selectedModel,
     );
+  }
+
+  /// The API key for the currently selected model's provider, or null when
+  /// the user has not set one (the backend then uses its default key).
+  String? _selectedApiKey(ChatState state) {
+    final model = state.models.where((m) => m.id == state.selectedModel).firstOrNull;
+    return ref.read(apiKeyProvider)[model?.provider];
   }
 }
 

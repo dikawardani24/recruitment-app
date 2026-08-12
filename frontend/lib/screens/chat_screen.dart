@@ -95,8 +95,9 @@ class _NotConfiguredBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'The copilot needs an LLM key (ATS_LLM__API_KEY). '
-              'Enable semantic search (ATS_RAG__ENABLED=true) for grounded answers.',
+              'The copilot is not configured. Set a provider API key in '
+              'Settings to enable answers (the server default is used when '
+              'one is configured).',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onErrorContainer,
               ),

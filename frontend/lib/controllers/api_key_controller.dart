@@ -4,31 +4,62 @@ import '../theme/theme_controller.dart';
 
 const _apiKeyPrefix = 'api_key_';
 
-/// Manages API key storage per model provider via SharedPreferences.
+/// Supported chat providers. The `default` provider is the backend's primary
+/// endpoint (e.g. Gemini); `openrouter` is the model router.
+enum ApiKeyProvider {
+  gemini('default', 'Gemini (Default)', 'AIza…'),
+  openrouter('openrouter', 'OpenRouter', 'sk-or-…');
+
+  const ApiKeyProvider(this.id, this.label, this.hint);
+
+  /// Provider id used by the backend model list and stored pref keys.
+  final String id;
+  final String label;
+  final String hint;
+
+  static ApiKeyProvider fromId(String? id) => ApiKeyProvider.values.firstWhere(
+        (p) => p.id == id,
+        orElse: () => ApiKeyProvider.gemini,
+      );
+}
+
+/// Manages API key storage per chat provider via SharedPreferences.
 /// Keys are stored as `api_key_<provider>` e.g. `api_key_openrouter`.
-class ApiKeyController extends Notifier<String?> {
+class ApiKeyController extends Notifier<Map<String, String?>> {
   @override
-  String? build() {
+  Map<String, String?> build() {
     final prefs = ref.read(sharedPreferencesProvider);
-    return prefs?.getString(_apiKeyKey('openrouter'));
+    return {
+      for (final provider in ApiKeyProvider.values)
+        provider.id: prefs?.getString(_apiKeyKey(provider.id)),
+    };
   }
 
   static String _apiKeyKey(String provider) => '$_apiKeyPrefix$provider';
 
+  /// The key saved for [provider], or null when none is set.
+  String? keyFor(ApiKeyProvider provider) => state[provider.id];
+
   /// Saves the [apiKey] for the given [provider] and updates state.
-  Future<void> setApiKey(String provider, String apiKey) async {
+  Future<void> setApiKey(ApiKeyProvider provider, String apiKey) async {
     final prefs = ref.read(sharedPreferencesProvider);
-    await prefs?.setString(_apiKeyKey(provider), apiKey);
-    state = apiKey.isNotEmpty ? apiKey : null;
+    await prefs?.setString(_apiKeyKey(provider.id), apiKey);
+    state = {...state, provider.id: apiKey.isNotEmpty ? apiKey : null};
   }
 
-  /// Clears the API key for the current provider and saves empty state.
-  void clearApiKey() async {
+  /// Clears the API key for [provider] and saves empty state.
+  Future<void> clearApiKey(ApiKeyProvider provider) async {
     final prefs = ref.read(sharedPreferencesProvider);
-    await prefs?.remove(_apiKeyKey('openrouter'));
-    state = null;
+    await prefs?.remove(_apiKeyKey(provider.id));
+    state = {...state, provider.id: null};
   }
 }
 
 final apiKeyProvider =
-    NotifierProvider<ApiKeyController, String?>(ApiKeyController.new);
+    NotifierProvider<ApiKeyController, Map<String, String?>>(ApiKeyController.new);
+
+/// The saved API key for [provider], or null when not set.
+final apiKeyForProvider =
+    Provider.family<String?, ApiKeyProvider>((ref, provider) {
+  return ref.watch(apiKeyProvider)[provider.id];
+});

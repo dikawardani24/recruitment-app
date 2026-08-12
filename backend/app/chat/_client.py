@@ -41,18 +41,52 @@ class ChatClient:
 
         When [runtime_api_key] is provided it overrides whatever key the
         resolved option carries, so a client-supplied key takes precedence
-        over the server's default.
+        over the server's default. If no provider is configured server-side,
+        the runtime key is used to build an option on the fly (default
+        provider for `default`/unknown ids, OpenRouter for `openrouter:` ids).
         """
         option = self.settings.resolve_chat_model(model_id)
+        if runtime_api_key is not None:
+            option = self._runtime_option(model_id, runtime_api_key, option)
         if option is None:
-            if runtime_api_key is not None:
-                for opt in self.settings.chat_models:
-                    if opt.provider == "default":
-                        option = opt
-                        break
-            if option is None:
-                raise ChatError("chat_not_configured")
-        return option.with_api_key(runtime_api_key)
+            raise ChatError("chat_not_configured")
+        return option
+
+    def _runtime_option(
+        self,
+        model_id: str | None,
+        api_key: str,
+        fallback: ChatModelOption | None,
+    ) -> ChatModelOption:
+        """Return the option for [model_id] carrying the client-supplied key.
+
+        Prefers the server-resolved [fallback] when its provider matches the
+        requested model. Otherwise constructs an option for the requested
+        provider using the client key, so a user-saved key works even when the
+        server has no key configured at startup.
+        """
+        if model_id and model_id.startswith("openrouter:"):
+            model = model_id[len("openrouter:"):]
+            if fallback is not None and fallback.provider == "openrouter":
+                return fallback.with_api_key(api_key)
+            return ChatModelOption(
+                id=model_id,
+                label=model,
+                provider="openrouter",
+                base_url=self.settings.openrouter_base_url,
+                api_key=api_key,
+                model=model,
+            )
+        if fallback is not None and fallback.provider == "default":
+            return fallback.with_api_key(api_key)
+        return ChatModelOption(
+            id="default",
+            label=self.settings.chat_model,
+            provider="default",
+            base_url=self.settings.llm_base_url or "",
+            api_key=api_key,
+            model=self.settings.chat_model,
+        )
 
     def _min_interval_s(self, option: ChatModelOption) -> float:
         """Minimum gap between calls for this provider.

@@ -4,6 +4,7 @@
 /// [AppNavigator] interface — never by constructing routes or URLs inline.
 enum AppRoute {
   searchCandidates('/candidates/search'),
+  intro('/intro'),
   jobs('/jobs'),
   actionResult('/jobs/action-result'),
   chat('/jobs/chat'),

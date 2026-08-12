@@ -8,6 +8,7 @@ import 'screens/action_result_screen.dart';
 import 'screens/candidate_detail_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/delete_confirm_screen.dart';
+import 'screens/intro_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/job_form_screen.dart';
 import 'screens/job_list_screen.dart';
@@ -21,33 +22,40 @@ import 'screens/api_key_screen.dart';
 /// Builds the app's [GoRouter]. Route patterns are derived from [AppRoute]
 /// so that the enum stays the single source of truth for navigation.
 class AppRouter {
-  static GoRouter create() {
+  /// Returns [childPath] relative to [parentPath], e.g. given
+  /// `/jobs/:jobId` and `/jobs/:jobId/rankings` it returns `rankings`.
+  static String childPath(String parentPath, String childPath) {
+    if (!childPath.startsWith(parentPath)) return childPath;
+    return childPath.substring(parentPath.length).replaceFirst(RegExp(r'^/+'), '');
+  }
+
+  static GoRouter create({String? initialLocation}) {
     return GoRouter(
       navigatorKey: ChuckerFlutter.navigatorKey,
-      initialLocation: AppRoute.jobs.path,
+      initialLocation: initialLocation ?? AppRoute.jobs.path,
       routes: [
+        GoRoute(
+          path: AppRoute.intro.path,
+          builder: (context, state) => const IntroScreen(),
+        ),
         GoRoute(
           path: AppRoute.jobs.path,
           builder: (context, state) => const JobListScreen(),
           routes: [
             GoRoute(
-              path: 'new',
+              path: childPath(AppRoute.jobs.path, AppRoute.jobForm.path),
               builder: (context, state) => const JobFormScreen(),
             ),
             GoRoute(
-              path: 'settings',
-              builder: (context, state) => const SettingsScreen(),
-            ),
-            GoRoute(
-              path: 'search',
+              path: childPath(AppRoute.jobs.path, AppRoute.searchJobs.path),
               builder: (context, state) => const SearchJobScreen(),
             ),
             GoRoute(
-              path: 'chat',
+              path: childPath(AppRoute.jobs.path, AppRoute.chat.path),
               builder: (context, state) => const ChatScreen(),
             ),
             GoRoute(
-              path: 'delete-confirm',
+              path: childPath(AppRoute.jobs.path, AppRoute.deleteConfirm.path),
               builder: (context, state) => DeleteConfirmScreen(
                 args: state.extra as DeleteConfirmArgs? ??
                     const DeleteConfirmArgs(
@@ -56,19 +64,22 @@ class AppRouter {
               ),
             ),
             GoRoute(
-              path: 'action-result',
+              path: childPath(AppRoute.jobs.path, AppRoute.actionResult.path),
               builder: (context, state) => ActionResultScreen(
                 data: state.extra as ActionResultData? ??
                     const ActionResultData(success: true, title: ''),
               ),
             ),
             GoRoute(
-              path: ':jobId',
+              path: childPath(AppRoute.jobs.path, AppRoute.jobDetail.path),
               builder: (context, state) =>
                   JobDetailScreen(jobId: state.pathParameters['jobId']!),
               routes: [
                 GoRoute(
-                  path: 'candidate/:cvId',
+                  path: childPath(
+                    AppRoute.jobDetail.path,
+                    AppRoute.candidateDetail.path,
+                  ),
                   builder: (context, state) => CandidateDetailScreen(
                     jobId: state.pathParameters['jobId']!,
                     cvId: state.pathParameters['cvId']!,
@@ -76,7 +87,7 @@ class AppRouter {
                   ),
                 ),
                 GoRoute(
-                  path: 'rankings',
+                  path: childPath(AppRoute.jobDetail.path, AppRoute.rankings.path),
                   builder: (context, state) {
                     final data = state.extra as RankingsScreenData?;
                     return RankingsScreen(
@@ -99,8 +110,14 @@ class AppRouter {
           builder: (context, state) => const UnifiedSearchScreen(),
         ),
         GoRoute(
-          path: AppRoute.apiKey.path,
-          builder: (context, state) => const ApiKeyScreen(),
+          path: AppRoute.settings.path,
+          builder: (context, state) => const SettingsScreen(),
+          routes: [
+            GoRoute(
+              path: childPath(AppRoute.settings.path, AppRoute.apiKey.path),
+              builder: (context, state) => const ApiKeyScreen(),
+            ),
+          ],
         ),
       ],
     );

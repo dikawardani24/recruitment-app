@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.config import Settings
-from app.chat import ChatError, QueryRouter, ToolCall, ToolError, ToolRegistry
+from app.chat import ChatClient, ChatError, QueryRouter, ToolCall, ToolError, ToolRegistry
 from app.domain.candidate import Candidate
 from app.domain.job import Job
 from app.domain.page import Page
@@ -420,6 +420,29 @@ async def test_ask_enabled_by_client_api_key_overrides_server_default():
     )
     assert result["configured"] is True
     assert result["answer"] == "Jane Doe matches the Flutter role [1]."
+
+
+async def test_chat_client_resolves_openrouter_model_from_client_key():
+    """A client-supplied OpenRouter key enables an OpenRouter model even when
+    the server has no keys configured at startup."""
+    s = _settings()
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+
+    client = ChatClient(s)
+    option = client._resolve(
+        "openrouter:qwen/qwen-2.5-72b-instruct", runtime_api_key="or-client-key"
+    )
+    assert option.provider == "openrouter"
+    assert option.api_key == "or-client-key"
+    assert option.base_url == "https://openrouter.ai/api/v1"
+    assert option.model == "qwen/qwen-2.5-72b-instruct"
+
+    # A plain/unknown id resolves to the default provider with the client key.
+    option = client._resolve(None, runtime_api_key="gemini-client-key")
+    assert option.provider == "default"
+    assert option.api_key == "gemini-client-key"
+    assert option.model == s.chat_model
 
 
 async def test_ask_answers_with_grounded_evidence():
