@@ -445,6 +445,103 @@ async def test_chat_client_resolves_openrouter_model_from_client_key():
     assert option.model == s.chat_model
 
 
+def _dual_provider_settings() -> Settings:
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = "or-key"
+    s.openrouter_models = ["qwen/qwen-2.5-72b-instruct"]
+    return s
+
+
+def test_client_attempts_with_server_key_fail_over_to_other_provider():
+    """With the server's default key each provider gets two attempts and the
+    turn fails over to the other configured provider."""
+    client = ChatClient(_dual_provider_settings())
+    assert [a.provider for a in client._attempts(None, None)] == [
+        "default", "default", "openrouter", "openrouter",
+    ]
+    assert [a.provider for a in client._attempts(
+        "openrouter:qwen/qwen-2.5-72b-instruct", None
+    )] == ["openrouter", "openrouter", "default", "default"]
+
+
+def test_client_attempts_single_provider_when_no_fallback_configured():
+    s = _settings()
+    s.llm_api_key = "test-key"
+    s.openrouter_api_key = None
+    client = ChatClient(s)
+    assert [a.provider for a in client._attempts(None, None)] == ["default", "default"]
+
+
+def test_client_attempts_single_when_client_api_key_supplied():
+    """A client-supplied key is tried once and never fails over."""
+    client = ChatClient(_dual_provider_settings())
+    attempts = client._attempts(None, runtime_api_key="client-key")
+    assert len(attempts) == 1
+    assert attempts[0].provider == "default"
+    assert attempts[0].api_key == "client-key"
+
+
+async def test_complete_fails_over_to_second_provider():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        if option.provider == "default":
+            raise ChatError("chat_call_failed:SomeError")
+        return "fallback answer"
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    answer = await client.complete("sys", "user")
+    assert answer == "fallback answer"
+    assert order == ["default", "default", "openrouter"]
+
+
+async def test_complete_raises_after_all_attempts_fail():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        raise ChatError("chat_call_failed:SomeError")
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    with pytest.raises(ChatError):
+        await client.complete("sys", "user")
+    assert order == ["default", "default", "openrouter", "openrouter"]
+
+
+async def test_complete_with_client_key_never_fails_over():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        raise ChatError("chat_call_failed:SomeError")
+
+    client._complete_with = _complete_with  # type: ignore[method-assign]
+    with pytest.raises(ChatError):
+        await client.complete("sys", "user", runtime_api_key="client-key")
+    assert order == ["default"]
+
+
+async def test_complete_stream_fails_over_to_second_provider():
+    client = ChatClient(_dual_provider_settings())
+    order: list[str] = []
+
+    async def _complete_stream_with(option, system, user, tools, execute_tool):
+        order.append(option.provider)
+        if option.provider == "default":
+            raise ChatError("chat_call_failed:SomeError")
+        yield "streamed answer"
+
+    client._complete_stream_with = _complete_stream_with  # type: ignore[method-assign]
+    events = [item async for item in client.complete_stream("sys", "user")]
+    assert events == ["streamed answer"]
+    assert order == ["default", "default", "openrouter"]
+
+
 async def test_ask_answers_with_grounded_evidence():
     job = _job("job-1", "Flutter Developer", description="Mobile apps")
     candidate = _candidate("cv-1", "job-1", "Jane Doe", ["Flutter", "Dart"])

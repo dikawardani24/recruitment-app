@@ -29,6 +29,13 @@ class ChatClient:
     via ATS_OPENROUTER__MODELS) — the base URL, API key and model name are picked
     per request from [Settings.resolve_chat_model].
 
+    Provider failover: when the server's default key is used (no per-request
+    [runtime_api_key]) each provider is given two attempts (the call plus one
+    more) and, if another provider is configured, the turn fails over to it — so
+    a flaky Gemini falls back to OpenRouter instead of failing the whole turn.
+    A client-supplied key pins the turn to that one provider: it is tried once
+    and never fails over.
+
     Supports optional function-calling: when [tools] and [execute_tool] are given
     the client runs the model/tool loop (up to [MAX_TOOL_ROUNDS]) so the copilot
     can look up full workspace records through the registered tools."""
@@ -87,6 +94,28 @@ class ChatClient:
             api_key=api_key,
             model=self.settings.chat_model,
         )
+
+    def _attempts(self, model_id: str | None, runtime_api_key: str | None) -> list[ChatModelOption]:
+        """Ordered provider options to try for one turn.
+
+        A client-supplied [runtime_api_key] pins the turn to a single option:
+        it is tried once and never fails over, so the user's own key is the
+        only one exercised.
+
+        With the server's default key each provider gets two attempts (the call
+        plus one more) and, when another provider is configured, the turn fails
+        over to it — e.g. Gemini fails twice, then OpenRouter gets two attempts
+        of its own before the caller gives up.
+        """
+        option = self._resolve(model_id, runtime_api_key)
+        if runtime_api_key is not None:
+            return [option]
+        options = [option]
+        for other in self.settings.chat_models:
+            if other.provider != option.provider:
+                options.append(other)
+                break
+        return [opt for opt in options for _ in range(2)]
 
     def _min_interval_s(self, option: ChatModelOption) -> float:
         """Minimum gap between calls for this provider.
@@ -172,7 +201,23 @@ class ChatClient:
     ) -> str:
         if not self.settings.chat_enabled_with_key(runtime_api_key):
             raise ChatError("chat_not_configured")
-        option = self._resolve(model_id, runtime_api_key)
+        last_error: ChatError | None = None
+        for option in self._attempts(model_id, runtime_api_key):
+            try:
+                return await self._complete_with(option, system, user, tools, execute_tool)
+            except ChatError as exc:
+                last_error = exc
+        assert last_error is not None
+        raise last_error
+
+    async def _complete_with(
+        self,
+        option: ChatModelOption,
+        system: str,
+        user: str,
+        tools: list[dict] | None,
+        execute_tool,
+    ) -> str:
         client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},
@@ -219,10 +264,33 @@ class ChatClient:
         runtime_api_key: str | None = None,
     ):
         """Like [complete] but streams. Yields either a text delta (str) or a
-        [ToolCall] marker just before each tool executes, then the final text."""
+        [ToolCall] marker just before each tool executes, then the final text.
+
+        Provider failover happens before any text is sent: if establishing the
+        stream fails, the next [ChatClient._attempts] option is tried."""
         if not self.settings.chat_enabled_with_key(runtime_api_key):
             raise ChatError("chat_not_configured")
-        option = self._resolve(model_id, runtime_api_key)
+        last_error: ChatError | None = None
+        for option in self._attempts(model_id, runtime_api_key):
+            try:
+                async for item in self._complete_stream_with(
+                    option, system, user, tools, execute_tool
+                ):
+                    yield item
+                return
+            except ChatError as exc:
+                last_error = exc
+        assert last_error is not None
+        raise last_error
+
+    async def _complete_stream_with(
+        self,
+        option: ChatModelOption,
+        system: str,
+        user: str,
+        tools: list[dict] | None,
+        execute_tool,
+    ):
         client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},

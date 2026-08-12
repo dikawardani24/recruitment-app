@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ai_ats/controllers/api_key_controller.dart';
+import 'package:ai_ats/controllers/chat/chat_controller.dart';
+import 'package:ai_ats/controllers/chat/chat_state.dart';
 import 'package:ai_ats/di.dart';
+import 'package:ai_ats/domain/models.dart';
 import 'package:ai_ats/main.dart';
 import 'package:ai_ats/providers.dart';
 import 'package:ai_ats/router.dart';
@@ -20,6 +25,42 @@ class _FakeJobListNotifier extends JobListNotifier {
     return JobListState(jobs: const [], page: 1, hasMore: false);
   }
 }
+
+class _FixedChatController extends ChatController {
+  _FixedChatController(this.models);
+
+  final List<ChatModel> models;
+
+  @override
+  ChatState build() => ChatState(
+        models: models,
+        selectedModel: models.isNotEmpty ? models.first.id : null,
+      );
+}
+
+class _FixedApiKeyController extends ApiKeyController {
+  _FixedApiKeyController(this.keys);
+
+  final Map<String, String?> keys;
+
+  @override
+  Map<String, String?> build() => keys;
+}
+
+const _serverModels = [
+  ChatModel(
+    id: 'default',
+    label: 'gemini-flash-latest',
+    provider: 'default',
+    model: 'gemini-flash-latest',
+  ),
+  ChatModel(
+    id: 'openrouter:qwen/qwen-2.5-72b-instruct',
+    label: 'Qwen via OpenRouter (qwen/qwen-2.5-72b-instruct)',
+    provider: 'openrouter',
+    model: 'qwen/qwen-2.5-72b-instruct',
+  ),
+];
 
 void main() {
   setupDependencies();
@@ -39,6 +80,7 @@ void main() {
   Future<GoRouter> pumpApp(
     WidgetTester tester, {
     SharedPreferences? prefs,
+    List<Override> overrides = const [],
   }) async {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -52,12 +94,18 @@ void main() {
           goRouterProvider.overrideWithValue(router),
           sharedPreferencesProvider.overrideWithValue(effective),
           jobsProvider.overrideWith(() => _FakeJobListNotifier()),
+          ...overrides,
         ],
         child: AtsApp(router: router),
       ),
     );
     await tester.pumpAndSettle();
     return router;
+  }
+
+  Future<void> openSettings(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
   }
 
   Brightness brightnessOf(WidgetTester tester, Type screen) {
@@ -131,5 +179,54 @@ void main() {
     await pumpApp(tester);
 
     expect(brightnessOf(tester, JobListScreen), Brightness.dark);
+  });
+
+  testWidgets('shows app default models when no user API key is set', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      overrides: [
+        chatControllerProvider.overrideWith(() => _FixedChatController(_serverModels)),
+        apiKeyProvider.overrideWith(() => _FixedApiKeyController(const {})),
+      ],
+    );
+    await openSettings(tester);
+
+    expect(find.text('Gemini (Default)'), findsOneWidget);
+    expect(find.text('OpenRouter'), findsOneWidget);
+    expect(find.textContaining('App default'), findsNWidgets(2));
+    expect(find.text('Not configured'), findsNothing);
+  });
+
+  testWidgets('shows user-set keys and not configured for the rest', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      overrides: [
+        chatControllerProvider.overrideWith(() => _FixedChatController(const [])),
+        apiKeyProvider.overrideWith(
+          () => _FixedApiKeyController({'default': 'AIzaSy-very-long-key'}),
+        ),
+      ],
+    );
+    await openSettings(tester);
+
+    expect(find.textContaining('Using your saved key'), findsOneWidget);
+    expect(find.text('Not configured'), findsOneWidget);
+  });
+
+  testWidgets('shows not configured for both when nothing is set', (tester) async {
+    await pumpApp(
+      tester,
+      overrides: [
+        chatControllerProvider.overrideWith(() => _FixedChatController(const [])),
+        apiKeyProvider.overrideWith(() => _FixedApiKeyController(const {})),
+      ],
+    );
+    await openSettings(tester);
+
+    expect(find.text('Not configured'), findsNWidgets(2));
   });
 }

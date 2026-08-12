@@ -23,37 +23,33 @@ class _ApiKeyContent extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final keys = ref.watch(apiKeyProvider);
     final apiKeyController = ref.read(apiKeyProvider.notifier);
-    final selectedProvider = useState(ApiKeyProvider.gemini);
-    final inputController = useTextEditingController(
-      text: keys[selectedProvider.value.id] ?? '',
-    );
+    final geminiController = useTextEditingController();
+    final openRouterController = useTextEditingController();
     final theme = Theme.of(context);
-    final provider = selectedProvider.value;
 
-    Future<void> save() async {
-      final value = inputController.text.trim();
+    Future<void> save(ApiKeyProvider provider, TextEditingController controller) async {
+      final value = controller.text.trim();
       await apiKeyController.setApiKey(provider, value);
+      controller.clear();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(
-            content: Text(
-              value.isEmpty
-                  ? '${provider.label} key removed'
-                  : '${provider.label} API key saved',
-            ),
-          ),
+          SnackBar(content: Text('${provider.label} API key saved')),
         );
       if (value.isNotEmpty) {
         ref.read(chatControllerProvider.notifier).loadModels();
       }
     }
 
-    void selectProvider(ApiKeyProvider next) {
-      if (next == provider) return;
-      inputController.text = keys[next.id] ?? '';
-      selectedProvider.value = next;
+    Future<void> remove(ApiKeyProvider provider) async {
+      await apiKeyController.clearApiKey(provider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${provider.label} API key removed')),
+        );
     }
 
     return Scaffold(
@@ -69,100 +65,160 @@ class _ApiKeyContent extends HookConsumerWidget {
               subtitle: 'Configure API keys for AI models',
             ),
             const SizedBox(height: 24),
-            Text('Provider', style: theme.textTheme.titleSmall),
+            _ProviderKeySection(
+              provider: ApiKeyProvider.gemini,
+              savedKey: keys[ApiKeyProvider.gemini.id],
+              controller: geminiController,
+              onSave: () => save(ApiKeyProvider.gemini, geminiController),
+              onDelete: () => remove(ApiKeyProvider.gemini),
+            ),
+            const SizedBox(height: 24),
+            _ProviderKeySection(
+              provider: ApiKeyProvider.openrouter,
+              savedKey: keys[ApiKeyProvider.openrouter.id],
+              controller: openRouterController,
+              onSave: () => save(ApiKeyProvider.openrouter, openRouterController),
+              onDelete: () => remove(ApiKeyProvider.openrouter),
+            ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<ApiKeyProvider>(
-              initialValue: provider,
-              items: [
-                for (final p in ApiKeyProvider.values)
-                  DropdownMenuItem(
-                    value: p,
-                    child: Row(
-                      children: [
-                        Icon(
-                          p == ApiKeyProvider.gemini
-                              ? Icons.auto_awesome
-                              : Icons.router_outlined,
-                          size: 18,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(p.label),
-                        if (keys[p.id] != null) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-              ],
-              onChanged: (value) {
-                if (value != null) selectProvider(value);
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                filled: true,
+            Text(
+              'When you set your own key, the copilot uses it directly and '
+              'does not fall back to the server default. Without a key, the '
+              'server default is used with automatic provider failover.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: 24),
-            _ApiKeyHelp(
-              text: _helpText(provider),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: inputController,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: '${provider.label} API Key',
-                hintText: provider.hint,
-                border: const OutlineInputBorder(),
-                filled: true,
-                suffixIcon: IconButton(
-                  tooltip:
-                      keys[provider.id] == null ? 'Key not set' : 'Key is set',
-                  icon: Icon(
-                    keys[provider.id] == null
-                        ? Icons.visibility_off
-                        : Icons.verified_user_outlined,
-                  ),
-                  onPressed: null,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: save,
-                icon: const Icon(Icons.save_outlined),
-                label: Text('Save ${provider.label} API Key'),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _ApiKeyStatus(
-              icon: keys[provider.id] == null
-                  ? Icons.warning_amber_rounded
-                  : Icons.check_circle_outline,
-              color: keys[provider.id] == null
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.primary,
-              message: keys[provider.id] == null
-                  ? 'No ${provider.label} API key set. The Recruiter Copilot '
-                      'will use the server default key, or show a '
-                      '"not configured" banner when none is available.'
-                  : '${provider.label} API key is set. The Recruiter Copilot '
-                      'will use it when this provider\'s model is selected.',
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+class _ProviderKeySection extends StatelessWidget {
+  const _ProviderKeySection({
+    required this.provider,
+    required this.savedKey,
+    required this.controller,
+    required this.onSave,
+    required this.onDelete,
+  });
+
+  final ApiKeyProvider provider;
+  final String? savedKey;
+  final TextEditingController controller;
+  final VoidCallback onSave;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: savedKey == null
+          ? _buildUnset(theme)
+          : _buildSet(theme),
+    );
+  }
+
+  Widget _buildUnset(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ProviderHeader(provider: provider, isSet: false),
+        const SizedBox(height: 16),
+        _ApiKeyHelp(text: _helpText(provider)),
+        const SizedBox(height: 16),
+        TextField(
+          controller: controller,
+          obscureText: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            labelText: '${provider.label} API Key',
+            hintText: provider.hint,
+            border: const OutlineInputBorder(),
+            filled: true,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: onSave,
+            icon: const Icon(Icons.save_outlined),
+            label: Text('Save ${provider.label} API Key'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ApiKeyStatus(
+          icon: Icons.warning_amber_rounded,
+          color: theme.colorScheme.error,
+          message: 'No ${provider.label} API key set. The Recruiter Copilot '
+              'will use the server default key (with automatic provider '
+              'failover), or show a "not configured" banner when none is '
+              'available.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSet(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ProviderHeader(provider: provider, isSet: true),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _maskKey(savedKey!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: onDelete,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+              ),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Delete'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _ApiKeyStatus(
+          icon: Icons.check_circle_outline,
+          color: theme.colorScheme.primary,
+          message: '${provider.label} API key is set. The Recruiter Copilot '
+              'will use it when this provider\'s model is selected and will '
+              'not fall back to the server default.',
+        ),
+      ],
+    );
+  }
+
+  String _maskKey(String key) {
+    if (key.length <= 8) return '••••••••';
+    return '${key.substring(0, 4)}••••••••${key.substring(key.length - 4)}';
   }
 
   String _helpText(ApiKeyProvider provider) {
@@ -187,6 +243,40 @@ class _ApiKeyContent extends HookConsumerWidget {
             'Without a key, the backend uses its own OpenRouter key when '
             'configured.';
     }
+  }
+}
+
+class _ProviderHeader extends StatelessWidget {
+  const _ProviderHeader({required this.provider, required this.isSet});
+
+  final ApiKeyProvider provider;
+  final bool isSet;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(
+          provider == ApiKeyProvider.gemini
+              ? Icons.auto_awesome
+              : Icons.router_outlined,
+          size: 20,
+          color: theme.colorScheme.primary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(provider.label, style: theme.textTheme.titleSmall),
+        ),
+        Icon(
+          isSet ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 18,
+          color: isSet
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+      ],
+    );
   }
 }
 
