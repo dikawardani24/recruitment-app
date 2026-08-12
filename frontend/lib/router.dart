@@ -39,10 +39,6 @@ class AppRouter {
               builder: (context, state) => const SettingsScreen(),
             ),
             GoRoute(
-              path: AppRoute.apiKey.path,
-              builder: (context, state) => const ApiKeyScreen(),
-            ),
-            GoRoute(
               path: 'search',
               builder: (context, state) => const SearchJobScreen(),
             ),
@@ -101,6 +97,10 @@ class AppRouter {
         GoRoute(
           path: AppRoute.search.path,
           builder: (context, state) => const UnifiedSearchScreen(),
+        ),
+        GoRoute(
+          path: AppRoute.apiKey.path,
+          builder: (context, state) => const ApiKeyScreen(),
         ),
       ],
     );

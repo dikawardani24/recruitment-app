@@ -3,19 +3,19 @@
 /// Every navigation in the app is defined here and reached through the
 /// [AppNavigator] interface — never by constructing routes or URLs inline.
 enum AppRoute {
-  jobs('/jobs'),
-  jobForm('/jobs/new'),
-  settings('/jobs/settings'),
-  apiKey('/api-key'),
-  searchJobs('/jobs/search'),
   searchCandidates('/candidates/search'),
-  search('/search'),
+  jobs('/jobs'),
+  actionResult('/jobs/action-result'),
+  chat('/jobs/chat'),
+  deleteConfirm('/jobs/delete-confirm'),
   jobDetail('/jobs/:jobId'),
   candidateDetail('/jobs/:jobId/candidate/:cvId'),
   rankings('/jobs/:jobId/rankings'),
-  chat('/jobs/chat'),
-  deleteConfirm('/jobs/delete-confirm'),
-  actionResult('/jobs/action-result');
+  jobForm('/jobs/new'),
+  searchJobs('/jobs/search'),
+  search('/search'),
+  settings('/settings'),
+  apiKey('/settings/api-key');
 
   const AppRoute(this.path);
 
