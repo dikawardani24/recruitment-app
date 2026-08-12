@@ -376,8 +376,20 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.fling(find.byType(ListView), const Offset(0, -3000), 1000);
-    await tester.pump();
+    // The list lays out children lazily and the footer grows while loading,
+    // so jump to the bottom repeatedly until the position stabilises.
+    Future<void> scrollToBottom() async {
+      final scrollController =
+          tester.widget<ListView>(find.byType(ListView)).controller!;
+      var last = -1.0;
+      while (scrollController.position.pixels != last) {
+        last = scrollController.position.pixels;
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        await tester.pump();
+      }
+    }
+
+    await scrollToBottom();
 
     // isLoadingMore was set synchronously; the delayed page resolves on the
     // next timer tick.
@@ -394,8 +406,7 @@ void main() {
       findsNothing,
     );
 
-    await tester.drag(find.byType(ListView), const Offset(0, -5000));
-    await tester.pump();
+    await scrollToBottom();
 
     expect(find.text('Job 39'), findsOneWidget);
     expect(find.text('No more jobs'), findsOneWidget);

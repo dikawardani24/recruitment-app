@@ -1,3 +1,4 @@
+import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,9 @@ import 'package:ai_ats/screens/job_list_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  // Disable Chucker's in-app notification so its 1s auto-dismiss timer does
+  // not leak into the test and trigger the "Timer still pending" assertion.
+  ChuckerFlutter.showNotification = false;
   SharedPreferences.setMockInitialValues({});
   setupDependencies();
 
