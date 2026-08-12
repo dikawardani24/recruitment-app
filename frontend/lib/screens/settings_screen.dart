@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../providers.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
@@ -22,6 +23,7 @@ class _SettingsContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final themeController = ref.read(themeModeProvider.notifier);
+    final navigator = ref.read(navigatorProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -32,6 +34,22 @@ class _SettingsContent extends ConsumerWidget {
             icon: Icons.settings,
             title: 'Settings',
             subtitle: 'Customize how the app looks and behaves.',
+          ),
+          const SizedBox(height: 16),
+          const SectionTitle('AI Models'),
+          const SizedBox(height: 8),
+          SectionCard(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: const Icon(Icons.key),
+              title: const Text('API Key Configuration'),
+              subtitle: const Text(
+                'Set API keys for chat models',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: navigator.goToApiKey,
+            ),
           ),
           const SizedBox(height: 16),
           const SectionTitle('Appearance'),

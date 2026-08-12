@@ -16,6 +16,7 @@ import 'screens/search_candidate_screen.dart';
 import 'screens/search_job_screen.dart';
 import 'screens/unified_search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/api_key_screen.dart';
 
 /// Builds the app's [GoRouter]. Route patterns are derived from [AppRoute]
 /// so that the enum stays the single source of truth for navigation.
@@ -36,6 +37,10 @@ class AppRouter {
             GoRoute(
               path: 'settings',
               builder: (context, state) => const SettingsScreen(),
+            ),
+            GoRoute(
+              path: AppRoute.apiKey.path,
+              builder: (context, state) => const ApiKeyScreen(),
             ),
             GoRoute(
               path: 'search',

@@ -6,6 +6,7 @@ enum AppRoute {
   jobs('/jobs'),
   jobForm('/jobs/new'),
   settings('/jobs/settings'),
+  apiKey('/api-key'),
   searchJobs('/jobs/search'),
   searchCandidates('/candidates/search'),
   search('/search'),
