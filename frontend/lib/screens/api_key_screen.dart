@@ -327,7 +327,6 @@ class _AddKeyForm extends StatelessWidget {
               decoration: const InputDecoration(
                 labelText: 'Select Provider',
                 border: OutlineInputBorder(),
-                filled: true,
               ),
               items: availableProviders
                   .map((p) => DropdownMenuItem(value: p, child: Text(p.label)))
@@ -346,13 +345,12 @@ class _AddKeyForm extends StatelessWidget {
                     : 'API Key',
                 hintText: selectedProvider?.hint,
                 border: const OutlineInputBorder(),
-                filled: true,
               ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: FilledButton.icon(
                 onPressed: selectedProvider != null ? onSave : null,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save API Key'),
