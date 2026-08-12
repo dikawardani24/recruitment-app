@@ -1,3 +1,4 @@
+import 'package:ai_ats/widgets/card_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -23,23 +24,54 @@ class _ApiKeyContent extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final keys = ref.watch(apiKeyProvider);
     final apiKeyController = ref.read(apiKeyProvider.notifier);
-    final geminiController = useTextEditingController();
-    final openRouterController = useTextEditingController();
-    final theme = Theme.of(context);
+    final keyInputController = useTextEditingController();
 
-    Future<void> save(ApiKeyProvider provider, TextEditingController controller) async {
-      final value = controller.text.trim();
+    // Get list of providers that have a key set (exclude empty strings)
+    final savedProviders = ApiKeyProvider.values
+        .where((p) => (keys[p.id]?.isNotEmpty) == true)
+        .toList();
+
+    // Get list of providers that DON'T have a key set
+    final availableProviders = ApiKeyProvider.values
+        .where((p) => (keys[p.id]?.isNotEmpty) != true)
+        .toList();
+
+    // Dropdown state
+    final selectedProvider = useState<ApiKeyProvider?>(
+      availableProviders.isNotEmpty ? availableProviders.first : null,
+    );
+
+    // Sync dropdown if available providers change (e.g. after adding/deleting)
+    useEffect(() {
+      if (selectedProvider.value == null && availableProviders.isNotEmpty) {
+        selectedProvider.value = availableProviders.first;
+      } else if (selectedProvider.value != null &&
+          !availableProviders.contains(selectedProvider.value)) {
+        selectedProvider.value = availableProviders.isNotEmpty
+            ? availableProviders.first
+            : null;
+      }
+      return null;
+    }, [availableProviders]);
+
+    Future<void> save() async {
+      final provider = selectedProvider.value;
+      if (provider == null) return;
+
+      final value = keyInputController.text.trim();
+      if (value.isEmpty) return;
+
       await apiKeyController.setApiKey(provider, value);
-      controller.clear();
+      keyInputController.clear();
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(content: Text('${provider.label} API key saved')),
         );
-      if (value.isNotEmpty) {
-        ref.read(chatControllerProvider.notifier).loadModels();
-      }
+
+      ref.read(chatControllerProvider.notifier).loadModels();
     }
 
     Future<void> remove(ApiKeyProvider provider) async {
@@ -65,154 +97,47 @@ class _ApiKeyContent extends HookConsumerWidget {
               subtitle: 'Configure API keys for AI models',
             ),
             const SizedBox(height: 24),
-            _ProviderKeySection(
-              provider: ApiKeyProvider.gemini,
-              savedKey: keys[ApiKeyProvider.gemini.id],
-              controller: geminiController,
-              onSave: () => save(ApiKeyProvider.gemini, geminiController),
-              onDelete: () => remove(ApiKeyProvider.gemini),
-            ),
+            const _HelpCard(),
             const SizedBox(height: 24),
-            _ProviderKeySection(
-              provider: ApiKeyProvider.openrouter,
-              savedKey: keys[ApiKeyProvider.openrouter.id],
-              controller: openRouterController,
-              onSave: () => save(ApiKeyProvider.openrouter, openRouterController),
-              onDelete: () => remove(ApiKeyProvider.openrouter),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'When you set your own key, the copilot uses it directly and '
-              'does not fall back to the server default. Without a key, the '
-              'server default is used with automatic provider failover.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+
+            // Section 1: Saved API Keys (Visible if any key is set)
+            if (savedProviders.isNotEmpty) ...[
+              Text(
+                'Saved API Keys',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProviderKeySection extends StatelessWidget {
-  const _ProviderKeySection({
-    required this.provider,
-    required this.savedKey,
-    required this.controller,
-    required this.onSave,
-    required this.onDelete,
-  });
-
-  final ApiKeyProvider provider;
-  final String? savedKey;
-  final TextEditingController controller;
-  final VoidCallback onSave;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: savedKey == null
-          ? _buildUnset(theme)
-          : _buildSet(theme),
-    );
-  }
-
-  Widget _buildUnset(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ProviderHeader(provider: provider, isSet: false),
-        const SizedBox(height: 16),
-        _ApiKeyHelp(text: _helpText(provider)),
-        const SizedBox(height: 16),
-        TextField(
-          controller: controller,
-          obscureText: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          decoration: InputDecoration(
-            labelText: '${provider.label} API Key',
-            hintText: provider.hint,
-            border: const OutlineInputBorder(),
-            filled: true,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: onSave,
-            icon: const Icon(Icons.save_outlined),
-            label: Text('Save ${provider.label} API Key'),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _ApiKeyStatus(
-          icon: Icons.warning_amber_rounded,
-          color: theme.colorScheme.error,
-          message: 'No ${provider.label} API key set. The Recruiter Copilot '
-              'will use the server default key (with automatic provider '
-              'failover), or show a "not configured" banner when none is '
-              'available.',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSet(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ProviderHeader(provider: provider, isSet: true),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _maskKey(savedKey!),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 12),
+              ...savedProviders.map(
+                (p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _SavedKeyItem(
+                    provider: p,
+                    maskedKey: _maskKey(keys[p.id]!),
+                    onDelete: () => remove(p),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: onDelete,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
+              const SizedBox(height: 12),
+            ],
+
+            // Section 2: Add API Key (Visible if 0 or 1 key is set)
+            if (savedProviders.length < 2) ...[
+              Text(
+                'Add API Key',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Delete'),
-            ),
+              const SizedBox(height: 12),
+              _AddKeyForm(
+                availableProviders: availableProviders,
+                selectedProvider: selectedProvider.value,
+                onProviderChanged: (p) => selectedProvider.value = p,
+                controller: keyInputController,
+                onSave: save,
+              ),
+            ],
           ],
         ),
-        const SizedBox(height: 16),
-        _ApiKeyStatus(
-          icon: Icons.check_circle_outline,
-          color: theme.colorScheme.primary,
-          message: '${provider.label} API key is set. The Recruiter Copilot '
-              'will use it when this provider\'s model is selected and will '
-              'not fall back to the server default.',
-        ),
-      ],
+      ),
     );
   }
 
@@ -220,133 +145,222 @@ class _ProviderKeySection extends StatelessWidget {
     if (key.length <= 8) return '••••••••';
     return '${key.substring(0, 4)}••••••••${key.substring(key.length - 4)}';
   }
-
-  String _helpText(ApiKeyProvider provider) {
-    switch (provider) {
-      case ApiKeyProvider.gemini:
-        return 'The default provider runs on Google Gemini through the backend. '
-            'It needs a Gemini API key for the chat copilot to answer.\n\n'
-            'How to get one:\n'
-            '1. Visit https://aistudio.google.com/apikey and sign in.\n'
-            '2. Create an API key and copy it.\n'
-            '3. Paste it here and tap Save.\n\n'
-            'If the backend already sets ATS_LLM__API_KEY, this field is '
-            'optional and the server default is used.';
-      case ApiKeyProvider.openrouter:
-        return 'OpenRouter lets the copilot switch between many models (e.g. '
-            'Qwen). An API key here overrides the server default when an '
-            'OpenRouter model is selected.\n\n'
-            'How to get one:\n'
-            '1. Visit https://openrouter.ai/keys and sign in.\n'
-            '2. Click "Create Key", give it a name, and copy it.\n'
-            '3. Paste it here and tap Save.\n\n'
-            'Without a key, the backend uses its own OpenRouter key when '
-            'configured.';
-    }
-  }
 }
 
-class _ProviderHeader extends StatelessWidget {
-  const _ProviderHeader({required this.provider, required this.isSet});
-
-  final ApiKeyProvider provider;
-  final bool isSet;
+class _HelpCard extends StatelessWidget {
+  const _HelpCard();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(
-          provider == ApiKeyProvider.gemini
-              ? Icons.auto_awesome
-              : Icons.router_outlined,
-          size: 20,
-          color: theme.colorScheme.primary,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(provider.label, style: theme.textTheme.titleSmall),
-        ),
-        Icon(
-          isSet ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 18,
-          color: isSet
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurfaceVariant,
-        ),
-      ],
-    );
-  }
-}
 
-class _ApiKeyHelp extends StatelessWidget {
-  final String text;
-
-  const _ApiKeyHelp({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.help_outline, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'What is an API key?',
-                style: theme.textTheme.titleSmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    return Card(
+      elevation: 0,
+      shape: cardShape(Theme.of(context)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.help_outline,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text('What is an API key?', style: theme.textTheme.titleSmall),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              'API keys allow the Copilot to connect to AI models directly using your account. '
+              'This overrides server defaults and provides a more personalized experience.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            _HelpItem(
+              title: 'Google Gemini',
+              url: 'https://aistudio.google.com/apikey',
+              instructions: 'Sign in, create an API key, and paste it here.',
+            ),
+            const SizedBox(height: 12),
+            _HelpItem(
+              title: 'OpenRouter',
+              url: 'https://openrouter.ai/keys',
+              instructions:
+                  'Sign in, create a key, and paste it here to access various models.',
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ApiKeyStatus extends StatelessWidget {
-  final String message;
-  final IconData icon;
-  final Color color;
+class _HelpItem extends StatelessWidget {
+  final String title;
+  final String url;
+  final String instructions;
 
-  const _ApiKeyStatus({
-    required this.message,
-    required this.icon,
-    required this.color,
+  const _HelpItem({
+    required this.title,
+    required this.url,
+    required this.instructions,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            message,
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
+        Text(
+          title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(instructions, style: theme.textTheme.bodySmall),
+        Text(
+          url,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.primary,
+            decoration: TextDecoration.underline,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SavedKeyItem extends ConsumerWidget {
+  final ApiKeyProvider provider;
+  final String maskedKey;
+  final VoidCallback onDelete;
+
+  const _SavedKeyItem({
+    required this.provider,
+    required this.maskedKey,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      shape: cardShape(Theme.of(context)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              provider == ApiKeyProvider.gemini
+                  ? Icons.auto_awesome
+                  : Icons.router_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(provider.label, style: theme.textTheme.labelLarge),
+                  Text(
+                    maskedKey,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
+              color: theme.colorScheme.error,
+              tooltip: 'Delete Key',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddKeyForm extends StatelessWidget {
+  final List<ApiKeyProvider> availableProviders;
+  final ApiKeyProvider? selectedProvider;
+  final ValueChanged<ApiKeyProvider?> onProviderChanged;
+  final TextEditingController controller;
+  final VoidCallback onSave;
+
+  const _AddKeyForm({
+    required this.availableProviders,
+    required this.selectedProvider,
+    required this.onProviderChanged,
+    required this.controller,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: cardShape(Theme.of(context)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<ApiKeyProvider>(
+              value: selectedProvider,
+              decoration: const InputDecoration(
+                labelText: 'Select Provider',
+                border: OutlineInputBorder(),
+                filled: true,
+              ),
+              items: availableProviders
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p.label)))
+                  .toList(),
+              onChanged: onProviderChanged,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                labelText: selectedProvider != null
+                    ? '${selectedProvider!.label} API Key'
+                    : 'API Key',
+                hintText: selectedProvider?.hint,
+                border: const OutlineInputBorder(),
+                filled: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: selectedProvider != null ? onSave : null,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save API Key'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

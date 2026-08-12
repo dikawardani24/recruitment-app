@@ -31,11 +31,14 @@ class ApiKeyController extends Notifier<Map<String, String?>> {
     final prefs = ref.read(sharedPreferencesProvider);
     return {
       for (final provider in ApiKeyProvider.values)
-        provider.id: prefs?.getString(_apiKeyKey(provider.id)),
+        provider.id: _normalizeKey(prefs?.getString(_apiKeyKey(provider.id))),
     };
   }
 
   static String _apiKeyKey(String provider) => '$_apiKeyPrefix$provider';
+
+  /// Normalize API key: treat empty strings as null.
+  static String? _normalizeKey(String? key) => key?.isNotEmpty == true ? key : null;
 
   /// The key saved for [provider], or null when none is set.
   String? keyFor(ApiKeyProvider provider) => state[provider.id];
@@ -43,8 +46,13 @@ class ApiKeyController extends Notifier<Map<String, String?>> {
   /// Saves the [apiKey] for the given [provider] and updates state.
   Future<void> setApiKey(ApiKeyProvider provider, String apiKey) async {
     final prefs = ref.read(sharedPreferencesProvider);
-    await prefs?.setString(_apiKeyKey(provider.id), apiKey);
-    state = {...state, provider.id: apiKey.isNotEmpty ? apiKey : null};
+    if (apiKey.isNotEmpty) {
+      await prefs?.setString(_apiKeyKey(provider.id), apiKey);
+      state = {...state, provider.id: apiKey};
+    } else {
+      await prefs?.remove(_apiKeyKey(provider.id));
+      state = {...state, provider.id: null};
+    }
   }
 
   /// Clears the API key for [provider] and saves empty state.

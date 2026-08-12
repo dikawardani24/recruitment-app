@@ -111,11 +111,13 @@ class _ModelStatus {
     required this.provider,
     required this.available,
     required this.detail,
+    required this.isUserConfigured,
   });
 
   final ApiKeyProvider provider;
   final bool available;
   final String detail;
+  final bool isUserConfigured;
 }
 
 List<_ModelStatus> _modelStatuses(
@@ -133,18 +135,29 @@ _ModelStatus _modelStatus(
   Map<String, String?> apiKeys,
 ) {
   final userKey = apiKeys[provider.id];
-  if (userKey != null) {
-    return _ModelStatus(provider: provider, available: true, detail: 'Using your saved key');
+  if (userKey?.isNotEmpty == true) {
+    return _ModelStatus(
+      provider: provider,
+      available: true,
+      isUserConfigured: true,
+      detail: 'Using your saved key',
+    );
   }
   final serverModel = models.where((m) => m.provider == provider.id).firstOrNull;
   if (serverModel != null) {
     return _ModelStatus(
       provider: provider,
       available: true,
+      isUserConfigured: false,
       detail: 'App default (${serverModel.label})',
     );
   }
-  return _ModelStatus(provider: provider, available: false, detail: 'Not configured');
+  return _ModelStatus(
+    provider: provider,
+    available: false,
+    isUserConfigured: false,
+    detail: 'Not configured',
+  );
 }
 
 class _ModelStatusTile extends StatelessWidget {
@@ -167,12 +180,7 @@ class _ModelStatusTile extends StatelessWidget {
         color: color,
       ),
       title: Text(status.provider.label),
-      subtitle: Text(status.detail),
-      trailing: Icon(
-        status.available ? Icons.check_circle : Icons.radio_button_unchecked,
-        color: color,
-        size: 18,
-      ),
+      subtitle: Text(status.detail)
     );
   }
 }
