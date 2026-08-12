@@ -27,6 +27,19 @@ class ChatModelOption:
     api_key: str | None
     model: str
 
+    def with_api_key(self, api_key: str | None) -> "ChatModelOption":
+        """Return a copy of this option with [api_key] overriding the configured one."""
+        if api_key is None:
+            return self
+        return ChatModelOption(
+            id=self.id,
+            label=self.label,
+            provider=self.provider,
+            base_url=self.base_url,
+            api_key=api_key,
+            model=self.model,
+        )
+
 
 def _list_env(name: str, default: str = "") -> list[str]:
     raw = os.getenv(name, default)
@@ -143,6 +156,14 @@ class Settings:
     @property
     def chat_enabled(self) -> bool:
         return bool(self.llm_api_key or self.openrouter_api_key)
+
+    def chat_enabled_with_key(self, runtime_key: str | None = None) -> bool:
+        """Return True if chat can be used.
+
+        Falls back to a per-request [runtime_key] (e.g. supplied by the client)
+        when no server-side key is configured at startup.
+        """
+        return bool(self.llm_api_key or self.openrouter_api_key or runtime_key)
 
     @property
     def chat_models(self) -> list[ChatModelOption]:

@@ -36,12 +36,23 @@ class ChatClient:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def _resolve(self, model_id: str | None) -> ChatModelOption:
-        """Resolve the requested model, raising if it is not configured."""
+    def _resolve(self, model_id: str | None, runtime_api_key: str | None = None) -> ChatModelOption:
+        """Resolve the requested model, raising if it is not configured.
+
+        When [runtime_api_key] is provided it overrides whatever key the
+        resolved option carries, so a client-supplied key takes precedence
+        over the server's default.
+        """
         option = self.settings.resolve_chat_model(model_id)
         if option is None:
-            raise ChatError("chat_not_configured")
-        return option
+            if runtime_api_key is not None:
+                for opt in self.settings.chat_models:
+                    if opt.provider == "default":
+                        option = opt
+                        break
+            if option is None:
+                raise ChatError("chat_not_configured")
+        return option.with_api_key(runtime_api_key)
 
     def _min_interval_s(self, option: ChatModelOption) -> float:
         """Minimum gap between calls for this provider.
@@ -123,10 +134,11 @@ class ChatClient:
         tools: list[dict] | None = None,
         execute_tool=None,
         model_id: str | None = None,
+        runtime_api_key: str | None = None,
     ) -> str:
-        if not self.settings.chat_enabled:
+        if not self.settings.chat_enabled_with_key(runtime_api_key):
             raise ChatError("chat_not_configured")
-        option = self._resolve(model_id)
+        option = self._resolve(model_id, runtime_api_key)
         client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},
@@ -170,12 +182,13 @@ class ChatClient:
         tools: list[dict] | None = None,
         execute_tool=None,
         model_id: str | None = None,
+        runtime_api_key: str | None = None,
     ):
         """Like [complete] but streams. Yields either a text delta (str) or a
         [ToolCall] marker just before each tool executes, then the final text."""
-        if not self.settings.chat_enabled:
+        if not self.settings.chat_enabled_with_key(runtime_api_key):
             raise ChatError("chat_not_configured")
-        option = self._resolve(model_id)
+        option = self._resolve(model_id, runtime_api_key)
         client = self._openai_client(option)
         messages: list[dict] = [
             {"role": "system", "content": system},

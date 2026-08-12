@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di.dart';
 import '../../domain/models.dart';
 import '../../domain/usecases/ask_chat.dart';
+import '../api_key_controller.dart';
 import 'chat_state.dart';
 
 /// Owns the recruiter-copilot conversation. Each turn sends the accumulated
@@ -57,6 +58,7 @@ class ChatController extends Notifier<ChatState> {
         question: trimmed,
         history: history,
         model: state.selectedModel,
+        apiKey: ref.read(apiKeyProvider),
       )) {
         switch (event) {
           case ChatStreamStarted():

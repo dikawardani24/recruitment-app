@@ -7,6 +7,7 @@ abstract class ChatRepository {
     List<ChatMessage> history,
     int topK,
     String? model,
+    String? apiKey,
   });
 
   Stream<ChatStreamEvent> askStream({
@@ -15,6 +16,7 @@ abstract class ChatRepository {
     List<ChatMessage> history,
     int topK,
     String? model,
+    String? apiKey,
   });
 
   Future<List<ChatModel>> getModels();

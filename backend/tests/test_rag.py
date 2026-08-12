@@ -344,7 +344,7 @@ class FakeChatClient:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system: str, user: str, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         self.calls.append((system, user))
         return "Jane Doe matches the Flutter role [1]."
 
@@ -355,7 +355,7 @@ class FakeStreamingChatClient(FakeChatClient):
         self.items = items
         self.tool_calls: list[tuple[str, str]] = []
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         self.calls.append((system, user))
         for item in self.items:
             if isinstance(item, ToolCall):
@@ -368,10 +368,10 @@ class ExplodingChatClient:
     """Package-only fake: raises if Gemini is ever called (used to prove that
     deterministic queries complete with ZERO Gemini requests)."""
 
-    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise AssertionError("Gemini should not have been called")
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise AssertionError("Gemini should not have been called")
         yield None  # pragma: no cover
 
@@ -380,10 +380,10 @@ class FailingChatClient:
     def __init__(self, error: str):
         self.error = error
 
-    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise ChatError(self.error)
 
-    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None):
+    async def complete_stream(self, system, user, tools=None, execute_tool=None, model_id=None, runtime_api_key=None):
         raise ChatError(self.error)
         yield None  # pragma: no cover
 
@@ -401,6 +401,25 @@ async def test_ask_disabled_when_no_llm_key():
     result = await Ask(s, FakeChatClient(), None).execute("who is best?")
     assert result["configured"] is False
     assert "not configured" in result["answer"]
+
+
+async def test_ask_enabled_by_client_api_key_overrides_server_default():
+    """A client-supplied api_key enables chat even when no server key is set,
+    and falls back to the server key when the client key is omitted."""
+    s = _settings()
+    s.llm_api_key = None
+    s.openrouter_api_key = None
+
+    # No client key -> still not configured (falls back to default = none).
+    result = await Ask(s, FakeChatClient(), None).execute("who is best?")
+    assert result["configured"] is False
+
+    # Client supplies its own key -> chat becomes configured.
+    result = await Ask(s, FakeChatClient(), None).execute(
+        "who is best?", api_key="client-key"
+    )
+    assert result["configured"] is True
+    assert result["answer"] == "Jane Doe matches the Flutter role [1]."
 
 
 async def test_ask_answers_with_grounded_evidence():
@@ -1002,6 +1021,21 @@ def test_api_chat_stream_disabled(client):
     assert resp.headers["content-type"].startswith("text/event-stream")
     assert '"type": "error"' in resp.text
     assert "not configured" in resp.text
+
+
+def test_api_chat_enabled_by_client_api_key(client):
+    """A per-request api_key enables chat even when the server has no key."""
+    resp = client.post(
+        "/api/chat",
+        json={
+            "question": "who is the best flutter candidate?",
+            "history": [],
+            "api_key": "client-key",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["configured"] is True
 
 
 def test_api_chat_models_lists_configured_providers(client):

@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list)
     top_k: int = Field(10, ge=1, le=50)
     model: str | None = None
+    api_key: str | None = None
 
 
 def _history(payload: ChatRequest) -> list[dict]:
@@ -54,7 +55,11 @@ async def chat_models() -> dict:
 async def chat(payload: ChatRequest) -> dict:
     """Recruiter-copilot Q&A. Retrieves grounded evidence via RAG and answers
     with a recruitment-scoped system prompt. Returns `configured: false` when no
-    LLM key is set; answers from evidence only when RAG is enabled."""
+    LLM key is set; answers from evidence only when RAG is enabled.
+
+    An optional per-request `api_key` overrides the server's default key, so a
+    client that saved its own key (e.g. OpenRouter) takes precedence when set.
+    """
     try:
         return await ask_use_case().execute(
             question=payload.question,
@@ -62,6 +67,7 @@ async def chat(payload: ChatRequest) -> dict:
             history=_history(payload),
             top_k=payload.top_k,
             model_id=payload.model,
+            api_key=payload.api_key,
         )
     except ChatError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -80,6 +86,7 @@ async def chat_stream(payload: ChatRequest) -> StreamingResponse:
             history=_history(payload),
             top_k=payload.top_k,
             model_id=payload.model,
+            api_key=payload.api_key,
         ):
             yield f"data: {json.dumps(event)}\n\n"
 
