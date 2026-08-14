@@ -152,13 +152,16 @@ or:
 make backend-test
 ```
 
-**86 tests, no external services.** `tests/test_api.py` covers: health, create job
+**144 tests, no external services.** `tests/test_api.py` covers: health, create job
 from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
 persisted rankings, and error cases (missing title, missing JD, unknown job).
 `tests/test_imports.py` covers the background import pipeline,
-`tests/test_jd_skills.py` covers JD structuring + skill matching, and
-`tests/test_rag.py` covers chunking, indexing, semantic search, and the
-RAG-disabled fallback (all with fake embedders/stores — no model or Qdrant).
+`tests/test_jd_skills.py` covers JD structuring + skill matching,
+`tests/test_ner_extract.py` and `tests/test_llm_extract.py` cover the NER and LLM
+CV-parsing engines, `tests/test_rag.py` covers chunking, indexing, semantic
+search, and the RAG-disabled fallback (all with fake embedders/stores — no model
+or Qdrant), and `tests/test_chat.py` / `tests/test_chat_router.py` cover the
+copilot chat (routing + structured candidate cards).
 
 ### Code check
 
@@ -182,6 +185,12 @@ or via Makefile:
 make frontend-test
 make frontend-analyze
 ```
+
+**122 widget/unit tests.** Use `flutter test` rather than `dart test`: the
+standalone `dart` binary lacks a Dart engine binding and crashes while compiling
+Flutter's `dart:ui` FFI hooks (`InvalidType is not a subtype of FunctionType`).
+The suite covers models, repositories, controllers, and screen flows (jobs,
+search, upload, chat, rankings, settings, and the API-key configuration screen).
 
 ---
 
@@ -231,6 +240,7 @@ curl -X POST http://localhost:8000/api/search/reindex \
 | `Form data requires python-multipart` | `pip install python-multipart` |
 | Port 8000 already in use | Change `--port`, or `lsof -ti:8000 \| xargs kill` |
 | Flutter build errors after dep changes | `flutter pub get`, then `flutter clean` |
+| `dart test` crashes with `InvalidType … FunctionType` | Known SDK issue — run `flutter test` instead (links the Dart engine) |
 | Scanned/image-only PDFs yield no text | Not supported yet — convert to text or DOCX |
 
 ---
@@ -245,7 +255,7 @@ cd backend && .venv/bin/uvicorn app.main:app --reload
 cd frontend && flutter run
 
 # Tests
-make backend-test       # 86 tests
+make backend-test       # 144 tests
 make frontend-test
 make lint               # compileall + flutter analyze
 ```
