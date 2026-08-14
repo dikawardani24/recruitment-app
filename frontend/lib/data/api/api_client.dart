@@ -7,7 +7,7 @@ class ApiClient {
   /// [dio] is injectable for tests; production uses the default client.
   ApiClient({@ignoreParam Dio? dio}) : _dio = dio ?? _defaultDio();
 
-  static const String _defaultBase = 'http://localhost:8000/api';
+  static const String _defaultBase = 'https://recruitment-app-z4kg.onrender.com/api';
 
   static Dio _defaultDio() {
     final dio = Dio(
