@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Launch the Flutter frontend.
-#   ./run_script.sh run [flutter run args...]
+# Build release APKs of the Flutter frontend, split per ABI.
+#   ./run_script.sh build_apk [flutter build apk args...]
 #
 # Choose the backend API base URL with --api-base <url>, or pick from an
-# interactive menu when none is given. Pass device/target args through, e.g.:
-#   ./run_script.sh run -d chrome
+# interactive menu when none is given.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -19,4 +18,4 @@ fi
 
 mapfile -t ARGS < <(extract_api_base_flag "$@")
 
-flutter run "$(api_base_dart_define)" "${ARGS[@]}"
+flutter build apk --release --split-per-abi "$(api_base_dart_define)" "${ARGS[@]}"

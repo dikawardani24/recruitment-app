@@ -1,4 +1,4 @@
-.PHONY: backend-test backend-run backend-analyze backend-script frontend-run frontend-test frontend-analyze lint
+.PHONY: backend-test backend-run backend-analyze backend-script frontend-run frontend-build-apk frontend-analyze frontend-test lint
 
 PY ?= .venv/bin/python
 
@@ -16,6 +16,9 @@ backend-script:
 
 frontend-run:
 	scripts/run_script.sh frontend/run
+
+frontend-build-apk:
+	scripts/run_script.sh frontend/build_apk
 
 frontend-analyze:
 	scripts/run_script.sh frontend/analyze

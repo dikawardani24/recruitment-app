@@ -24,7 +24,7 @@ print_menu() {
     echo ""
     local idx=1
     local dir="$ROOT_DIR/$project/scripts"
-    for file in "$dir"/*.sh; do
+    for file in "$dir"/[!_]*.sh; do
         [[ -f "$file" ]] || continue
         local name desc
         name="$(basename "${file%.sh}")"
@@ -39,7 +39,7 @@ get_script_by_index() {
     local project="$1" idx="$2"
     local dir="$ROOT_DIR/$project/scripts"
     local count=0
-    for file in "$dir"/*.sh; do
+    for file in "$dir"/[!_]*.sh; do
         [[ -f "$file" ]] || continue
         ((count++))
         if [[ "$count" -eq "$idx" ]]; then
@@ -52,7 +52,7 @@ get_script_by_index() {
 
 script_count() {
     local dir="$ROOT_DIR/$1/scripts"
-    ls "$dir"/*.sh 2>/dev/null | wc -l | tr -d ' '
+    ls "$dir"/[!_]*.sh 2>/dev/null | wc -l | tr -d ' '
 }
 
 run_script() {
