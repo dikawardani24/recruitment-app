@@ -49,7 +49,9 @@ extract_api_base_flag() {
     shift
   done
   API_BASE_FLAG="$flag"
-  printf '%s\n' "${rest[@]}"
+  if ((${#rest[@]})); then
+    printf '%s\n' "${rest[@]}"
+  fi
 }
 
 # Prompts the user to pick a backend (used when stdin is a TTY).
