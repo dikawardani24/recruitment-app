@@ -53,15 +53,17 @@ extract_api_base_flag() {
 }
 
 # Prompts the user to pick a backend (used when stdin is a TTY).
+# Display goes to stderr so it stays visible even when stdout is captured
+# by a command substitution; only the chosen URL goes to stdout.
 prompt_api_base() {
   local n="${#API_BASE_OPTIONS[@]}"
-  echo ""
-  echo "Select API base URL:"
+  echo "" >&2
+  echo "Select API base URL:" >&2
   local i
   for i in "${!API_BASE_OPTIONS[@]}"; do
-    printf '  %d. %s\n' "$((i + 1))" "${API_BASE_OPTIONS[$i]}"
+    printf '  %d. %s\n' "$((i + 1))" "${API_BASE_OPTIONS[$i]}" >&2
   done
-  printf '  %d. Custom URL\n' "$((n + 1))"
+  printf '  %d. Custom URL\n' "$((n + 1))" >&2
   local choice url
   read -rp "Pick [1-$((n + 1))]: " choice
   if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= n)); then
