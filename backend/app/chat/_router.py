@@ -99,12 +99,14 @@ _WORKSPACE_PATTERNS: list[tuple[str, re.Pattern]] = [
             re.I,
         ),
     ),
-    # a specific candidate by id or demonstrative reference
+    # a specific candidate by id or demonstrative reference ("this candidate",
+    # "that candidate"). A bare "the candidate" is treated as a list/search
+    # request so that "show me the candidate" renders candidate cards.
     (
         "candidate_detail",
         re.compile(
             r"\b(cv-[\w-]+)\b|"
-            r"\b(this|that|the)\s+(candidate|applicant)\b",
+            r"\b(this|that)\s+(candidate|applicant)\b",
             re.I,
         ),
     ),
