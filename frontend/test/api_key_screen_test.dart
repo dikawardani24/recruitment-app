@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ai_ats/controllers/api_key_controller.dart';
 import 'package:ai_ats/di.dart';
 import 'package:ai_ats/screens/api_key_screen.dart';
 import 'package:ai_ats/theme/theme_controller.dart';
@@ -43,9 +44,17 @@ void main() {
   ) async {
     await pumpScreen(tester);
 
-    expect(find.text('Save Gemini (Default) API Key'), findsOneWidget);
-    expect(find.text('Save OpenRouter API Key'), findsOneWidget);
-    expect(find.text('Delete'), findsNothing);
+    // The add-key form is shown with the first provider pre-selected.
+    expect(find.text('Add API Key'), findsOneWidget);
+    expect(find.text('Save API Key'), findsOneWidget);
+    expect(find.text('Gemini (Default) API Key'), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+
+    // Both providers are selectable from the dropdown.
+    await tester.tap(find.byType(DropdownButtonFormField<ApiKeyProvider>));
+    await tester.pumpAndSettle();
+    expect(find.text('Gemini (Default)'), findsWidgets);
+    expect(find.text('OpenRouter'), findsWidgets);
   });
 
   testWidgets('with one key set the other provider still offers an add input', (
@@ -56,10 +65,13 @@ void main() {
     });
     await pumpScreen(tester, prefs: prefs);
 
+    // The saved key is listed with a masked preview and a delete action.
     expect(find.textContaining('••••'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
-    expect(find.text('Save OpenRouter API Key'), findsOneWidget);
-    expect(find.text('Save Gemini (Default) API Key'), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+
+    // The remaining provider is offered in the add form.
+    expect(find.text('OpenRouter API Key'), findsOneWidget);
+    expect(find.text('Save API Key'), findsOneWidget);
   });
 
   testWidgets('no add input when both keys are already set', (tester) async {
@@ -69,8 +81,10 @@ void main() {
     });
     await pumpScreen(tester, prefs: prefs);
 
-    expect(find.text('Delete'), findsNWidgets(2));
-    expect(find.textContaining('Save '), findsNothing);
+    expect(find.text('Saved API Keys'), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsNWidgets(2));
+    expect(find.text('Add API Key'), findsNothing);
+    expect(find.text('Save API Key'), findsNothing);
   });
 
   testWidgets('delete removes the saved key and reveals the add input', (
@@ -81,12 +95,11 @@ void main() {
     });
     await pumpScreen(tester, prefs: prefs);
 
-    await tester.tap(find.text('Delete'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 5));
+    await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
 
     expect(prefs.getString('api_key_default'), isNull);
-    expect(find.text('Save Gemini (Default) API Key'), findsOneWidget);
+    expect(find.text('Add API Key'), findsOneWidget);
+    expect(find.text('Save API Key'), findsOneWidget);
   });
 }

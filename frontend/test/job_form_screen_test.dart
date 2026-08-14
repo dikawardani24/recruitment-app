@@ -159,6 +159,8 @@ void main() {
   testWidgets('trims whitespace from title and description before submitting', (
     tester,
   ) async {
+    final gate = Completer<Job>();
+    createJob.result = gate.future;
     await pumpForm(tester);
 
     await tester.enterText(
@@ -167,6 +169,9 @@ void main() {
     );
     await tester.enterText(find.byType(TextFormField).at(1), '  Build  ');
     await tester.tap(find.text('Create job'));
+    await tester.pump();
+
+    gate.complete(_job());
     await tester.pump();
     await tester.pump();
 
