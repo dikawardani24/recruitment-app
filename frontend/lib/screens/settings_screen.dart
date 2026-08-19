@@ -41,6 +41,10 @@ class _SettingsContent extends ConsumerWidget {
             subtitle: 'Customize how the app looks and behaves.',
           ),
           const SizedBox(height: 16),
+          const SectionTitle('How to use'),
+          const SizedBox(height: 8),
+          const _GettingStartedCard(),
+          const SizedBox(height: 16),
           const SectionTitle('AI Models'),
           const SizedBox(height: 8),
           SectionCard(
@@ -97,6 +101,101 @@ class _SettingsContent extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Step-by-step guide to the core workflow, shown on the Settings screen.
+class _GettingStartedCard extends StatelessWidget {
+  const _GettingStartedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      child: const Column(
+        children: [
+          _StepItem(
+            icon: Icons.work_outline,
+            title: '1. Create a job',
+            detail: 'Paste a job description or upload a JD file (PDF/DOCX/TXT). '
+                'Skills, experience and education are extracted automatically.',
+          ),
+          _StepItem(
+            icon: Icons.upload_file_outlined,
+            title: '2. Add candidates',
+            detail: 'Upload CVs (PDF/DOCX/TXT) to the job. Each CV is parsed '
+                'in the background.',
+          ),
+          _StepItem(
+            icon: Icons.auto_awesome,
+            title: '3. Rank candidates',
+            detail: 'Tap Rank to score every CV and order them by best match, '
+                'with reasoning and a recommendation.',
+          ),
+          _StepItem(
+            icon: Icons.manage_search_outlined,
+            title: '4. Review rankings',
+            detail: 'Check match scores, strengths, weaknesses and skill gaps. '
+                'Tap a candidate to see full details.',
+          ),
+          _StepItem(
+            icon: Icons.search,
+            title: '5. Search & ask',
+            detail: 'Use unified search across jobs and candidates, and ask the '
+                'recruiter copilot anything about your workspace.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  const _StepItem({
+    required this.icon,
+    required this.title,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child: Icon(
+              icon,
+              size: 18,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(detail, style: theme.textTheme.bodySmall),
+              ],
             ),
           ),
         ],
