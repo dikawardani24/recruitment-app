@@ -20,7 +20,6 @@ const _months = [
   'Dec',
 ];
 
-/// Formats an ISO-8601 UTC timestamp as `dd MMM yyyy h:mm am/pm` in local time.
 String formatCreatedAt(String? iso) {
   final date = iso == null ? null : DateTime.tryParse(iso);
   if (date == null) return '';
@@ -33,14 +32,19 @@ String formatCreatedAt(String? iso) {
   return '$day $month ${local.year} $hour12:$minute $period';
 }
 
-/// Tappable summary card for a single job: avatar, title, created date, and
-/// candidate count. Shared by the job list and the job search screens.
 class JobCard extends StatelessWidget {
   final Job job;
   final int index;
   final VoidCallback onTap;
+  final VoidCallback? onAddCandidate;
 
-  const JobCard({super.key, required this.job, required this.index, required this.onTap});
+  const JobCard({
+    super.key,
+    required this.job,
+    required this.index,
+    required this.onTap,
+    this.onAddCandidate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -115,15 +119,25 @@ class JobCard extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        if (onAddCandidate != null) ...[
+                          const SizedBox(width: 8),
+                          Text('·', style: theme.textTheme.labelSmall),
+                          TextButton(
+                            onPressed: onAddCandidate,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              minimumSize: const Size(0, 28),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Add Candidate'),
+                          ),
+                        ],
                       ],
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -132,8 +146,6 @@ class JobCard extends StatelessWidget {
   }
 }
 
-/// Shimmering placeholder that mirrors the layout of [JobCard]: avatar, title,
-/// date, candidate count, and chevron grey areas.
 class JobCardSkeleton extends StatelessWidget {
   const JobCardSkeleton({super.key});
 
