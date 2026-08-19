@@ -88,8 +88,7 @@ Widget _content(BuildContext context, UploadState state) {
             ),
           const SizedBox(height: 12),
           Text(
-            'Submitting files to the server. CV processing runs in the '
-            'background afterwards.',
+            'Uploading CVs now. After submission, AI will process each candidate in the background.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
@@ -132,8 +131,9 @@ Widget _content(BuildContext context, UploadState state) {
           ],
           const SizedBox(height: 12),
           Text(
-            'Candidate processing will continue in the background. '
-            'You can leave this page now.',
+            failed > 0
+                ? 'Successful CVs will continue processing in the background. You can retry the failed files.'
+                : 'AI candidate processing is now running in the background. You can leave this page and return later to see the results.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
