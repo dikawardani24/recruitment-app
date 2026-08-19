@@ -109,14 +109,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// The Appearance (Theme) section sits below the "How to use" guide and the
-  /// AI Models card; the settings ListView only builds visible children, so
-  /// scroll until the theme radios are on screen before interacting with them.
-  Future<void> scrollToTheme(WidgetTester tester) async {
+  /// The settings ListView only builds visible children, so sections below the
+  /// fold (AI Models, Appearance) need to be scrolled into view before
+  /// asserting on or interacting with them.
+  Future<void> scrollToText(WidgetTester tester, String text) async {
     final scrollable = find
         .descendant(of: find.byType(SettingsScreen), matching: find.byType(Scrollable))
         .first;
-    await tester.scrollUntilVisible(find.text('Theme'), 300, scrollable: scrollable);
+    await tester.scrollUntilVisible(find.text(text), 300, scrollable: scrollable);
     await tester.pumpAndSettle();
   }
 
@@ -135,7 +135,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SettingsScreen), findsOneWidget);
-    await scrollToTheme(tester);
+    await scrollToText(tester, 'Theme');
     expect(find.text('Theme'), findsOneWidget);
     expect(find.text('System'), findsOneWidget);
     expect(find.text('Light'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    await scrollToTheme(tester);
+    await scrollToText(tester, 'Theme');
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(brightnessOf(tester, SettingsScreen), Brightness.dark);
@@ -173,7 +173,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    await scrollToTheme(tester);
+    await scrollToText(tester, 'Theme');
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
 

@@ -2,6 +2,8 @@ import 'package:chucker_flutter/chucker_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'domain/models.dart';
+import 'help/ui/help_category_page.dart';
+import 'help/ui/help_page.dart';
 import 'navigation/app_navigator.dart';
 import 'navigation/app_route.dart';
 import 'screens/action_result_screen.dart';
@@ -116,6 +118,21 @@ class AppRouter {
             GoRoute(
               path: childPath(AppRoute.settings.path, AppRoute.apiKey.path),
               builder: (context, state) => const ApiKeyScreen(),
+            ),
+            GoRoute(
+              path: childPath(AppRoute.settings.path, AppRoute.help.path),
+              builder: (context, state) => const HelpPage(),
+              routes: [
+                GoRoute(
+                  path: childPath(
+                    AppRoute.help.path,
+                    AppRoute.helpCategory.path,
+                  ),
+                  builder: (context, state) => HelpCategoryPage(
+                    categoryId: state.pathParameters['categoryId'] ?? '',
+                  ),
+                ),
+              ],
             ),
           ],
         ),

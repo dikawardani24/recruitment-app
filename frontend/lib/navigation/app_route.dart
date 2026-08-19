@@ -16,7 +16,9 @@ enum AppRoute {
   searchJobs('/jobs/search'),
   search('/search'),
   settings('/settings'),
-  apiKey('/settings/api-key');
+  apiKey('/settings/api-key'),
+  help('/settings/help'),
+  helpCategory('/settings/help/:categoryId');
 
   const AppRoute(this.path);
 
@@ -29,4 +31,8 @@ enum AppRoute {
   /// Path with both placeholders filled in.
   String withCandidate(String jobId, String cvId) =>
       candidateDetail.path.replaceFirst(':jobId', jobId).replaceFirst(':cvId', cvId);
+
+  /// Path with the `:categoryId` placeholder filled in.
+  String withCategory(String categoryId) =>
+      helpCategory.path.replaceFirst(':categoryId', categoryId);
 }

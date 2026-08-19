@@ -36,6 +36,13 @@ class GoRouterNavigator implements AppNavigator {
   void goToApiKey() => _router.push(AppRoute.apiKey.path);
 
   @override
+  void goToHelp() => _router.push(AppRoute.help.path);
+
+  @override
+  void goToHelpCategory(String categoryId) =>
+      _router.push(AppRoute.helpCategory.withCategory(categoryId));
+
+  @override
   void goToJobDetail(String jobId) =>
       _router.push(AppRoute.jobDetail.withJobId(jobId));
 

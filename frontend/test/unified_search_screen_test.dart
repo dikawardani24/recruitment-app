@@ -23,6 +23,12 @@ class _FakeNavigator implements AppNavigator {
 
   @override
   void goToApiKey() {}
+
+  @override
+  void goToHelp() {}
+
+  @override
+  void goToHelpCategory(String categoryId) {}
   @override void goToJobDetail(String jobId) => openedJobIds.add(jobId);
   @override void goToCandidateDetail(String jobId, CandidateResult candidate) =>
       openedCandidates.add(candidate);
