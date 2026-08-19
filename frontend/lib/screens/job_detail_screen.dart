@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -46,29 +45,11 @@ class _JobDetailContent extends HookConsumerWidget {
     final detailState = ref.watch(jobDetailStateProvider);
     final detailController = ref.read(jobDetailControllerProvider);
 
-    final polledCvs = cvsAsync.value ?? const <CandidateResult>[];
-    final hasPendingProcessing = polledCvs.any(
-      (c) => c.status == 'uploaded' || c.status == 'processing',
-    );
-    // Poll while candidates are still being processed in the background so the
-    // list refreshes on its own. No WebSocket required.
+    // Periodic polling is owned by the detail notifier and is started only
+    // after a successful import. This cleanup prevents it surviving the page.
     useEffect(() {
-      if (!hasPendingProcessing) return null;
-      Timer? timer;
-      timer = Timer.periodic(const Duration(seconds: 3), (_) {
-        final current =
-            ref.read(cvsProvider(jobId)).value ?? const <CandidateResult>[];
-        final stillPending = current.any(
-          (c) => c.status == 'uploaded' || c.status == 'processing',
-        );
-        if (!stillPending) {
-          timer?.cancel();
-          return;
-        }
-        ref.invalidate(cvsProvider(jobId));
-      });
-      return timer.cancel;
-    }, [jobId, hasPendingProcessing, polledCvs.length]);
+      return () => detailController.stopPolling(jobId);
+    }, [jobId, detailController]);
 
     final job = jobAsync.value;
     final cvs = [...cvsAsync.value ?? const <CandidateResult>[]]..sort(_byRank);
@@ -248,8 +229,9 @@ class _RankingSection extends ConsumerWidget {
 
     // Ranked candidates come from the already-loaded CV list; no extra
     // rankings fetch on screen open (the full-ranking screen loads its own).
-    final ranked =
-        cvs.where((c) => c.overallScore != null).toList(growable: false);
+    final ranked = cvs
+        .where((c) => c.overallScore != null)
+        .toList(growable: false);
     final hasRankings = ranked.isNotEmpty;
 
     return SectionCard(
@@ -344,8 +326,7 @@ class _CandidatesSection extends ConsumerWidget {
               child: Dismissible(
                 key: ValueKey('cv-${cv.cvId ?? cv.fileName}'),
                 direction: DismissDirection.endToStart,
-                confirmDismiss: (_) =>
-                    detailController.deleteCv(jobId, cv),
+                confirmDismiss: (_) => detailController.deleteCv(jobId, cv),
                 background: DeleteBackground(
                   color: Theme.of(context).colorScheme.error,
                 ),

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -7,6 +5,7 @@ import '../../domain/models/candidate_page.dart';
 import '../../domain/models/candidate_result.dart';
 import '../../domain/models/import_result.dart';
 import '../../domain/models/rank_response.dart';
+import '../../domain/models/upload_file.dart';
 import '../../domain/repositories/candidate_repository.dart';
 import '../api/response_models.dart';
 import '../data_sources/candidate_api_data_source.dart';
@@ -21,7 +20,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
   Future<ImportResponse> uploadCvBatch(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
   }) async {
     final dto = await _dataSource.uploadCvBatch(

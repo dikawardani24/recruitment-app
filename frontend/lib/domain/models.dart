@@ -12,3 +12,4 @@ export 'models/job_page.dart';
 export 'models/job_requirements.dart';
 export 'models/rank_response.dart';
 export 'models/unified_search_result.dart';
+export 'models/upload_file.dart';
