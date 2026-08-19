@@ -111,16 +111,18 @@ flowchart TD
     extraction[extraction/\nCV profile extraction]
     imports[imports/\nBackground CV processor]
     ranking[ranking/\nScoring + reasoning]
-    router[routers/jobs.py\nAll HTTP endpoints]
+    llm[llm/\nOpenAI-compatible client]
+    chat[chat/\nRecruiter copilot: router + tools]
+    routers[routers/\njobs + candidates + search + chat]
     usecase[usecase/\nOrchestration]
     repo[repository/\nInterfaces + impls]
 
     main --> config
     main --> db
-    main --> router
+    main --> routers
     main --> di
 
-    router --> usecase
+    routers --> usecase
     usecase --> repo
     repo --> db
 
@@ -129,6 +131,8 @@ flowchart TD
     usecase --> ranking
     usecase --> jd
     usecase --> imports
+    usecase --> chat
+    usecase --> llm
 
     jd --> skills
     extraction --> config
@@ -136,6 +140,8 @@ flowchart TD
     extraction --> skills
     ranking --> config
     ranking --> extraction
+    chat --> llm
+    chat --> ranking
 ```
 
 ## API Endpoints
@@ -155,6 +161,19 @@ flowchart LR
         POST_RANK["POST /jobs/{id}/rank\nRank all candidates"]
         POST_RANK_CV["POST /jobs/{id}/cvs/{cv_id}/rank\nRank one candidate"]
         GET_RANK["GET /jobs/{id}/rankings\nRanked candidates"]
+    end
+
+    subgraph SEARCH["/api"]
+        SEARCH_CANDIDATES["GET /candidates/search?keyword=\nSearch candidates (all jobs)"]
+        UNIFIED["GET /search?keyword=\nUnified jobs + candidates search"]
+        SEMANTIC["POST /search/semantic\nSemantic search (RAG, opt-in)"]
+        REINDEX["POST /search/reindex\nRebuild vector index (RAG, opt-in)"]
+    end
+
+    subgraph CHAT["/api"]
+        CHAT_MODELS["GET /chat/models\nAvailable copilot models"]
+        CHAT["POST /chat\nRecruiter copilot Q&A"]
+        CHAT_STREAM["POST /chat/stream\nSSE streaming chat"]
     end
 
     HEALTH["GET /health\nHealth check"]

@@ -1,17 +1,63 @@
-# ai_ats
+# ai_ats — Flutter frontend
 
-A new Flutter project.
+The AI-powered applicant-ranking app's Flutter client (Material 3). Clean
+architecture: `domain → data → controllers → screens`, with `navigation`,
+`widgets`, and `theme` shared across screens. State management uses Riverpod
+(hooks_riverpod) with get_it + injectable for DI.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- **Jobs** — list, create (paste JD text and/or upload a PDF/DOCX/TXT file),
+  search, swipe-to-delete, and detail with structured requirements.
+- **Candidates** — batch CV upload with live import progress, per-candidate
+  detail, delete, and individual ranking.
+- **Rankings** — best-match-first list with scores, buckets, and expandable
+  reasoning (rules or LLM).
+- **Search** — job search, candidate search, and a unified search screen that
+  queries jobs and candidates at once.
+- **Chat** — recruiter copilot with streaming (SSE) answers, source citations,
+  and candidate result cards.
+- **Settings** — light/dark theme and per-provider API-key configuration for the
+  chat models.
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter pub get
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+The app calls `http://127.0.0.1:8000/api` by default. Override with:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
+```
+
+Start the backend first — see [../docs/setup-and-testing.md](../docs/setup-and-testing.md).
+
+## Test
+
+```bash
+flutter analyze
+flutter test   # ~122 tests (use flutter test, not dart test)
+```
+
+## Structure
+
+```
+lib/
+├── main.dart        # bootstrap: DI init, provider overrides, GoRouter
+├── router.dart      # go_router route table (derived from AppRoute)
+├── providers.dart   # Riverpod providers
+├── di.dart / di.config.dart   # get_it + injectable wiring (generated)
+├── domain/          # models, repository interfaces, use cases
+├── data/            # dio ApiClient, API paths, data sources, repo impls
+├── controllers/     # Riverpod controllers/notifiers per screen
+├── navigation/      # AppRoute enum, AppNavigator interface, go_router impl
+├── screens/         # one file per screen
+├── widgets/         # shared UI components
+└── theme/           # Material 3 theme + theme-mode controller
+```
+
+See [../docs/04-folder-structure.md](../docs/04-folder-structure.md) for the
+full tree.

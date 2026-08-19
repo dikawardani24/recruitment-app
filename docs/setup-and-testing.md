@@ -52,6 +52,27 @@ ATS_LLM__MODEL=gpt-4o-mini                    # or gemini-flash-latest
 Without a key, the app still ranks candidates and produces template reasoning via
 a deterministic rule-based engine.
 
+### Optional: recruiter copilot (chat)
+
+The recruiter copilot answers workspace questions (counts, candidate search,
+rankings, comparisons) with a deterministic query router — most questions are
+answered with **zero** LLM calls — and uses a single LLM call only for
+reasoning-heavy questions, grounded in RAG evidence and the API tools. It reuses
+the same `ATS_LLM__*` settings above, so no extra config is required beyond the
+LLM key. To make additional models selectable in the UI, configure OpenRouter:
+
+```
+# ATS_OPENROUTER__API_KEY=sk-or-...
+# ATS_OPENROUTER__BASE_URL=https://openrouter.ai/api/v1
+# ATS_OPENROUTER__MODELS=qwen/qwen-2.5-72b-instruct
+```
+
+Chat is served by `GET /api/chat/models` (available models),
+`POST /api/chat` (JSON Q&A), and `POST /api/chat/stream` (SSE streaming, used by
+the Flutter app). Without any key the endpoints respond with `"configured": false`;
+clients may also send their own `api_key` in the request body, which takes
+precedence over the server's configured key.
+
 ### Optional: local BERT resume-NER extraction
 
 By default CVs are parsed with deterministic rules (fast), or with an LLM when
@@ -116,6 +137,10 @@ cd backend
 2. `POST /api/jobs/{id}/candidates/import` — batch-upload CVs (PDF/DOCX/TXT). The request returns immediately with an `import_id`; each CV is parsed **in the background** by a built-in asyncio worker (`POST /api/jobs/{id}/cvs` is a backwards-compatible alias). Track progress with `GET /api/jobs/{id}/imports/{import_id}` or poll `GET /api/jobs/{id}/cvs`.
 3. `POST /api/jobs/{id}/rank` — scores and ranks every candidate, best match first, with an explanation, strengths, weaknesses, skill gaps, and a hiring recommendation. A single CV can be ranked with `POST /api/jobs/{id}/cvs/{cv_id}/rank`.
 4. `GET /api/jobs/{id}/rankings` — persisted ranking results, best match first.
+5. `GET /api/search?keyword=` — unified search across jobs and candidates;
+   `GET /api/candidates/search?keyword=` searches candidates by name/skills/file.
+6. `POST /api/chat` — ask the recruiter copilot anything about the workspace
+   (counts, "who fits this role", rankings, general recruiting advice).
 
 ---
 
@@ -136,7 +161,10 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
 
 Screens: **Jobs** (list) → **New job** (paste description and/or upload a JD file)
 → **Job detail** (add CVs, then "Rank candidates") → **Rankings** (scores +
-expandable reasoning).
+expandable reasoning). Plus **Unified search** (jobs + candidates), **Search jobs**
+and **Search candidates** (swipe-to-delete), **Chat** (recruiter copilot with
+streaming answers and candidate cards), and **Settings** (theme + API key
+configuration for chat models).
 
 ---
 
@@ -230,6 +258,20 @@ curl -X POST http://localhost:8000/api/search/semantic \
 # 7. Backfill the vector index (after enabling RAG)
 curl -X POST http://localhost:8000/api/search/reindex \
   -H "Content-Type: application/json" -d '{}'
+
+# 8. Unified search over jobs and candidates
+curl "http://localhost:8000/api/search?keyword=flutter"
+
+# 9. Search candidates by name/skills across all jobs
+curl "http://localhost:8000/api/candidates/search?keyword=flutter"
+
+# 10. Recruiter copilot (returns "configured": false until an LLM key is set)
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How many candidates do I have?"}'
+
+# 11. Available chat models
+curl http://localhost:8000/api/chat/models
 ```
 
 ---
