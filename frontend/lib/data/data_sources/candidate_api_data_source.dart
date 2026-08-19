@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -7,6 +5,7 @@ import '../api/api_client.dart';
 import '../api/api_paths.dart';
 import '../api/mappers.dart';
 import '../api/response_models.dart';
+import '../../domain/models/upload_file.dart';
 
 @Injectable()
 class CandidateApiDataSource {
@@ -17,7 +16,7 @@ class CandidateApiDataSource {
   Future<ImportResponseDto> uploadCvBatch(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
   }) async {
     final form = FormData();
@@ -28,10 +27,7 @@ class CandidateApiDataSource {
       form.files.add(
         MapEntry(
           'files',
-          await MultipartFile.fromFile(
-            file.path,
-            filename: file.path.split('/').last,
-          ),
+          MultipartFile.fromBytes(file.bytes, filename: file.name),
         ),
       );
     }
@@ -39,14 +35,16 @@ class CandidateApiDataSource {
       ApiPaths.candidateImport(jobId),
       data: form,
       onSendProgress: onSendProgress,
-      parse: (data) => ImportResponseMapper.fromJson(data as Map<String, dynamic>),
+      parse: (data) =>
+          ImportResponseMapper.fromJson(data as Map<String, dynamic>),
     );
   }
 
   Future<ImportStatusDto> getImportStatus(String jobId, String importId) {
     return _client.get(
       ApiPaths.importStatus(jobId, importId),
-      parse: (data) => ImportStatusMapper.fromJson(data as Map<String, dynamic>),
+      parse: (data) =>
+          ImportStatusMapper.fromJson(data as Map<String, dynamic>),
     );
   }
 
@@ -86,11 +84,7 @@ class CandidateApiDataSource {
   }) {
     return _client.get(
       ApiPaths.searchCandidates,
-      query: {
-        'keyword': keyword,
-        'page': page,
-        'limit': limit,
-      },
+      query: {'keyword': keyword, 'page': page, 'limit': limit},
       parse: (data) => CandidatePageResponseMapper.fromJson(
         data as Map<String, dynamic>,
         fallbackPage: page,

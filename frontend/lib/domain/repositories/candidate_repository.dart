@@ -1,17 +1,16 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 
 import '../models/candidate_page.dart';
 import '../models/candidate_result.dart';
 import '../models/import_result.dart';
 import '../models/rank_response.dart';
+import '../models/upload_file.dart';
 
 abstract class CandidateRepository {
   Future<ImportResponse> uploadCvBatch(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
   });
 

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_ats/data/api/api_client.dart';
@@ -12,6 +12,7 @@ import 'package:ai_ats/domain/models/candidate_page.dart';
 import 'package:ai_ats/domain/models/candidate_result.dart';
 import 'package:ai_ats/domain/models/import_result.dart';
 import 'package:ai_ats/domain/models/rank_response.dart';
+import 'package:ai_ats/domain/models/upload_file.dart';
 import 'package:ai_ats/domain/repositories/candidate_repository.dart';
 import 'package:ai_ats/domain/usecases/upload_cvs.dart';
 
@@ -33,11 +34,21 @@ class _FakeAdapter implements HttpClientAdapter {
     final key = '${options.method} $path';
     final body = _responses[key];
     if (body == null) {
-      return ResponseBody.fromString('{"detail":"not_found"}', 404,
-          headers: {'content-type': ['application/json']});
+      return ResponseBody.fromString(
+        '{"detail":"not_found"}',
+        404,
+        headers: {
+          'content-type': ['application/json'],
+        },
+      );
     }
-    return ResponseBody.fromString(body, 200,
-        headers: {'content-type': ['application/json']});
+    return ResponseBody.fromString(
+      body,
+      200,
+      headers: {
+        'content-type': ['application/json'],
+      },
+    );
   }
 
   @override
@@ -53,11 +64,30 @@ class _FakeApiClient {
 
 void main() {
   group('uploadCvBatch', () {
+    test('accepts web picker bytes when the picker path is null', () async {
+      final picked = PlatformFile(
+        name: 'web-cv.pdf',
+        size: 3,
+        bytes: Uint8List.fromList([1, 2, 3]),
+      );
+      final file = UploadFile(name: picked.name, bytes: picked.bytes!);
+      final client = _FakeApiClient.routed({
+        'POST /jobs/job-1/candidates/import':
+            '{"import_id":"imp-web","job_id":"job-1","status":"submitted",'
+            '"total_files":1,"batch_files":1}',
+      });
+
+      final response = await CandidateRepositoryImpl(
+        CandidateApiDataSource(client),
+      ).uploadCvBatch('job-1', files: [file]);
+
+      expect(picked.path, isNull);
+      expect(response.importId, 'imp-web');
+    });
+
     test('posts files and import_id, parses ImportResponse', () async {
-      final tmp = Directory.systemTemp.createTempSync('upload_test');
-      addTearDown(() => tmp.deleteSync(recursive: true));
-      final f1 = File('${tmp.path}/a.txt')..writeAsStringSync('CV A');
-      final f2 = File('${tmp.path}/b.txt')..writeAsStringSync('CV B');
+      const f1 = UploadFile(name: 'a.txt', bytes: [67, 86, 32, 65]);
+      const f2 = UploadFile(name: 'b.txt', bytes: [67, 86, 32, 66]);
 
       final client = _FakeApiClient.routed({
         'POST /jobs/job-1/candidates/import':
@@ -84,14 +114,16 @@ void main() {
       expect(sent.path, '/jobs/job-1/candidates/import');
       final form = sent.data as FormData;
       expect(form.fields.map((f) => f.key), contains('import_id'));
-      expect(form.fields.firstWhere((f) => f.key == 'import_id').value, 'imp-x');
+      expect(
+        form.fields.firstWhere((f) => f.key == 'import_id').value,
+        'imp-x',
+      );
       expect(form.files.length, 2);
+      expect(form.files.first.value.filename, 'a.txt');
     });
 
     test('creates a fresh import when importId is omitted', () async {
-      final tmp = Directory.systemTemp.createTempSync('upload_test2');
-      addTearDown(() => tmp.deleteSync(recursive: true));
-      final f1 = File('${tmp.path}/a.txt')..writeAsStringSync('CV A');
+      const f1 = UploadFile(name: 'a.txt', bytes: [67, 86, 32, 65]);
 
       final client = _FakeApiClient.routed({
         'POST /jobs/job-1/candidates/import':
@@ -126,20 +158,20 @@ void main() {
   group('UploadCvs use case', () {
     test('delegates to the repository', () async {
       final calls = <String?>[];
-      final useCase = UploadCvs(_FakeRepository((importId, _) async {
-        calls.add(importId);
-        return const ImportResponse(
-          importId: 'imp-1',
-          jobId: 'job-1',
-          status: 'submitted',
-          totalFiles: 1,
-          batchFiles: 1,
-        );
-      }));
+      final useCase = UploadCvs(
+        _FakeRepository((importId, _) async {
+          calls.add(importId);
+          return const ImportResponse(
+            importId: 'imp-1',
+            jobId: 'job-1',
+            status: 'submitted',
+            totalFiles: 1,
+            batchFiles: 1,
+          );
+        }),
+      );
 
-      final tmp = Directory.systemTemp.createTempSync('upload_test3');
-      addTearDown(() => tmp.deleteSync(recursive: true));
-      final f1 = File('${tmp.path}/a.txt')..writeAsStringSync('CV A');
+      const f1 = UploadFile(name: 'a.txt', bytes: [67, 86, 32, 65]);
 
       final resp = await useCase('job-1', importId: 'imp-9', files: [f1]);
       expect(resp.importId, 'imp-1');
@@ -151,17 +183,19 @@ void main() {
 class _FakeRepository implements CandidateRepository {
   _FakeRepository(this._onUpload);
 
-  final Future<ImportResponse> Function(String? importId, List<File> files)
-      _onUpload;
+  final Future<ImportResponse> Function(
+    String? importId,
+    List<UploadFile> files,
+  )
+  _onUpload;
 
   @override
   Future<ImportResponse> uploadCvBatch(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
-  }) =>
-      _onUpload(importId, files);
+  }) => _onUpload(importId, files);
 
   @override
   Future<ImportStatus> getImportStatus(String jobId, String importId) {

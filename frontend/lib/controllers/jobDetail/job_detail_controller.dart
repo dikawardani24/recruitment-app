@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +22,8 @@ class JobDetailController {
   JobDetailNotifier get _notifier => _ref.read(jobDetailStateProvider.notifier);
 
   Future<void> refreshCvs(String jobId) => _notifier.refreshCvs(jobId);
+
+  void stopPolling(String jobId) => _notifier.stopPolling(jobId);
 
   /// Ranks all candidates. Shows a dialog when there is nothing to rank, asks
   /// before re-ranking an already-ranked set, then navigates to the ranking
@@ -87,7 +87,8 @@ class JobDetailController {
       if (!context.mounted) return false;
       await _showRankingUnavailableDialog(
         context,
-        message: 'This candidate is not ready to rank yet. Wait until CV '
+        message:
+            'This candidate is not ready to rank yet. Wait until CV '
             'processing finishes before ranking.',
       );
       return false;
@@ -117,7 +118,11 @@ class JobDetailController {
 
   /// Deletes the whole job: confirms, calls the API, shows a result page, then
   /// navigates back to the job list.
-  Future<void> deleteJob(String jobId, Job job, List<CandidateResult> candidates) async {
+  Future<void> deleteJob(
+    String jobId,
+    Job job,
+    List<CandidateResult> candidates,
+  ) async {
     final deleteFlow = _ref.read(deleteConfirmControllerProvider.notifier);
     deleteFlow.prepare(
       onConfirm: () => _notifier.deleteJob(jobId),
@@ -128,22 +133,24 @@ class JobDetailController {
       ),
     );
 
-    await _ref.read(navigatorProvider).pushDeleteConfirm(
-      DeleteConfirmArgs(
-        data: DeleteConfirmData(
-          title: 'Delete this job?',
-          message: candidates.isEmpty
-              ? 'This job has no candidates. It will be permanently removed.'
-              : 'This job and its ${candidates.length} '
-                    '${candidates.length == 1 ? 'candidate' : 'candidates'} '
-                    'will be permanently removed.',
-          details: [jobDeleteDetails(job, candidates)],
-        ),
-        onDeleted: () async {
-          _ref.read(navigatorProvider).goToJobs();
-        },
-      ),
-    );
+    await _ref
+        .read(navigatorProvider)
+        .pushDeleteConfirm(
+          DeleteConfirmArgs(
+            data: DeleteConfirmData(
+              title: 'Delete this job?',
+              message: candidates.isEmpty
+                  ? 'This job has no candidates. It will be permanently removed.'
+                  : 'This job and its ${candidates.length} '
+                        '${candidates.length == 1 ? 'candidate' : 'candidates'} '
+                        'will be permanently removed.',
+              details: [jobDeleteDetails(job, candidates)],
+            ),
+            onDeleted: () async {
+              _ref.read(navigatorProvider).goToJobs();
+            },
+          ),
+        );
   }
 
   /// Deletes a single candidate: confirms, calls the API, shows a result page.
@@ -162,15 +169,18 @@ class JobDetailController {
       ),
     );
 
-    return _ref.read(navigatorProvider).pushDeleteConfirm(
-      DeleteConfirmArgs(
-        data: DeleteConfirmData(
-          title: 'Delete this candidate?',
-          message: 'This candidate and their CV will be permanently removed.',
-          details: [candidateDeleteDetails(cv)],
-        ),
-      ),
-    );
+    return _ref
+        .read(navigatorProvider)
+        .pushDeleteConfirm(
+          DeleteConfirmArgs(
+            data: DeleteConfirmData(
+              title: 'Delete this candidate?',
+              message:
+                  'This candidate and their CV will be permanently removed.',
+              details: [candidateDeleteDetails(cv)],
+            ),
+          ),
+        );
   }
 
   /// Lets the user pick CV files and submits them for upload. File selection
@@ -180,11 +190,12 @@ class JobDetailController {
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['pdf', 'docx', 'doc', 'txt'],
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final files = result.files
-        .where((f) => f.path != null)
-        .map((f) => File(f.path!))
+        .where((f) => f.bytes?.isNotEmpty ?? false)
+        .map((f) => UploadFile(name: f.name, bytes: f.bytes!))
         .toList();
     if (files.isEmpty) return;
     if (!context.mounted) return;
@@ -196,13 +207,23 @@ class JobDetailController {
   Future<void> submitCvs(
     BuildContext context,
     String jobId,
-    List<File> files,
+    List<UploadFile> files,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    _ref.read(uploadControllerProvider.notifier).start(jobId, files);
+    final upload = _ref
+        .read(uploadControllerProvider.notifier)
+        .start(jobId, files);
     await showCvUploadOverlay(context, jobId);
+    final importId = await upload;
     if (!context.mounted) return;
+    if (importId == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('CV upload failed. Please try again.')),
+      );
+      return;
+    }
     await refreshCvs(jobId);
+    _notifier.startPolling(jobId, importId);
     if (!context.mounted) return;
     messenger.showSnackBar(
       SnackBar(
@@ -270,7 +291,8 @@ class JobDetailController {
   /// Info dialog shown when nothing is ready to rank yet.
   Future<void> _showRankingUnavailableDialog(
     BuildContext context, {
-    String message = 'No candidates are ready to rank yet. Wait until CV '
+    String message =
+        'No candidates are ready to rank yet. Wait until CV '
         'processing finishes before ranking.',
   }) {
     return showDialog<void>(

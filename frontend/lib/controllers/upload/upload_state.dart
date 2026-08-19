@@ -8,6 +8,7 @@ class UploadState {
   final int totalBatches;
   final double batchProgress;
   final String? error;
+  final String? importId;
 
   const UploadState({
     this.uploading = false,
@@ -19,6 +20,7 @@ class UploadState {
     this.totalBatches = 0,
     this.batchProgress = 0,
     this.error,
+    this.importId,
   });
 
   double get fraction => totalFiles == 0 ? 0 : uploadedFiles / totalFiles;
@@ -35,6 +37,7 @@ class UploadState {
     int? totalBatches,
     double? batchProgress,
     String? error,
+    String? importId,
   }) {
     return UploadState(
       uploading: uploading ?? this.uploading,
@@ -46,6 +49,7 @@ class UploadState {
       totalBatches: totalBatches ?? this.totalBatches,
       batchProgress: batchProgress ?? this.batchProgress,
       error: error ?? this.error,
+      importId: importId ?? this.importId,
     );
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_ats/controllers/upload/upload_controller.dart';
 import 'package:ai_ats/di.dart';
 import 'package:ai_ats/domain/models/import_result.dart';
+import 'package:ai_ats/domain/models/upload_file.dart';
 import 'package:ai_ats/domain/usecases/upload_cvs.dart';
 
 /// Records each batch and can be told to fail uploads of specific files.
@@ -14,23 +13,24 @@ class _FakeUploadCvs implements UploadCvs {
   final batches = <List<String>>[]; // file names per batch
   final importIds = <String?>[];
   Set<String> failNames = {}; // file names that always throw
+  String responseStatus = 'submitted';
 
   @override
   Future<ImportResponse> call(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
   }) async {
-    batches.add(files.map((f) => f.path.split('/').last).toList());
+    batches.add(files.map((f) => f.name).toList());
     importIds.add(importId);
-    if (files.any((f) => failNames.contains(f.path.split('/').last))) {
+    if (files.any((f) => failNames.contains(f.name))) {
       throw Exception('network down');
     }
     return ImportResponse(
       importId: 'imp-1',
       jobId: jobId,
-      status: 'submitted',
+      status: responseStatus,
       totalFiles: files.length,
       batchFiles: files.length,
     );
@@ -52,11 +52,12 @@ void main() {
     getIt.unregister<UploadCvs>();
   });
 
-  List<File> makeFiles(int n) =>
-      List.generate(n, (i) => File('/tmp/upload_controller/cv_$i.pdf'));
+  List<UploadFile> makeFiles(int n) =>
+      List.generate(n, (i) => UploadFile(name: 'cv_$i.pdf', bytes: const [1]));
 
-  Set<String> namesOf(List<File> files, int start, int end) =>
-      {for (var i = start; i < end; i++) 'cv_$i.pdf'};
+  Set<String> namesOf(List<UploadFile> files, int start, int end) => {
+    for (var i = start; i < end; i++) 'cv_$i.pdf',
+  };
 
   test('splits 45 files into ceil(45/20) batches', () async {
     await container
@@ -130,12 +131,30 @@ void main() {
   });
 
   test('empty file list produces an error state, not an upload', () async {
-    await container
-        .read(uploadControllerProvider.notifier)
-        .start('job-1', []);
+    await container.read(uploadControllerProvider.notifier).start('job-1', []);
 
     final state = container.read(uploadControllerProvider);
     expect(state.error, 'No files selected');
     expect(fake.batches, isEmpty);
+  });
+
+  test('files without bytes are rejected before an upload request', () async {
+    await container.read(uploadControllerProvider.notifier).start('job-1', [
+      const UploadFile(name: 'empty.pdf', bytes: []),
+    ]);
+
+    expect(container.read(uploadControllerProvider).error, 'No files selected');
+    expect(fake.batches, isEmpty);
+  });
+
+  test('unsuccessful import responses do not produce an import ID', () async {
+    fake.responseStatus = 'failed';
+
+    final importId = await container
+        .read(uploadControllerProvider.notifier)
+        .start('job-1', makeFiles(1));
+
+    expect(importId, isNull);
+    expect(container.read(uploadControllerProvider).uploadedFiles, 0);
   });
 }

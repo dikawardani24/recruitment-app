@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
 import '../models/import_result.dart';
+import '../models/upload_file.dart';
 import '../repositories/candidate_repository.dart';
 
 /// Uploads a single batch of CV files to an import job. Batching, progress
@@ -17,13 +16,12 @@ class UploadCvs {
   Future<ImportResponse> call(
     String jobId, {
     String? importId,
-    required List<File> files,
+    required List<UploadFile> files,
     ProgressCallback? onSendProgress,
-  }) =>
-      _repository.uploadCvBatch(
-        jobId,
-        importId: importId,
-        files: files,
-        onSendProgress: onSendProgress,
-      );
+  }) => _repository.uploadCvBatch(
+    jobId,
+    importId: importId,
+    files: files,
+    onSendProgress: onSendProgress,
+  );
 }

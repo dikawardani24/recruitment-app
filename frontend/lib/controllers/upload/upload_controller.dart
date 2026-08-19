@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../di.dart';
 import '../../domain/usecases/upload_cvs.dart';
+import '../../domain/models/upload_file.dart';
 import 'upload_state.dart';
 
 /// Number of CVs uploaded per HTTP request. Configurable at build time with
@@ -24,16 +24,16 @@ const Duration uploadRetryDelay = Duration(milliseconds: 600);
 /// happens on the backend afterwards; the recruiter can leave this page once
 /// uploads are submitted.
 class UploadController extends Notifier<UploadState> {
-  List<File> _failedFiles = const [];
+  List<UploadFile> _failedFiles = const [];
   String? _importId;
 
   @override
   UploadState build() => const UploadState();
 
-  Future<void> start(String jobId, List<File> files) async {
-    if (files.isEmpty) {
+  Future<String?> start(String jobId, List<UploadFile> files) async {
+    if (files.isEmpty || files.any((file) => !file.hasBytes)) {
       state = const UploadState(error: 'No files selected');
-      return;
+      return null;
     }
     _failedFiles = [];
     _importId = null;
@@ -43,6 +43,7 @@ class UploadController extends Notifier<UploadState> {
       totalBatches: _batchCount(files.length),
     );
     await _upload(jobId, files);
+    return _importId;
   }
 
   /// Re-attempts uploads that failed during the last run. Keeps the existing
@@ -62,7 +63,7 @@ class UploadController extends Notifier<UploadState> {
     await _upload(jobId, failed);
   }
 
-  Future<void> _upload(String jobId, List<File> files) async {
+  Future<void> _upload(String jobId, List<UploadFile> files) async {
     var uploaded = state.uploadedFiles;
     var failed = 0; // failures in this run only
 
@@ -90,6 +91,10 @@ class UploadController extends Notifier<UploadState> {
               }
             },
           );
+          if (resp.importId.trim().isEmpty ||
+              !_isSuccessfulImport(resp.status)) {
+            throw StateError('Upload did not create a successful import');
+          }
           _importId ??= resp.importId;
           uploaded += batch.length;
           succeeded = true;
@@ -105,7 +110,11 @@ class UploadController extends Notifier<UploadState> {
         failed += batch.length;
         _failedFiles = [..._failedFiles, ...batch];
       }
-      state = state.copyWith(uploadedFiles: uploaded, failedFiles: failed);
+      state = state.copyWith(
+        uploadedFiles: uploaded,
+        failedFiles: failed,
+        importId: _importId,
+      );
     }
 
     state = state.copyWith(uploading: false, completed: true);
@@ -113,6 +122,20 @@ class UploadController extends Notifier<UploadState> {
 
   static int _batchCount(int fileCount) =>
       fileCount == 0 ? 0 : (fileCount / cvUploadBatchSize).ceil();
+
+  static bool _isSuccessfulImport(String status) {
+    switch (status.trim().toLowerCase()) {
+      case '':
+      case 'failed':
+      case 'partially_failed':
+      case 'cancelled':
+      case 'canceled':
+      case 'error':
+        return false;
+      default:
+        return true;
+    }
+  }
 }
 
 final uploadControllerProvider =
