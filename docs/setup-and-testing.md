@@ -181,7 +181,7 @@ or:
 make backend-test
 ```
 
-**144 tests, no external services.** `tests/test_api.py` covers: health, create job
+**158 tests, no external services.** `tests/test_api.py` covers: health, create job
 from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
 persisted rankings, and error cases (missing title, missing JD, unknown job).
 `tests/test_imports.py` covers the background import pipeline,
@@ -276,7 +276,76 @@ curl http://localhost:8000/api/chat/models
 
 ---
 
-## 6. Troubleshooting
+## 6. Sample Dataset (`test_data/`)
+
+`test_data/` ships a ready-to-run dataset for exercising the **JD processing →
+CV extraction → relevance gate → ranking** flow end-to-end. All people,
+companies, and contacts are fictional.
+
+```
+test_data/
+├── flutter_developer/        # Junior Flutter Developer
+├── backend_developer/        # Backend Developer (Python/FastAPI)
+├── ui_ux_designer/           # UI/UX Designer
+├── data_analyst/             # Data Analyst
+├── hr_recruiter/             # HR Recruiter
+└── verify_dataset.py         # read-only pipeline check over all 5 jobs
+```
+
+Each job folder contains a `job_description.txt`, a `README.md` (expected vs
+verified results, per-candidate rationale, and observed gate behavior), and
+`cvs/` with **five unique CV PDFs** (25 CVs in total) distributed as:
+
+| # | Intent | Verified behaviour |
+|---|--------|--------------------|
+| c1 | strong match | `MET` / `RELEVANT` — top of ranking |
+| c2 | good match | `MET` / `RELEVANT` |
+| c3 | related (same domain) | `MET` / `RELEVANT` (gate treats same-domain candidates as relevant) |
+| c4 | weak/adjacent (cross-domain) | `PARTIALLY_MET` / `PARTIALLY_RELEVANT` (3 of 5 jobs) |
+| c5 | **unrelated** (accountant, designer, HR, backend dev, Flutter dev) | `NOT_MET`, `score = 0`, pinned to the bottom |
+
+Every `c5` is an **intentional negative test**: it matches zero required skills
+and shares no professional domain, so the hard relevance gate (ranking doc §1.1)
+forces `score = 0`, skips all scoring, and sorts it below every relevant
+candidate — even when it has more years of experience.
+
+### Run the whole dataset against the pipeline (deterministic)
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python ../test_data/verify_dataset.py
+```
+
+Prints each job's parsed requirements and the per-candidate
+classification/score/meets-JD/relevance plus a duplicate-name check. It uses
+`Settings(llm_api_key=None)` (rules-based) so output is reproducible; with an
+API key the LLM also re-scores relevant candidates, so exact scores vary.
+
+### Run it through the API
+
+For a single job: `POST /api/jobs` with `jd_file=test_data/<job>/job_description.txt`,
+`POST /api/jobs/{id}/candidates/import` with the five PDFs, then
+`POST /api/jobs/{id}/rank` and `GET /api/jobs/{id}/rankings`.
+
+### What the dataset is designed to surface
+
+- Cross-domain negatives are truly unrelated (verified `score = 0`, bottom).
+- The gate is **same-domain permissive**: any candidate sharing the job's
+  professional domain or matching 2+ required skills is `MET`, so intended
+  "related" profiles (Android dev for Flutter, fullstack for Backend, Visual
+  Designer for UI/UX, Data Scientist for Data, HR Generalist for HR) are `MET`,
+  not `PARTIALLY_MET`.
+- Soft-skill-only JDs (HR Recruiter) leave every CV with `n_specific = 0` —
+  classification is purely domain-driven there.
+- JD **wording** affects the job's detected domains: mentioning "backend"/"QA"
+  in a Flutter JD's responsibilities made an adjacent Java developer `RELEVANT`;
+  the bundled Flutter JD deliberately avoids that wording.
+
+Per-job details and known divergences are documented in each `README.md`.
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -288,7 +357,7 @@ curl http://localhost:8000/api/chat/models
 
 ---
 
-## 7. Quick Reference
+## 8. Quick Reference
 
 ```bash
 # Backend
@@ -298,7 +367,7 @@ cd backend && .venv/bin/uvicorn app.main:app --reload
 cd frontend && flutter run
 
 # Tests
-make backend-test       # 144 tests
+make backend-test       # 158 tests
 make frontend-test
 make lint               # compileall + flutter analyze
 ```

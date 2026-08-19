@@ -12,7 +12,8 @@ recruitment-app/
 ├── scripts/                  # one-off bash scripts (run_script.sh runner)
 ├── docs/                     # design deliverables 01–14 + backend-flow + setup
 ├── backend/                  # Python FastAPI (single process)
-└── frontend/                 # Flutter app (Material 3)
+├── frontend/                 # Flutter app (Material 3)
+└── test_data/                # sample jobs + CVs (5 jobs × 5 CVs; see setup-and-testing.md §6)
 ```
 
 ## 2. Backend — Detailed

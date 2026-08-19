@@ -110,6 +110,45 @@ REST API, State management):
 `classification`, `meets_job_description`, `relevance_score` and the relevance
 reason are persisted on the candidate and returned by the ranking endpoints.
 
+### Validating with the sample dataset
+
+`test_data/` ships **5 jobs × 5 CVs** (25 unique fictional candidates) that
+exercise all three gate outcomes. Reproduce the checks with:
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python ../test_data/verify_dataset.py
+```
+
+Verified results (rules-based, `Settings(llm_api_key=None)`):
+
+| Job | `MET` | `PARTIALLY_MET` | `NOT_MET` (score 0, bottom) |
+|-----|-------|-----------------|------------------------------|
+| Flutter Developer | c1 Flutter, c2 Flutter, c3 Android | c4 Java | c5 Accountant |
+| Backend Developer | c1 Python, c2 Python, c3 Fullstack, c4 Java | — | c5 Graphic Designer |
+| UI/UX Designer | c1 UI/UX, c2 Product, c3 Visual | c4 Frontend (Figma-only) | c5 Backend Dev |
+| Data Analyst | c1 Data Analyst, c2 Data Analyst, c3 Data Scientist | c4 Finance (Excel-only) | c5 HR Recruiter |
+| HR Recruiter | c1 Tech Recruiter, c2 Recruitment Spec, c3 HR Generalist | — | c4 Admin, c5 Flutter Dev |
+
+Observed gate behavior the dataset exposes:
+
+- **Same-domain permissiveness.** Any candidate sharing the job's professional
+  domain or matching 2+ required skills is `RELEVANT`/`MET` — e.g. an Android
+  developer for a Flutter role, a fullstack/Java developer for a Python backend
+  role, a Data Scientist for a Data Analyst role. Only genuinely cross-domain
+  candidates with a single skill overlap get `PARTIALLY_MET` (Flutter-Java,
+  UI/UX-Frontend, Data-Finance); Backend and HR jobs produce none.
+- **Soft-skill-only JDs.** The HR Recruiter JD's required skills are all
+  open-vocabulary or the excluded soft skill `communication`, so every CV has
+  `n_specific = 0`; classification is purely domain-driven there.
+- **JD wording shapes the job's domains.** The job's detected domains come from
+  its title, required skills *and responsibilities*. "backend"/"QA" wording in a
+  Flutter JD made an adjacent Java developer `RELEVANT`; the bundled Flutter JD
+  avoids that wording so the cross-domain candidate lands `PARTIALLY_MET`.
+
+Per-candidate rationale and divergences are documented in each job's
+`test_data/<job>/README.md`.
+
 ## 2. Intent Parsing
 
 Query is lightly processed (rule-based + optional LLM) into structured intent:
