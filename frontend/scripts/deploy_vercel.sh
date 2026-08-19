@@ -48,4 +48,4 @@ fi
 
 echo ">>> Deploying frontend/build/web to Vercel (--prod)"
 cd "$SCRIPT_DIR/../build/web"
-npx --yes vercel --prod "${API_BASE_ARGS[@]}"
+npx --yes vercel --prod --yes "${API_BASE_ARGS[@]}"
