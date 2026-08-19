@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
@@ -7,6 +5,7 @@ import '../api/api_client.dart';
 import '../api/api_paths.dart';
 import '../api/mappers.dart';
 import '../api/response_models.dart';
+import '../../domain/models/upload_file.dart';
 
 @Injectable()
 class JobApiDataSource {
@@ -45,8 +44,7 @@ class JobApiDataSource {
   Future<JobResponse> createJob({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     final form = FormData();
     form.fields.add(MapEntry('title', title));
@@ -55,10 +53,7 @@ class JobApiDataSource {
       form.files.add(
         MapEntry(
           'jd_file',
-          await MultipartFile.fromFile(
-            jdFile.path,
-            filename: jdFileName ?? jdFile.path.split('/').last,
-          ),
+          MultipartFile.fromBytes(jdFile.bytes, filename: jdFile.name),
         ),
       );
     }

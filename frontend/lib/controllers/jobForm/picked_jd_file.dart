@@ -1,15 +1,10 @@
-import 'dart:io';
+import '../../domain/models/upload_file.dart';
 
 /// A job description file chosen by the user, plus the description text read
 /// out of it when the file is a text/markdown document.
 class PickedJdFile {
-  final File file;
-  final String name;
+  final UploadFile file;
   final String? description;
 
-  const PickedJdFile({
-    required this.file,
-    required this.name,
-    this.description,
-  });
+  const PickedJdFile({required this.file, this.description});
 }

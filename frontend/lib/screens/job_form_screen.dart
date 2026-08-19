@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../controllers/jobForm/job_form_controller.dart';
+import '../domain/models/upload_file.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/loading_overlay.dart';
@@ -27,8 +26,7 @@ class _JobFormContent extends HookConsumerWidget {
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final titleController = useTextEditingController();
     final descriptionController = useTextEditingController();
-    final jdFile = useState<File?>(null);
-    final jdFileName = useState<String?>(null);
+    final jdFile = useState<UploadFile?>(null);
 
     final formState = ref.watch(jobFormControllerProvider);
     final formController = ref.read(jobFormControllerProvider.notifier);
@@ -37,7 +35,6 @@ class _JobFormContent extends HookConsumerWidget {
       final picked = await formController.pickJdFile();
       if (picked == null) return;
       jdFile.value = picked.file;
-      jdFileName.value = picked.name;
       if (picked.description != null) {
         descriptionController.text = picked.description!;
       }
@@ -50,7 +47,6 @@ class _JobFormContent extends HookConsumerWidget {
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
         jdFile: jdFile.value,
-        jdFileName: jdFileName.value,
       );
     }
 
@@ -103,7 +99,7 @@ class _JobFormContent extends HookConsumerWidget {
                         onPressed: pickJdFile,
                         icon: const Icon(Icons.upload_file),
                         label: Text(
-                          jdFileName.value ?? 'Upload JD file (optional)',
+                          jdFile.value?.name ?? 'Upload JD file (optional)',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,25 +13,38 @@ import 'package:ai_ats/screens/job_form_screen.dart';
 
 class _FakeNavigator implements AppNavigator {
   var popCount = 0;
-  @override void goToJobs() {}
-  @override void goToJobForm() {}
-  @override void goToSettings() {}
-  @override void goToSearchJobs() {}
-  @override void goToSearchCandidates() {}
-  @override void goToSearch() {}
-  @override void goToChat() {}
+  @override
+  void goToJobs() {}
+  @override
+  void goToJobForm() {}
+  @override
+  void goToSettings() {}
+  @override
+  void goToSearchJobs() {}
+  @override
+  void goToSearchCandidates() {}
+  @override
+  void goToSearch() {}
+  @override
+  void goToChat() {}
 
   @override
   void goToApiKey() {}
 
   @override
   void goToHelp() {}
-  @override void goToJobDetail(String jobId) {}
-  @override void goToCandidateDetail(String jobId, CandidateResult candidate) {}
-  @override void goToRankings(RankingsScreenData data) {}
-  @override Future<bool> pushDeleteConfirm(DeleteConfirmArgs args) async => true;
-  @override Future<void> pushActionResult(ActionResultData data) async {}
-  @override void pop() => popCount++;
+  @override
+  void goToJobDetail(String jobId) {}
+  @override
+  void goToCandidateDetail(String jobId, CandidateResult candidate) {}
+  @override
+  void goToRankings(RankingsScreenData data) {}
+  @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmArgs args) async => true;
+  @override
+  Future<void> pushActionResult(ActionResultData data) async {}
+  @override
+  void pop() => popCount++;
 }
 
 class _FakeCreateJob implements CreateJob {
@@ -41,7 +53,11 @@ class _FakeCreateJob implements CreateJob {
   Future<Job> result = Future.value(_job());
 
   @override
-  Future<Job> call({required String title, required String description, File? jdFile, String? jdFileName}) async {
+  Future<Job> call({
+    required String title,
+    required String description,
+    UploadFile? jdFile,
+  }) async {
     calls.add((title: title, description: description));
     final e = error;
     if (e != null) throw e;
@@ -49,7 +65,13 @@ class _FakeCreateJob implements CreateJob {
   }
 }
 
-Job _job() => const Job(id: 'j1', title: 'Backend Engineer', description: 'Build services', status: 'open', createdAt: '2026-08-06T14:05:00');
+Job _job() => const Job(
+  id: 'j1',
+  title: 'Backend Engineer',
+  description: 'Build services',
+  status: 'open',
+  createdAt: '2026-08-06T14:05:00',
+);
 
 void main() {
   testWidgets('trim', (tester) async {
@@ -61,13 +83,18 @@ void main() {
     getIt.registerLazySingleton<CreateJob>(() => createJob);
     addTearDown(() => getIt.unregister<CreateJob>());
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [navigatorProvider.overrideWithValue(navigator)],
-      child: const MaterialApp(home: JobFormScreen()),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [navigatorProvider.overrideWithValue(navigator)],
+        child: const MaterialApp(home: JobFormScreen()),
+      ),
+    );
     await tester.pump();
 
-    await tester.enterText(find.byType(TextFormField).at(0), '  Backend Engineer  ');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      '  Backend Engineer  ',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), '  Build  ');
     await tester.tap(find.text('Create job'));
     await tester.pump();

@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import '../models/job.dart';
 import '../models/job_page.dart';
+import '../models/upload_file.dart';
 
 abstract class JobRepository {
   Future<JobPage> listJobs({int page = 1, int limit = 20});
@@ -15,8 +14,7 @@ abstract class JobRepository {
   Future<Job> createJob({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   });
 
   Future<Job> getJob(String jobId);
