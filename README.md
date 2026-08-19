@@ -132,6 +132,8 @@ build image) and the static output is deployed with the Vercel CLI:
 # or: make frontend-deploy-vercel
 ```
 
+Deployed app: **https://web-2fxujs18i-dika-squad.vercel.app/**
+
 - The app is baked with the **deployed backend** API base
   (`https://recruitment-app-z4kg.onrender.com/api`) by default — override with
   `--api-base <url>` if your backend lives elsewhere.
