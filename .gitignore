@@ -21,6 +21,9 @@ frontend/ios/Pods/
 backend/data/
 *.log
 
+# Vercel CLI project link
+.vercel/
+
 # macOS
 .DS_Store
 

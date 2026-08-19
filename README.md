@@ -122,6 +122,25 @@ project directory as the working directory and load the backend `.env` file.
 Or via Make: `make backend-script SCRIPT=seed`.
 New scripts are discovered automatically by filename in `<project>/scripts/`.
 
+## Deploy to Vercel
+
+The Flutter web bundle is built locally (Flutter isn't available in Vercel's
+build image) and the static output is deployed with the Vercel CLI:
+
+```bash
+./scripts/run_script.sh frontend/deploy_vercel
+# or: make frontend-deploy-vercel
+```
+
+- The app is baked with the **deployed backend** API base
+  (`https://recruitment-app-z4kg.onrender.com/api`) by default — override with
+  `--api-base <url>` if your backend lives elsewhere.
+- First run links or creates the Vercel project interactively; pass
+  `--token <token>` (and `--yes`) for CI.
+- `--skip-build` re-deploys the existing `frontend/build/web` without rebuilding.
+- Backend CORS is already open (`allow_origins=["*"]`), so the Vercel-hosted
+  frontend can call the backend.
+
 ## API
 
 Base URL: `http://localhost:8000/api`

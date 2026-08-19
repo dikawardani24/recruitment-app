@@ -20,6 +20,12 @@ frontend-run:
 frontend-build-apk:
 	scripts/run_script.sh frontend/build_apk
 
+frontend-build-web:
+	scripts/run_script.sh frontend/build_web
+
+frontend-deploy-vercel:
+	scripts/run_script.sh frontend/deploy_vercel
+
 frontend-analyze:
 	scripts/run_script.sh frontend/analyze
 
