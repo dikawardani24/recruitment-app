@@ -119,6 +119,9 @@ class CvDatasource:
         certification_score: float | None,
         ranked_at: str | None,
         ranked_by: str | None,
+        classification: str | None = None,
+        meets_job_description: bool | None = None,
+        relevance_score: float | None = None,
     ):
         query = """
         UPDATE cvs
@@ -136,7 +139,10 @@ class CvDatasource:
             education_score = ?,
             certification_score = ?,
             ranked_at = ?,
-            ranked_by = ?
+            ranked_by = ?,
+            classification = ?,
+            meets_job_description = ?,
+            relevance_score = ?
         WHERE id = ?
         """
         await self.db.execute(
@@ -155,6 +161,9 @@ class CvDatasource:
                 certification_score,
                 ranked_at,
                 ranked_by,
+                classification,
+                int(bool(meets_job_description)) if meets_job_description is not None else None,
+                relevance_score,
                 cv_id,
             ),
         )

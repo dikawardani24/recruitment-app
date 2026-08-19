@@ -6,8 +6,8 @@ from app.config import Settings
 from app.domain.errors import NotFoundError
 from app.extraction import Profile
 from app.ranking import RankingService
-from app.repository.job_repository import JobRepository
 from app.repository.cv_repository import CvRepository
+from app.repository.job_repository import JobRepository
 
 
 class RankCv:
@@ -79,6 +79,9 @@ def _to_candidate(item: dict, source: str):
         certification_score=item.get("certification_score"),
         ranked_at=item.get("ranked_at") or _now(),
         ranked_by=source,
+        classification=item.get("classification"),
+        meets_job_description=item.get("meets_job_description"),
+        relevance_score=item.get("relevance_score"),
     )
 
 
