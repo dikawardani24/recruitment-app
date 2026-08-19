@@ -1,6 +1,7 @@
-from app.repository.job_repository import JobRepository
-from app.repository.cv_repository import CvRepository
+from app.domain.candidate import Candidate
 from app.domain.errors import NotFoundError
+from app.repository.cv_repository import CvRepository
+from app.repository.job_repository import JobRepository
 
 
 class GetRankings:
@@ -15,7 +16,7 @@ class GetRankings:
 
         cvs = await self.cv_repo.find_by_job(job_id)
         ranked = [cv for cv in cvs if cv.overall_score is not None]
-        ranked.sort(key=lambda c: c.overall_score, reverse=True)
+        ranked.sort(key=Candidate.ranking_key, reverse=True)
         for i, cv in enumerate(ranked):
             cv.rank = i + 1
         return {

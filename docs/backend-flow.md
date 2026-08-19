@@ -32,7 +32,9 @@ flowchart TD
     end
 
     subgraph Ranking["3. Rank Candidates (POST /api/jobs/{id}/rank)"]
-        R[Trigger ranking] --> S[ranking.service\nrule-based scoring]
+        R[Trigger ranking] --> RELEVANCE{Relevance gate\nranking._relevance\nrequired-skill match +\ndomain overlap}
+        RELEVANCE -->|UNRELATED| NM[NOT_MET: score 0\nmeets_job_description = false]
+        RELEVANCE -->|RELEVANT / PARTIALLY_RELEVANT| S[ranking.service\nrule-based scoring]
 
         S --> T{LLM enabled?}
         T -->|Yes| U[ranking._llm\nper-candidate reasoning]
@@ -41,8 +43,9 @@ flowchart TD
 
         S --> X[Sub-scores: skill, experience,\neducation, certification]
         X --> V
-        V --> Y[(SQLite: cvs table\nscores, bucket, recommendation, ranked_at)]
+        V --> Y[(SQLite: cvs table\nscores, bucket, classification, ranked_at)]
         W --> Y
+        NM --> Y
     end
 
     subgraph Results["4. View Rankings (GET /api/jobs/{id}/rankings)"]
@@ -78,7 +81,9 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[Job Requirements] --> B[For each CV]
-    B --> C[skill_score\n70% required match\n+ 30% preferred match]
+    B --> RELEVANCE{Relevance gate\nrequired-skill match +\nprofessional-domain overlap}
+    RELEVANCE -->|UNRELATED| NM[NOT_MET\nscore = 0\nnever scored / always bottom]
+    RELEVANCE -->|RELEVANT / PARTIALLY_RELEVANT| C[skill_score\n70% required match\n+ 30% preferred match]
     B --> D[experience_score\nmin 1.0, candidate_years / required_years]
     B --> E[education_score\nlevel comparison: diploma<bsc<msc<phd]
     B --> F[certification_score\nmatched / required]
@@ -96,6 +101,23 @@ flowchart TD
     H -->|< 0.50| L[weak_match]
 ```
 
+The **relevance gate runs first and is a hard stop, not a scoring weight**:
+candidates whose professional background is fundamentally unrelated to the job
+(no meaningful required-skill match and no domain overlap — e.g. an accountant
+applying to a Flutter Developer role) are classified `NOT_MET` with
+`meets_job_description=false` and `overall_score=0`. They never enter
+skill/experience/education/certification or LLM scoring, and are always placed
+at the bottom of the ranking, regardless of years of unrelated experience.
+
+| Relevance | Classification | Behaviour |
+|-----------|----------------|-----------|
+| `RELEVANT` | `MET` | Continue normal scoring + ranking |
+| `PARTIALLY_RELEVANT` | `PARTIALLY_MET` | Continue scoring, flagged with missing requirements |
+| `UNRELATED` | `NOT_MET` | Stop — score `0`, bottom of ranking |
+
+Generic traits (communication, management, leadership, teamwork, project, …) are
+**not** treated as evidence of relevance.
+
 ## Module Dependencies
 
 ```mermaid
@@ -111,16 +133,18 @@ flowchart TD
     extraction[extraction/\nCV profile extraction]
     imports[imports/\nBackground CV processor]
     ranking[ranking/\nScoring + reasoning]
-    router[routers/jobs.py\nAll HTTP endpoints]
+    llm[llm/\nOpenAI-compatible client]
+    chat[chat/\nRecruiter copilot: router + tools]
+    routers[routers/\njobs + candidates + search + chat]
     usecase[usecase/\nOrchestration]
     repo[repository/\nInterfaces + impls]
 
     main --> config
     main --> db
-    main --> router
+    main --> routers
     main --> di
 
-    router --> usecase
+    routers --> usecase
     usecase --> repo
     repo --> db
 
@@ -129,6 +153,8 @@ flowchart TD
     usecase --> ranking
     usecase --> jd
     usecase --> imports
+    usecase --> chat
+    usecase --> llm
 
     jd --> skills
     extraction --> config
@@ -136,6 +162,8 @@ flowchart TD
     extraction --> skills
     ranking --> config
     ranking --> extraction
+    chat --> llm
+    chat --> ranking
 ```
 
 ## API Endpoints
@@ -157,6 +185,19 @@ flowchart LR
         GET_RANK["GET /jobs/{id}/rankings\nRanked candidates"]
     end
 
+    subgraph SEARCH["/api"]
+        SEARCH_CANDIDATES["GET /candidates/search?keyword=\nSearch candidates (all jobs)"]
+        UNIFIED["GET /search?keyword=\nUnified jobs + candidates search"]
+        SEMANTIC["POST /search/semantic\nSemantic search (RAG, opt-in)"]
+        REINDEX["POST /search/reindex\nRebuild vector index (RAG, opt-in)"]
+    end
+
+    subgraph CHAT["/api"]
+        CHAT_MODELS["GET /chat/models\nAvailable copilot models"]
+        CHAT["POST /chat\nRecruiter copilot Q&A"]
+        CHAT_STREAM["POST /chat/stream\nSSE streaming chat"]
+    end
+
     HEALTH["GET /health\nHealth check"]
 ```
 
@@ -165,5 +206,5 @@ flowchart LR
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `jobs` | Job vacancies | id, title, description, requirements (JSON), status, jd_file |
-| `cvs` | Candidate CVs + scores | id, job_id (FK, CASCADE), import_job_id (FK, SET NULL), file_name, storage_path, status, skills (JSON), overall_score, bucket, recommendation, source |
+| `cvs` | Candidate CVs + scores | id, job_id (FK, CASCADE), import_job_id (FK, SET NULL), file_name, storage_path, status, skills (JSON), overall_score, bucket, classification, meets_job_description, relevance_score, recommendation, source |
 | `import_jobs` | CV batch import progress | id, job_id (FK, CASCADE), total/uploaded/processed/failed_files, status, completed_at |

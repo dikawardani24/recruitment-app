@@ -109,6 +109,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The settings ListView only builds visible children, so sections below the
+  /// fold (AI Models, Appearance) need to be scrolled into view before
+  /// asserting on or interacting with them.
+  Future<void> scrollToText(WidgetTester tester, String text) async {
+    final scrollable = find
+        .descendant(of: find.byType(SettingsScreen), matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(find.text(text), 300, scrollable: scrollable);
+    await tester.pumpAndSettle();
+  }
+
   Brightness brightnessOf(WidgetTester tester, Type screen) {
     return Theme.of(tester.element(find.byType(screen))).brightness;
   }
@@ -124,6 +135,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SettingsScreen), findsOneWidget);
+    await scrollToText(tester, 'Theme');
     expect(find.text('Theme'), findsOneWidget);
     expect(find.text('System'), findsOneWidget);
     expect(find.text('Light'), findsOneWidget);
@@ -144,6 +156,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
+    await scrollToText(tester, 'Theme');
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(brightnessOf(tester, SettingsScreen), Brightness.dark);
@@ -160,6 +173,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
+    await scrollToText(tester, 'Theme');
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
 

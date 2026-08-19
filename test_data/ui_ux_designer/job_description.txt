@@ -1,0 +1,40 @@
+Job Title:
+UI/UX Designer
+
+About the Job:
+We are looking for a UI/UX Designer to shape intuitive, delightful product
+experiences. You will work with product managers to research user needs, design
+interfaces, and validate solutions before they are built.
+
+Responsibilities:
+- Conduct user research and usability testing to inform design decisions.
+- Create wireframes, prototypes, and user flows for new features.
+- Maintain and extend the product design system.
+- Partner with product and engineering to hand off polished designs.
+- Iterate on designs based on user feedback and product analytics.
+
+Required Qualifications:
+- 2+ years of experience in product or interface design.
+- A portfolio demonstrating interface design and prototyping work.
+- Bachelor's degree in Design, Human-Computer Interaction, or a related field.
+
+Required Skills:
+- Figma
+- User interface design
+- User experience research
+- Wireframing
+- Prototyping
+- Design systems
+- User flows
+- Usability testing
+
+Preferred Qualifications:
+- Experience planning and moderating user interviews.
+- Familiarity with accessibility best practices.
+- Experience working in agile product teams.
+
+Experience Requirements:
+- 2+ years of professional design experience.
+
+Education Requirements:
+- Bachelor's degree or higher in a relevant field.

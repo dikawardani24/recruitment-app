@@ -36,6 +36,9 @@ class CvEntity:
     ranked_by: str | None = None
     error: str | None = None
     source: str | None = None
+    classification: str | None = None
+    meets_job_description: bool | None = None
+    relevance_score: float | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "CvEntity":
@@ -69,4 +72,7 @@ class CvEntity:
             ranked_by=row["ranked_by"],
             error=row["error"],
             source=row["source"],
+            classification=row["classification"] if "classification" in row.keys() else None,
+            meets_job_description=bool(row["meets_job_description"]) if "meets_job_description" in row.keys() and row["meets_job_description"] is not None else None,
+            relevance_score=row["relevance_score"] if "relevance_score" in row.keys() else None,
         )

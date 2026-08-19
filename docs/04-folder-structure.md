@@ -12,7 +12,8 @@ recruitment-app/
 ├── scripts/                  # one-off bash scripts (run_script.sh runner)
 ├── docs/                     # design deliverables 01–14 + backend-flow + setup
 ├── backend/                  # Python FastAPI (single process)
-└── frontend/                 # Flutter app (Material 3)
+├── frontend/                 # Flutter app (Material 3)
+└── test_data/                # sample jobs + CVs (5 jobs × 5 CVs; see setup-and-testing.md §6)
 ```
 
 ## 2. Backend — Detailed
@@ -134,6 +135,11 @@ frontend/lib/
 │   ├── app_route.dart        # AppRoute enum (single source of path truth)
 │   ├── app_navigator.dart    # AppNavigator interface + shared data types
 │   └── go_router_navigator.dart  # go_router-backed AppNavigator
+│
+├── help/                     # Help & Guidance feature
+│   ├── models/               # content model types (sections, blocks, FAQs)
+│   ├── data/                 # static help content + search (no UI strings)
+│   └── ui/                   # help page, expandable category cards, FAQ items
 │
 ├── screens/                  # One file per screen
 │   ├── intro_screen.dart

@@ -41,6 +41,20 @@ class _SettingsContent extends ConsumerWidget {
             subtitle: 'Customize how the app looks and behaves.',
           ),
           const SizedBox(height: 16),
+          const SectionTitle('Help'),
+          const SizedBox(height: 8),
+          SectionCard(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: const Text('Help & Guidance'),
+              subtitle: const Text('Learn how to use the recruitment assistant'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: navigator.goToHelp,
+            ),
+          ),
+          const SizedBox(height: 16),
           const SectionTitle('AI Models'),
           const SizedBox(height: 8),
           SectionCard(

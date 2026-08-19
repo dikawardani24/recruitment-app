@@ -52,6 +52,27 @@ ATS_LLM__MODEL=gpt-4o-mini                    # or gemini-flash-latest
 Without a key, the app still ranks candidates and produces template reasoning via
 a deterministic rule-based engine.
 
+### Optional: recruiter copilot (chat)
+
+The recruiter copilot answers workspace questions (counts, candidate search,
+rankings, comparisons) with a deterministic query router — most questions are
+answered with **zero** LLM calls — and uses a single LLM call only for
+reasoning-heavy questions, grounded in RAG evidence and the API tools. It reuses
+the same `ATS_LLM__*` settings above, so no extra config is required beyond the
+LLM key. To make additional models selectable in the UI, configure OpenRouter:
+
+```
+# ATS_OPENROUTER__API_KEY=sk-or-...
+# ATS_OPENROUTER__BASE_URL=https://openrouter.ai/api/v1
+# ATS_OPENROUTER__MODELS=qwen/qwen-2.5-72b-instruct
+```
+
+Chat is served by `GET /api/chat/models` (available models),
+`POST /api/chat` (JSON Q&A), and `POST /api/chat/stream` (SSE streaming, used by
+the Flutter app). Without any key the endpoints respond with `"configured": false`;
+clients may also send their own `api_key` in the request body, which takes
+precedence over the server's configured key.
+
 ### Optional: local BERT resume-NER extraction
 
 By default CVs are parsed with deterministic rules (fast), or with an LLM when
@@ -116,6 +137,10 @@ cd backend
 2. `POST /api/jobs/{id}/candidates/import` — batch-upload CVs (PDF/DOCX/TXT). The request returns immediately with an `import_id`; each CV is parsed **in the background** by a built-in asyncio worker (`POST /api/jobs/{id}/cvs` is a backwards-compatible alias). Track progress with `GET /api/jobs/{id}/imports/{import_id}` or poll `GET /api/jobs/{id}/cvs`.
 3. `POST /api/jobs/{id}/rank` — scores and ranks every candidate, best match first, with an explanation, strengths, weaknesses, skill gaps, and a hiring recommendation. A single CV can be ranked with `POST /api/jobs/{id}/cvs/{cv_id}/rank`.
 4. `GET /api/jobs/{id}/rankings` — persisted ranking results, best match first.
+5. `GET /api/search?keyword=` — unified search across jobs and candidates;
+   `GET /api/candidates/search?keyword=` searches candidates by name/skills/file.
+6. `POST /api/chat` — ask the recruiter copilot anything about the workspace
+   (counts, "who fits this role", rankings, general recruiting advice).
 
 ---
 
@@ -136,7 +161,10 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
 
 Screens: **Jobs** (list) → **New job** (paste description and/or upload a JD file)
 → **Job detail** (add CVs, then "Rank candidates") → **Rankings** (scores +
-expandable reasoning).
+expandable reasoning). Plus **Unified search** (jobs + candidates), **Search jobs**
+and **Search candidates** (swipe-to-delete), **Chat** (recruiter copilot with
+streaming answers and candidate cards), and **Settings** (theme + API key
+configuration for chat models).
 
 ---
 
@@ -153,7 +181,7 @@ or:
 make backend-test
 ```
 
-**144 tests, no external services.** `tests/test_api.py` covers: health, create job
+**158 tests, no external services.** `tests/test_api.py` covers: health, create job
 from text and from an uploaded JD file, multi-CV upload, ranking order + reasoning,
 persisted rankings, and error cases (missing title, missing JD, unknown job).
 `tests/test_imports.py` covers the background import pipeline,
@@ -230,11 +258,94 @@ curl -X POST http://localhost:8000/api/search/semantic \
 # 7. Backfill the vector index (after enabling RAG)
 curl -X POST http://localhost:8000/api/search/reindex \
   -H "Content-Type: application/json" -d '{}'
+
+# 8. Unified search over jobs and candidates
+curl "http://localhost:8000/api/search?keyword=flutter"
+
+# 9. Search candidates by name/skills across all jobs
+curl "http://localhost:8000/api/candidates/search?keyword=flutter"
+
+# 10. Recruiter copilot (returns "configured": false until an LLM key is set)
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How many candidates do I have?"}'
+
+# 11. Available chat models
+curl http://localhost:8000/api/chat/models
 ```
 
 ---
 
-## 6. Troubleshooting
+## 6. Sample Dataset (`test_data/`)
+
+`test_data/` ships a ready-to-run dataset for exercising the **JD processing →
+CV extraction → relevance gate → ranking** flow end-to-end. All people,
+companies, and contacts are fictional.
+
+```
+test_data/
+├── flutter_developer/        # Junior Flutter Developer
+├── backend_developer/        # Backend Developer (Python/FastAPI)
+├── ui_ux_designer/           # UI/UX Designer
+├── data_analyst/             # Data Analyst
+├── hr_recruiter/             # HR Recruiter
+└── verify_dataset.py         # read-only pipeline check over all 5 jobs
+```
+
+Each job folder contains a `job_description.txt`, a `README.md` (expected vs
+verified results, per-candidate rationale, and observed gate behavior), and
+`cvs/` with **five unique CV PDFs** (25 CVs in total) distributed as:
+
+| # | Intent | Verified behaviour |
+|---|--------|--------------------|
+| c1 | strong match | `MET` / `RELEVANT` — top of ranking |
+| c2 | good match | `MET` / `RELEVANT` |
+| c3 | related (same domain) | `MET` / `RELEVANT` (gate treats same-domain candidates as relevant) |
+| c4 | weak/adjacent (cross-domain) | `PARTIALLY_MET` / `PARTIALLY_RELEVANT` (3 of 5 jobs) |
+| c5 | **unrelated** (accountant, designer, HR, backend dev, Flutter dev) | `NOT_MET`, `score = 0`, pinned to the bottom |
+
+Every `c5` is an **intentional negative test**: it matches zero required skills
+and shares no professional domain, so the hard relevance gate (ranking doc §1.1)
+forces `score = 0`, skips all scoring, and sorts it below every relevant
+candidate — even when it has more years of experience.
+
+### Run the whole dataset against the pipeline (deterministic)
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python ../test_data/verify_dataset.py
+```
+
+Prints each job's parsed requirements and the per-candidate
+classification/score/meets-JD/relevance plus a duplicate-name check. It uses
+`Settings(llm_api_key=None)` (rules-based) so output is reproducible; with an
+API key the LLM also re-scores relevant candidates, so exact scores vary.
+
+### Run it through the API
+
+For a single job: `POST /api/jobs` with `jd_file=test_data/<job>/job_description.txt`,
+`POST /api/jobs/{id}/candidates/import` with the five PDFs, then
+`POST /api/jobs/{id}/rank` and `GET /api/jobs/{id}/rankings`.
+
+### What the dataset is designed to surface
+
+- Cross-domain negatives are truly unrelated (verified `score = 0`, bottom).
+- The gate is **same-domain permissive**: any candidate sharing the job's
+  professional domain or matching 2+ required skills is `MET`, so intended
+  "related" profiles (Android dev for Flutter, fullstack for Backend, Visual
+  Designer for UI/UX, Data Scientist for Data, HR Generalist for HR) are `MET`,
+  not `PARTIALLY_MET`.
+- Soft-skill-only JDs (HR Recruiter) leave every CV with `n_specific = 0` —
+  classification is purely domain-driven there.
+- JD **wording** affects the job's detected domains: mentioning "backend"/"QA"
+  in a Flutter JD's responsibilities made an adjacent Java developer `RELEVANT`;
+  the bundled Flutter JD deliberately avoids that wording.
+
+Per-job details and known divergences are documented in each `README.md`.
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -246,7 +357,7 @@ curl -X POST http://localhost:8000/api/search/reindex \
 
 ---
 
-## 7. Quick Reference
+## 8. Quick Reference
 
 ```bash
 # Backend
@@ -256,7 +367,7 @@ cd backend && .venv/bin/uvicorn app.main:app --reload
 cd frontend && flutter run
 
 # Tests
-make backend-test       # 144 tests
+make backend-test       # 158 tests
 make frontend-test
 make lint               # compileall + flutter analyze
 ```

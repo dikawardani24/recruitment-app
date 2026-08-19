@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from app.domain.candidate import Candidate
 from app.repository.cv_repository import CvRepository
 from app.repository.job_repository import JobRepository
 
@@ -136,7 +137,7 @@ async def _handle_get_rankings(registry: ToolRegistry, **kwargs) -> dict:
         return {"error": "job_not_found", "job_id": job_id}
     candidates = await registry.cv_repo.find_by_job(job_id)
     ranked = [cv for cv in candidates if cv.overall_score is not None]
-    ranked.sort(key=lambda c: c.overall_score, reverse=True)
+    ranked.sort(key=Candidate.ranking_key, reverse=True)
     for i, cv in enumerate(ranked):
         cv.rank = i + 1
     return {"job_id": job_id, "count": len(ranked), "results": [cv.to_json() for cv in ranked]}

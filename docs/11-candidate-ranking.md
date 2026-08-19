@@ -43,6 +43,112 @@ The final bucket (`best | strong | hidden_gem | alternative`) is decided by a **
                     └────────────────────────────────────────────────┘
 ```
 
+## 1.1 Job Relevance Gate (hard prerequisite — current implementation)
+
+Ranking is gated by a **job-relevance check that runs before any scoring**. It is
+a hard stop, not an additional scoring weight: a candidate whose professional
+background is fundamentally unrelated to the job must never receive a normal
+ranking score.
+
+```
+CV + Job Description
+        ↓
+Check whether CV is relevant to the job
+        ↓
+   ┌────┴────┐
+   │         │
+Unrelated  Relevant
+   │         │
+   ↓         ↓
+NOT_MET   Calculate Score
+score=0       ↓
+             Rank
+```
+
+### Signals
+
+Relevance is evaluated deterministically in `app/ranking/_relevance.py`
+(`evaluate_relevance`) using the candidate's current/previous roles, core
+professional domain, technical skills, experience, projects, education and
+overall career background:
+
+- **Required-skill matches** against the job's required skills. Generic soft
+  skills (`communication`, `management`, `leadership`, `teamwork`, `project`, …)
+  are deliberately excluded — they are not evidence of relevance on their own.
+- **Professional-domain overlap** between the job (title + required skills +
+  responsibilities) and the candidate (skills + full CV text), e.g. `mobile`,
+  `frontend`, `backend`, `data`, `devops`, `qa`, `design`, `finance`, `hr`, …
+
+### Classification mapping
+
+| Relevance | Classification | Meets JD | Behaviour |
+|-----------|----------------|----------|-----------|
+| `RELEVANT` | `MET` | `true` | Continue normal ranking |
+| `PARTIALLY_RELEVANT` | `PARTIALLY_MET` | `false` | Continue ranking, flagged with missing requirements |
+| `UNRELATED` | `NOT_MET` | `false` | Stop — `score = 0`, bottom of ranking |
+
+### Rules
+
+1. `UNRELATED` is a hard stop: the candidate never enters skill/experience/
+   education/keyword/LLM scoring.
+2. A final safety pass forces `score = 0` for every `NOT_MET` candidate.
+3. Sorting places `NOT_MET` candidates below any candidate that meets the
+   requirements, even at equal scores (`Candidate.ranking_key`).
+
+Example (Job: Flutter Developer — required: Flutter, Dart, Mobile development,
+REST API, State management):
+
+| Candidate | Result |
+|-----------|--------|
+| Flutter Developer, 3 yrs | `MET`, normal score (e.g. 85) |
+| React Native Developer | `RELEVANT`/`MET`, normal score |
+| Backend Developer | `PARTIALLY_RELEVANT`, scored only if relevant |
+| Accountant, 10 yrs | `UNRELATED` → `NOT_MET`, `score 0`, bottom |
+| Graphic Designer | `UNRELATED` → `NOT_MET`, `score 0`, bottom |
+| HR Manager | `UNRELATED` → `NOT_MET`, `score 0`, bottom |
+
+`classification`, `meets_job_description`, `relevance_score` and the relevance
+reason are persisted on the candidate and returned by the ranking endpoints.
+
+### Validating with the sample dataset
+
+`test_data/` ships **5 jobs × 5 CVs** (25 unique fictional candidates) that
+exercise all three gate outcomes. Reproduce the checks with:
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python ../test_data/verify_dataset.py
+```
+
+Verified results (rules-based, `Settings(llm_api_key=None)`):
+
+| Job | `MET` | `PARTIALLY_MET` | `NOT_MET` (score 0, bottom) |
+|-----|-------|-----------------|------------------------------|
+| Flutter Developer | c1 Flutter, c2 Flutter, c3 Android | c4 Java | c5 Accountant |
+| Backend Developer | c1 Python, c2 Python, c3 Fullstack, c4 Java | — | c5 Graphic Designer |
+| UI/UX Designer | c1 UI/UX, c2 Product, c3 Visual | c4 Frontend (Figma-only) | c5 Backend Dev |
+| Data Analyst | c1 Data Analyst, c2 Data Analyst, c3 Data Scientist | c4 Finance (Excel-only) | c5 HR Recruiter |
+| HR Recruiter | c1 Tech Recruiter, c2 Recruitment Spec, c3 HR Generalist | — | c4 Admin, c5 Flutter Dev |
+
+Observed gate behavior the dataset exposes:
+
+- **Same-domain permissiveness.** Any candidate sharing the job's professional
+  domain or matching 2+ required skills is `RELEVANT`/`MET` — e.g. an Android
+  developer for a Flutter role, a fullstack/Java developer for a Python backend
+  role, a Data Scientist for a Data Analyst role. Only genuinely cross-domain
+  candidates with a single skill overlap get `PARTIALLY_MET` (Flutter-Java,
+  UI/UX-Frontend, Data-Finance); Backend and HR jobs produce none.
+- **Soft-skill-only JDs.** The HR Recruiter JD's required skills are all
+  open-vocabulary or the excluded soft skill `communication`, so every CV has
+  `n_specific = 0`; classification is purely domain-driven there.
+- **JD wording shapes the job's domains.** The job's detected domains come from
+  its title, required skills *and responsibilities*. "backend"/"QA" wording in a
+  Flutter JD made an adjacent Java developer `RELEVANT`; the bundled Flutter JD
+  avoids that wording so the cross-domain candidate lands `PARTIALLY_MET`.
+
+Per-candidate rationale and divergences are documented in each job's
+`test_data/<job>/README.md`.
+
 ## 2. Intent Parsing
 
 Query is lightly processed (rule-based + optional LLM) into structured intent:

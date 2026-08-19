@@ -20,6 +20,7 @@ class LLMReasoning:
     explanation: str
     strengths: list[str]
     weaknesses: list[str]
+    classification: str = "MET"
 
     def as_dict(self) -> dict:
         return {
@@ -29,6 +30,7 @@ class LLMReasoning:
             "explanation": self.explanation,
             "strengths": self.strengths,
             "weaknesses": self.weaknesses,
+            "classification": self.classification,
         }
 
 
@@ -64,6 +66,7 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
       "candidate": 1,
       "rank": 1,
       "overall": 0.95,
+      "classification": "MET | PARTIALLY_MET | NOT_MET",
       "recommendation": "strong_match | good_match | possible_match | weak_match",
       "explanation": "2-3 sentence reasoning",
       "strengths": ["..."],
@@ -75,6 +78,11 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
 Rules:
 - "candidate" is the NUMBER of the candidate from the list above (1-based), not the name.
 - Include exactly {len(candidates)} entries, one per candidate.
+- "classification" reflects how well the candidate's professional background matches
+  the job: MET = directly relevant, PARTIALLY_MET = relevant domain but missing key
+  requirements, NOT_MET = fundamentally unrelated to the job (set "overall" to 0.0).
+- Do NOT treat generic traits (communication, management, leadership, teamwork) as
+  evidence of relevance on their own; the candidate needs real professional overlap.
 """
 
 
@@ -146,6 +154,7 @@ def _parse_response(content: str, candidates: list[dict]) -> list[LLMReasoning]:
             explanation=str(item.get("explanation", "")),
             strengths=[str(s) for s in item.get("strengths", [])],
             weaknesses=[str(w) for w in item.get("weaknesses", [])],
+            classification=str(item.get("classification", "MET")),
         )
 
     if len(entries) != len(candidates):

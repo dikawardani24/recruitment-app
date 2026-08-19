@@ -76,6 +76,8 @@ abstract class AppNavigator {
 
   void goToApiKey();
 
+  void goToHelp();
+
   void goToChat();
 
   void goToJobDetail(String jobId);

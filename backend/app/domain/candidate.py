@@ -50,6 +50,9 @@ class Candidate:
         error: str | None = None,
         source: str | None = None,
         rank: int | None = None,
+        classification: str | None = None,
+        meets_job_description: bool | None = None,
+        relevance_score: float | None = None,
     ):
         self.id = id
         self.job_id = job_id
@@ -80,6 +83,9 @@ class Candidate:
         self.error = error
         self.source = source
         self.rank = rank
+        self.classification = classification
+        self.meets_job_description = meets_job_description
+        self.relevance_score = relevance_score
 
     @classmethod
     def from_entity(cls, entity: CvEntity) -> "Candidate":
@@ -112,6 +118,9 @@ class Candidate:
             ranked_by=entity.ranked_by,
             error=entity.error,
             source=entity.source,
+            classification=entity.classification,
+            meets_job_description=entity.meets_job_description,
+            relevance_score=entity.relevance_score,
         )
 
     @classmethod
@@ -145,6 +154,9 @@ class Candidate:
             error=d.get("error"),
             source=d.get("source"),
             rank=d.get("rank"),
+            classification=d.get("classification"),
+            meets_job_description=d.get("meets_job_description"),
+            relevance_score=d.get("relevance_score"),
         )
 
     def as_dict(self) -> dict:
@@ -162,6 +174,9 @@ class Candidate:
             "education": self.education,
             "certifications": self.certifications,
             "source": self.source,
+            "classification": self.classification,
+            "meets_job_description": self.meets_job_description,
+            "relevance_score": self.relevance_score,
         }
 
     def to_entity(self) -> CvEntity:
@@ -195,6 +210,9 @@ class Candidate:
             ranked_by=self.ranked_by,
             error=self.error,
             source=self.source,
+            classification=self.classification,
+            meets_job_description=self.meets_job_description,
+            relevance_score=self.relevance_score,
         )
 
     def to_json(self) -> dict:
@@ -224,5 +242,14 @@ class Candidate:
             "years_experience": self.years_experience,
             "education": self.education,
             "certifications": self.certifications,
+            "classification": self.classification,
+            "meets_job_description": self.meets_job_description,
+            "relevance_score": self.relevance_score,
             "error": self.error,
         }
+
+    @staticmethod
+    def ranking_key(candidate: Candidate) -> tuple:
+        """Sort key that always pushes ``NOT_MET`` candidates to the bottom."""
+        not_met = 1 if candidate.classification == "NOT_MET" else 0
+        return (-not_met, candidate.overall_score or 0.0)

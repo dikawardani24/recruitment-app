@@ -9,6 +9,7 @@ import '../widgets/card_shape.dart';
 import '../widgets/deferred_page.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/rank_engine_chip.dart';
+import '../widgets/ranked_by_info.dart';
 import '../widgets/rankings_summary.dart';
 import '../widgets/score_color.dart';
 import 'candidate_detail_screen.dart';
@@ -151,7 +152,14 @@ class _RankedCard extends StatelessWidget {
                       Text(c.fileName, style: theme.textTheme.bodySmall),
                       if (c.rankedBy != null) ...[
                         const SizedBox(height: 6),
-                        RankEngineChip(rankedBy: c.rankedBy),
+                        InkWell(
+                          onTap: () => showRankedByInfoDialog(
+                            context,
+                            currentRankedBy: c.rankedBy,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          child: RankEngineChip(rankedBy: c.rankedBy),
+                        ),
                       ],
                     ],
                   ),

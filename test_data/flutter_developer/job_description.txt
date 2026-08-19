@@ -1,0 +1,42 @@
+Job Title:
+Junior Flutter Developer
+
+About the Job:
+We are looking for a motivated Junior Flutter Developer to join our mobile
+engineering team. You will help build, test, and ship production mobile
+applications used by thousands of daily active users. Working closely with
+product managers and senior mobile engineers, you will turn product ideas into
+smooth, reliable mobile experiences on Android and iOS.
+
+Responsibilities:
+- Develop and maintain Flutter applications for Android and iOS.
+- Write clean, maintainable Dart code following team coding standards.
+- Integrate mobile applications with REST API services.
+- Manage application state efficiently for complex screens and flows.
+- Parse and display JSON data from a variety of API endpoints.
+- Use Git for version control and collaborate through pull request reviews.
+- Write widget tests and contribute to the mobile app testing effort.
+- Debug and fix issues reported by users and app store reviews.
+
+Minimum Qualifications:
+- 1+ years of professional experience with Flutter and Dart.
+- Strong working knowledge of Flutter framework and Dart language.
+- Experience building mobile applications for Android and iOS.
+- REST API integration in mobile applications.
+- State management in Flutter (Provider, Riverpod, or Bloc).
+- JSON data parsing and serialization.
+- Git and GitHub for version control.
+- Bachelor's degree in Computer Science, Information Technology, or a related field.
+
+Nice to Have:
+- Firebase integration (Auth, Firestore, Cloud Messaging).
+- CI/CD for mobile apps.
+- Widget testing and integration testing.
+- Clean Architecture and SOLID principles.
+- Experience publishing apps to the Google Play Store or App Store.
+
+What we offer:
+- Competitive salary and health benefits.
+- Remote-friendly working environment.
+- Mentorship from senior mobile engineers.
+- Opportunities to grow into a mid-level Flutter role.

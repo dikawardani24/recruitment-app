@@ -16,7 +16,8 @@ enum AppRoute {
   searchJobs('/jobs/search'),
   search('/search'),
   settings('/settings'),
-  apiKey('/settings/api-key');
+  apiKey('/settings/api-key'),
+  help('/settings/help');
 
   const AppRoute(this.path);
 

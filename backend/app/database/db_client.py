@@ -1,9 +1,9 @@
-from contextlib import asynccontextmanager
+import sqlite3
 from collections.abc import AsyncIterator, Iterable
+from contextlib import asynccontextmanager
 from typing import Any
 
 import aiosqlite
-import sqlite3
 
 from app.config import settings
 
@@ -71,7 +71,10 @@ class DbClient:
             ranked_at           TEXT,
             ranked_by           TEXT,
             error               TEXT,
-            source              TEXT
+            source              TEXT,
+            classification      TEXT,
+            meets_job_description INTEGER,
+            relevance_score     REAL
         );
         """
 
@@ -91,6 +94,7 @@ class DbClient:
         settings.ensure_dirs()
 
         async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = sqlite3.Row
             await db.executescript(
                 f"""
                 {self.jobs_scheme()}
@@ -103,6 +107,7 @@ class DbClient:
                 """
             )
 
+            await self._migrate_cvs(db)
             await db.commit()
 
     @asynccontextmanager
@@ -116,6 +121,18 @@ class DbClient:
             yield db
         finally:
             await db.close()
+
+    async def _migrate_cvs(self, db) -> None:
+        """Add ranking classification columns to pre-existing ``cvs`` tables."""
+        cols = {row["name"] for row in await db.execute_fetchall("PRAGMA table_info(cvs)")}
+        additions = {
+            "classification": "TEXT",
+            "meets_job_description": "INTEGER",
+            "relevance_score": "REAL",
+        }
+        for col, decl in additions.items():
+            if col not in cols:
+                await db.execute(f"ALTER TABLE cvs ADD COLUMN {col} {decl}")
 
     async def execute(
         self,

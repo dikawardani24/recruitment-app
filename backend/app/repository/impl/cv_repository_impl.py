@@ -45,6 +45,9 @@ class CvRepositoryImpl:
             certification_score=candidate.certification_score,
             ranked_at=candidate.ranked_at,
             ranked_by=candidate.ranked_by,
+            classification=candidate.classification,
+            meets_job_description=candidate.meets_job_description,
+            relevance_score=candidate.relevance_score,
         )
 
     async def find_uploaded(self, limit: int) -> list[Candidate]:
