@@ -98,9 +98,15 @@ async def rank_with_llm(
     caller can fall back to other providers or deterministic scoring."""
     import openai
 
+    extra_headers = {}
+    if base_url and "openrouter.ai" in base_url:
+        extra_headers["HTTP-Referer"] = "https://github.com/dikawardani24/recruitment-app"
+        extra_headers["X-Title"] = "AI Applicant Ranking"
+
     kwargs: dict = {
         "api_key": api_key,
         "timeout": settings.llm_timeout_ms / 1000.0,
+        "default_headers": extra_headers,
     }
     if base_url:
         kwargs["base_url"] = base_url
@@ -123,7 +129,8 @@ async def rank_with_llm(
             base_delay_s=settings.llm_retry_base_ms / 1000.0,
         )
     except Exception as exc:  # network, auth, quota, etc.
-        raise LLMRankingError(f"llm_call_failed:{type(exc).__name__}") from exc
+        # Include the error message so the server log shows why it failed (e.g. 400 info)
+        raise LLMRankingError(f"llm_call_failed:{type(exc).__name__}: {exc}") from exc
 
     content = response.choices[0].message.content or ""
     return _parse_response(content, candidates)

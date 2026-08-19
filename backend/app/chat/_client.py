@@ -133,9 +133,15 @@ class ChatClient:
     def _openai_client(self, option: ChatModelOption):
         import openai
 
+        extra_headers = {}
+        if option.base_url and "openrouter.ai" in option.base_url:
+            extra_headers["HTTP-Referer"] = "https://github.com/dikawardani24/recruitment-app"
+            extra_headers["X-Title"] = "AI Applicant Ranking"
+
         kwargs: dict = {
             "api_key": option.api_key,
             "timeout": self.settings.llm_timeout_ms / 1000.0,
+            "default_headers": extra_headers,
         }
         if option.base_url:
             kwargs["base_url"] = option.base_url
@@ -234,7 +240,7 @@ class ChatClient:
             try:
                 response = await self._create(client, messages, tools, option)
             except Exception as exc:  # network, auth, quota, etc.
-                raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
+                raise ChatError(f"chat_call_failed:{type(exc).__name__}: {exc}") from exc
             choice = response.choices[0].message
             calls = choice.tool_calls if execute_tool is not None else None
             if calls:
@@ -312,7 +318,7 @@ class ChatClient:
             try:
                 stream = await self._create_stream(client, messages, tools, option)
             except Exception as exc:  # network, auth, quota, etc.
-                raise ChatError(f"chat_call_failed:{type(exc).__name__}") from exc
+                raise ChatError(f"chat_call_failed:{type(exc).__name__}: {exc}") from exc
 
             text_chunks: list[str] = []
             tool_calls: dict[int, dict] = {}
