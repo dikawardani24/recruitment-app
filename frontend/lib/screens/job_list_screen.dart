@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../controllers/jobDetail/job_detail_controller.dart';
 import '../controllers/job_list_controller.dart';
 import '../providers.dart';
 import '../widgets/delete_background.dart';
@@ -21,6 +22,7 @@ class JobListScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final jobsAsync = ref.watch(jobsProvider);
     final jobListController = ref.read(jobListControllerProvider);
+    final detailController = ref.read(jobDetailControllerProvider);
     final scrollController = useScrollController();
 
     useEffect(() {
@@ -120,6 +122,10 @@ class JobListScreen extends HookConsumerWidget {
                         index: entry.key,
                         onTap: () =>
                             jobListController.openJobDetail(entry.value.id),
+                        onAddCandidate: () => detailController.pickCvs(
+                          context,
+                          entry.value.id,
+                        ),
                       ),
                     ),
                   ),
