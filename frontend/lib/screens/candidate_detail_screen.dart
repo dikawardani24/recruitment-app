@@ -8,6 +8,7 @@ import '../providers.dart';
 import '../widgets/accent_chip.dart';
 import '../widgets/bucket_donut.dart';
 import '../widgets/deferred_page.dart';
+import '../widgets/ranked_by_info.dart';
 import '../widgets/score_color.dart';
 
 /// Full-screen page with a candidate's ranking details, opened from the job
@@ -170,10 +171,7 @@ class _CandidateDetailContent extends HookConsumerWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        _rankedByLabel(cv.rankedBy!),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      RankedByInfoRow(rankedBy: cv.rankedBy),
                     ],
                   ),
                 ],
@@ -377,10 +375,6 @@ CandidateResult? _resolveCandidate(
     }
   }
   return initial;
-}
-
-String _rankedByLabel(String source) {
-  return source == 'llm' ? 'AI' : 'In-App';
 }
 
 class _RankCvButton extends StatelessWidget {
