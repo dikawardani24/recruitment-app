@@ -61,7 +61,7 @@ class RankingService:
         return ranked, source
 
     async def _llm_rank(self, requirements: dict, profiles: list[Profile]):
-        if not self.settings.llm_enabled or not profiles:
+        if not self.settings.ranking_llm_enabled or not profiles:
             return None
         try:
             return await rank_with_llm(

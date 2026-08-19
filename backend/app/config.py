@@ -154,6 +154,35 @@ class Settings:
         return bool(self.llm_api_key)
 
     @property
+    def ranking_llm_enabled(self) -> bool:
+        """Whether ranking has an AI provider available.
+
+        Ranking prefers the configured default LLM (Gemini by default). If it
+        is not configured, the first configured OpenRouter model is used. The
+        ranking service still falls back to deterministic rules if this call
+        fails.
+        """
+        return bool(self.llm_api_key or self.openrouter_api_key)
+
+    @property
+    def ranking_llm_api_key(self) -> str | None:
+        return self.llm_api_key or self.openrouter_api_key
+
+    @property
+    def ranking_llm_base_url(self) -> str | None:
+        if self.llm_api_key:
+            return self.llm_base_url
+        if self.openrouter_api_key:
+            return self.openrouter_base_url
+        return None
+
+    @property
+    def ranking_llm_model(self) -> str:
+        if self.llm_api_key:
+            return self.llm_model
+        return self.openrouter_models[0] if self.openrouter_models else self.llm_model
+
+    @property
     def chat_enabled(self) -> bool:
         return bool(self.llm_api_key or self.openrouter_api_key)
 

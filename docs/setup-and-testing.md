@@ -49,8 +49,10 @@ ATS_LLM__BASE_URL=https://api.openai.com/v1   # or Gemini/Ollama/vLLM/DeepSeek/.
 ATS_LLM__MODEL=gpt-4o-mini                    # or gemini-flash-latest
 ```
 
-Without a key, the app still ranks candidates and produces template reasoning via
-a deterministic rule-based engine.
+If the default/Gemini key is absent but an OpenRouter key is configured, ranking
+uses the first model in `ATS_OPENROUTER__MODELS`. If neither provider is
+available (or the AI call fails), the app ranks candidates with template
+reasoning via the deterministic In-App engine.
 
 ### Optional: recruiter copilot (chat)
 

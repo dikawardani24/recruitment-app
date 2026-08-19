@@ -197,7 +197,9 @@ the API tools (jobs, candidates, rankings).
 
 Configured with any OpenAI-compatible endpoint via `ATS_LLM__API_KEY` (defaults to
 Gemini), plus optional OpenRouter models (`ATS_OPENROUTER__API_KEY` +
-`ATS_OPENROUTER__MODELS`) selectable in the UI. Clients may also save their own
+`ATS_OPENROUTER__MODELS`) selectable in the UI. For ranking, OpenRouter is used
+when the default/Gemini key is absent, and deterministic In-App rules remain the
+fallback when neither provider is available or an AI call fails. Clients may also save their own
 API key in the app (Settings → API Key), which takes precedence per request.
 
 ```

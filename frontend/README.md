@@ -49,7 +49,7 @@ Both build scripts point the app at a backend API base URL. Pass
 to pick one explicitly, or let the script prompt from a menu of known backends
 (Local, Android emulator, deployed Render instance).
 
-Deployed to Vercel: https://web-2fxujs18i-dika-squad.vercel.app/ (see
+Deployed to Vercel: https://web-aoylxazet-dika-squad.vercel.app (see
 `frontend/scripts/deploy_vercel.sh`).
 
 ## Test
