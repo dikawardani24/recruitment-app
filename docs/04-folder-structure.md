@@ -32,21 +32,27 @@ backend/
 │   │   ├── job_repository.py / cv_repository.py / import_job_repository.py
 │   │   └── impl/             # Implementations over the datasources
 │   ├── usecase/              # Orchestration (one file per operation)
-│   │   ├── save_job, get_job, get_job_by_page, search_jobs, delete_job
+│   │   ├── save_job, get_job, get_job_by_page, search_jobs, search_candidates,
+│   │   │   delete_job, unified_search
 │   │   ├── import_cv_batch, list_cvs, delete_cv
 │   │   ├── rank_job, rank_cv, get_rankings
 │   │   ├── get_import_status
-│   │   └── semantic_search, reindex_embeddings   # RAG (opt-in)
+│   │   ├── semantic_search, reindex_embeddings   # RAG (opt-in)
+│   │   └── ask                                     # recruiter copilot chat
 │   ├── di/
-│   │   ├── injection.py      # Composition root (manual DI), cv_processor()
+│   │   ├── injection.py      # Composition root (manual DI), chat client/tools,
+│   │   │                     #   lazy RAG indexer, cv_processor()
 │   │   └── __init__.py
 │   ├── domain/               # Job, Candidate, ImportJob, Page, errors
 │   ├── routers/
-│   │   ├── jobs.py           # All /api/jobs/* endpoints
-│   │   └── search.py         # /api/search/semantic + /api/search/reindex
+│   │   ├── jobs.py           # /api/jobs/* endpoints
+│   │   ├── candidates.py     # /api/candidates/search
+│   │   ├── search.py         # /api/search (semantic, reindex, unified search)
+│   │   └── chat.py           # /api/chat, /api/chat/stream, /api/chat/models
 │   ├── parsers/              # File text extraction (_extract.py: PDF/DOCX/TXT)
 │   ├── skills/               # Skill dictionaries + matching (_match.py)
 │   ├── jd/                   # JD → structured requirements (_parser.py, _structure.py)
+│   ├── llm/                  # OpenAI-compatible chat client (_gate.py)
 │   ├── extraction/           # CV → profile (NER → LLM → rules)
 │   │   ├── _profile.py       # Profile dataclass + deterministic extraction
 │   │   ├── _orchestrator.py  # NER → LLM → Rules fallback chain
@@ -54,11 +60,18 @@ backend/
 │   ├── imports/              # Background CV processing
 │   │   ├── processor.py      # asyncio worker pool; DB-as-queue
 │   │   └── pipeline.py       # extract_and_profile orchestration
+│   ├── chat/                 # Recruiter copilot
+│   │   ├── _router.py        # deterministic query router (intent classification)
+│   │   ├── _tools.py         # API tools the copilot answers from
+│   │   ├── _answerer.py      # deterministic + reasoning answer builders
+│   │   ├── _prompt.py        # recruitment-scoped system prompts
+│   │   └── _client.py        # streaming LLM chat client (default + OpenRouter)
 │   ├── rag/                  # Semantic search / RAG (opt-in, off by default)
 │   │   ├── _embedder.py      # local bge-small embeddings (lazy-load)
 │   │   ├── _chunker.py       # candidate + job semantic chunks
 │   │   ├── _qdrant.py        # Qdrant wrapper (embedded/local mode by default)
-│   │   └── _indexer.py       # idempotent indexing, search, backfill
+│   │   ├── _indexer.py       # idempotent indexing, search, backfill
+│   │   └── _retriever.py     # evidence retrieval (copilot + semantic search)
 │   ├── ranking/              # Scoring, buckets, LLM reasoning
 │   │   ├── _scoring.py       # score_profile, bucket_for, rule_reasoning
 │   │   ├── _llm.py           # LLM-powered reasoning
@@ -67,6 +80,7 @@ backend/
 └── tests/
     ├── conftest.py
     ├── test_api.py           # endpoint smoke tests
+    ├── test_chat.py / test_chat_router.py  # copilot chat + SSE routing
     ├── test_imports.py       # background import flow
     ├── test_jd_skills.py     # JD structuring + skill matching
     ├── test_llm_extract.py   # LLM extraction (mocked)
@@ -83,27 +97,37 @@ Clean-architecture layout: `domain → data → controllers → screens`, with
 frontend/lib/
 ├── main.dart                 # app bootstrap: DI init, provider overrides, GoRouter
 ├── router.dart               # go_router route table (routes derived from AppRoute)
-├── providers.dart            # Riverpod providers (jobs, cvs, rankings, navigation)
+├── providers.dart            # Riverpod providers (jobs, cvs, rankings, chat, ...)
 ├── di.dart / di.config.dart  # get_it + injectable wiring (generated)
 │
 ├── domain/
 │   ├── models/               # Job, CandidateResult, JobPage, JobRequirements,
-│   │                         #   RankResponse, ImportResult
-│   ├── repositories/         # JobRepository, CandidateRepository interfaces
+│   │                         #   RankResponse, ImportResult, chat models,
+│   │                         #   ChatMessage, ChatResponse, ChatSource,
+│   │                         #   ChatStreamEvent, UnifiedSearchResult
+│   ├── repositories/         # JobRepository, CandidateRepository, SearchRepository,
+│   │                         #   ChatRepository interfaces
 │   └── usecases/             # create/delete/list/search job, list/delete/rank CV,
-│                             #   get job, get rankings, get import status
+│   │                         #   get job, get rankings, get import status,
+│   │                         #   unified_search, ask_chat, search_candidates
 │
 ├── data/
-│   ├── api/                  # ApiClient (dio), ApiPaths, mappers, response models
-│   ├── data_sources/         # JobApiDataSource, CandidateApiDataSource
-│   └── repositories/         # JobRepositoryImpl, CandidateRepositoryImpl
+│   ├── api/                  # ApiClient (dio), ApiPaths, mappers, response models,
+│   │                         #   chat_stream_events (SSE frame DTOs)
+│   ├── data_sources/         # JobApiDataSource, CandidateApiDataSource,
+│   │                         #   SearchApiDataSource, ChatApiDataSource
+│   └── repositories/         # JobRepositoryImpl, CandidateRepositoryImpl,
+│   │                         #   SearchRepositoryImpl, ChatRepositoryImpl
 │
 ├── controllers/              # Riverpod controllers/notifiers per screen
 │   ├── job_list_controller.dart
+│   ├── candidate_search_controller.dart
+│   ├── rankings_controller.dart
+│   ├── api_key_controller.dart
 │   ├── jobDetail/            # job_detail_controller, _notifier, _state
 │   ├── jobForm/              # job_form_controller, _state, picked_jd_file
-│   ├── rankings_controller.dart
 │   ├── upload/               # upload_controller, _state
+│   ├── chat/                 # chat_controller, _state
 │   └── deleteConfirm/        # delete_confirm_controller, _state
 │
 ├── navigation/
@@ -112,15 +136,20 @@ frontend/lib/
 │   └── go_router_navigator.dart  # go_router-backed AppNavigator
 │
 ├── screens/                  # One file per screen
+│   ├── intro_screen.dart
 │   ├── job_list_screen.dart
 │   ├── search_job_screen.dart
+│   ├── search_candidate_screen.dart
+│   ├── unified_search_screen.dart
 │   ├── job_form_screen.dart
 │   ├── job_detail_screen.dart
 │   ├── candidate_detail_screen.dart
 │   ├── rankings_screen.dart
+│   ├── chat_screen.dart
 │   ├── delete_confirm_screen.dart
 │   ├── action_result_screen.dart
-│   └── settings_screen.dart
+│   ├── settings_screen.dart
+│   └── api_key_screen.dart
 │
 ├── widgets/                  # Shared UI components
 │   ├── deferred_page.dart    # smooth page transitions (defer heavy builds)
@@ -128,8 +157,8 @@ frontend/lib/
 │   ├── job_card.dart, job_list_footer.dart, gradient_header.dart
 │   ├── section_card.dart, card_shape.dart, accent_chip.dart
 │   ├── cv_upload_overlay.dart, loading_overlay.dart, shimmer.dart
-│   ├── delete_background.dart, error_view.dart, rankings_summary.dart
-│   └── ...
+│   ├── candidate_tile.dart, delete_background.dart, error_view.dart
+│   └── rankings_summary.dart
 │
 └── theme/
     ├── app_theme.dart        # Material 3 ColorScheme

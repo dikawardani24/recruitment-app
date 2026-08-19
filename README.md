@@ -12,14 +12,17 @@ A simple recruiter tool:
 |-------|--------|
 | Backend | Python FastAPI (single process) |
 | Storage | SQLite + on-disk file uploads — no external services |
-| Ranking | Deterministic rule-based scoring, plus AI reasoning via any OpenAI-compatible LLM when `ATS_LLM__API_KEY` is set |
+| Ranking | Deterministic rule-based scoring, plus AI reasoning via any OpenAI-compatible LLM when a key is set |
+| Extraction | Rule-based by default; local BERT resume-NER or LLM (openai-compatible) when configured |
+| Recruiter copilot | Chat Q&A grounded in workspace data (RAG) + API tools; LLM-driven reasoning |
 | Semantic search (RAG) | Optional, opt-in: local `bge-small-en-v1.5` embeddings + Qdrant (embedded/local mode) |
 | Frontend | Flutter (Material 3) |
 
 ## Backend structure
 
 Clean-architecture monorepo (domain → use cases → repositories → datasources →
-routers). All HTTP endpoints live under `/api` in `routers/jobs.py`.
+routers). HTTP endpoints are split across `routers/jobs.py`, `routers/candidates.py`,
+`routers/search.py`, and `routers/chat.py`, all mounted under `/api`.
 
 ```
 backend/app/
@@ -35,28 +38,40 @@ backend/app/
 │   ├── impl/               # Repository implementations over the datasources
 │   └── *.py                # Repository interfaces (job, cv, import_job)
 │
-├── usecase/                # Orchestration: create/list/search/delete job,
-│   │                       #   import/list/delete CV, rank (job & CV), rankings
+├── usecase/                # Orchestration, one file per operation: jobs, CV
+│   │                       #   import, ranking, search, chat, unified search
 ├── di/
-│   └── injection.py        # Composition root (manual DI), background worker factory
+│   └── injection.py        # Composition root (manual DI), chat client/tools,
+│                           #   lazy RAG indexer, background worker factory
 │
 ├── domain/                 # Job, Candidate, ImportJob, Page, errors
 │
 ├── routers/
-│   └── jobs.py             # All /api endpoints
+│   ├── jobs.py             # /api/jobs/* (create/list/search/detail/delete/rank)
+│   ├── candidates.py       # /api/candidates/search
+│   ├── search.py           # /api/search (semantic, reindex, unified search)
+│   └── chat.py             # /api/chat, /api/chat/stream, /api/chat/models
 │
 ├── parsers/                # File text extraction (PDF, DOCX, TXT)
 ├── skills/                 # Skill dictionaries + matching
 ├── jd/                     # JD → structured requirements
+├── llm/                    # OpenAI-compatible chat client (gate, throttling, retries)
 ├── extraction/             # CV → profile (NER → LLM → rules fallback)
 ├── imports/                # Background CV processing
 │   ├── processor.py        # asyncio worker pool; DB acts as the queue
 │   └── pipeline.py         # extract_and_profile orchestration
+├── chat/                   # Recruiter copilot
+│   ├── _router.py          # deterministic query router (no LLM, saves quota)
+│   ├── _tools.py           # API tools the copilot answers from (jobs/candidates)
+│   ├── _answerer.py        # deterministic + reasoning answer builders
+│   ├── _prompt.py          # recruitment-scoped system prompts
+│   └── _client.py          # streaming LLM chat client (default + OpenRouter)
 ├── rag/                    # Semantic search / RAG (opt-in, off by default)
 │   ├── _embedder.py        # local bge-small embeddings (lazy-load, free)
 │   ├── _chunker.py         # candidate + job semantic chunks
 │   ├── _qdrant.py          # Qdrant wrapper (embedded local mode by default)
-│   └── _indexer.py         # idempotent indexing, search, backfill
+│   ├── _indexer.py         # idempotent indexing, search, backfill
+│   └── _retriever.py       # evidence retrieval for the copilot + semantic search
 └── ranking/                # Scoring, buckets, LLM reasoning
 ```
 
@@ -64,9 +79,11 @@ Each folder is a domain:
 - **parsers/** — reads files
 - **skills/** — knows what skills are
 - **jd/** — parses job descriptions
+- **llm/** — talks to LLM providers
 - **extraction/** — pulls structured data from resumes
 - **ranking/** — scores and ranks candidates
 - **imports/** — processes uploaded CVs in the background
+- **chat/** — answers recruiter questions (deterministic or LLM-grounded)
 - **rag/** — embeds jobs/CVs and answers semantic searches
 
 ## Quick start
@@ -124,8 +141,13 @@ Base URL: `http://localhost:8000/api`
 | POST | `/api/jobs/{id}/rank` | Rank all parsed CVs (LLM reasoning when configured) |
 | POST | `/api/jobs/{id}/cvs/{cv_id}/rank` | Rank a single CV |
 | GET | `/api/jobs/{id}/rankings` | Persisted rankings, best match first |
+| GET | `/api/candidates/search?keyword=` | Search candidates by name/skills/file across all jobs |
+| GET | `/api/search?keyword=` | Unified search over jobs and candidates |
 | POST | `/api/search/semantic` | Semantic search over jobs or candidates (RAG, opt-in) |
 | POST | `/api/search/reindex` | Build/rebuild the vector index (RAG, opt-in) |
+| GET | `/api/chat/models` | List available copilot chat models |
+| POST | `/api/chat` | Recruiter-copilot Q&A (deterministic or LLM + RAG grounded) |
+| POST | `/api/chat/stream` | SSE streaming variant of `/api/chat` |
 
 Plus `GET /health` (service health).
 
@@ -142,3 +164,26 @@ ATS_RAG__ENABLED=true
 ```
 
 See [docs/setup-and-testing.md](docs/setup-and-testing.md) for all RAG settings.
+
+## Recruiter copilot (chat, opt-in)
+
+A chat Q&A ("recruiter copilot") that answers questions about your workspace:
+counts, candidate search, rankings, comparisons, and general recruiting advice.
+Every question is classified first by a **deterministic router** (no LLM call) so
+greetings, chit-chat, and data lookups are answered with zero LLM usage; only
+reasoning-heavy questions make a single LLM call, grounded in RAG evidence and
+the API tools (jobs, candidates, rankings).
+
+Configured with any OpenAI-compatible endpoint via `ATS_LLM__API_KEY` (defaults to
+Gemini), plus optional OpenRouter models (`ATS_OPENROUTER__API_KEY` +
+`ATS_OPENROUTER__MODELS`) selectable in the UI. Clients may also save their own
+API key in the app (Settings → API Key), which takes precedence per request.
+
+```
+ATS_LLM__API_KEY=sk-...
+# ATS_OPENROUTER__API_KEY=sk-or-...
+# ATS_OPENROUTER__MODELS=qwen/qwen-2.5-72b-instruct
+```
+
+Without a key the chat reports `configured: false`; when RAG is disabled it still
+answers deterministic questions from the tools alone.

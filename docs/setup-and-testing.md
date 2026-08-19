@@ -10,6 +10,7 @@ How to run the application locally, run its test suites, and smoke-test the API 
 | Storage | SQLite (`backend/data/ats.db`) — no database server needed |
 | File uploads | Local disk (`backend/data/uploads/`) |
 | Ranking | Rule-based scoring always; AI reasoning via any OpenAI-compatible LLM when a key is set |
+| Recruiter copilot | Chat Q&A grounded in workspace data (RAG) + API tools; LLM-driven reasoning (opt-in) |
 | Semantic search (RAG) | Opt-in: local bge-small embeddings + Qdrant (embedded/local mode) |
 
 In the default (RAG-disabled) configuration no PostgreSQL, Qdrant, Redis, Docker,
