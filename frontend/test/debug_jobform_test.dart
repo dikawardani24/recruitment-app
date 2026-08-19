@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,32 +10,57 @@ import 'package:ai_ats/screens/job_form_screen.dart';
 
 class _FakeNavigator implements AppNavigator {
   var popCount = 0;
-  @override void goToJobs() {}
-  @override void goToJobForm() {}
-  @override void goToSettings() {}
-  @override void goToSearchJobs() {}
-  @override void goToSearchCandidates() {}
-  @override void goToSearch() {}
-  @override void goToChat() {}
+  @override
+  void goToJobs() {}
+  @override
+  void goToJobForm() {}
+  @override
+  void goToSettings() {}
+  @override
+  void goToSearchJobs() {}
+  @override
+  void goToSearchCandidates() {}
+  @override
+  void goToSearch() {}
+  @override
+  void goToChat() {}
 
   @override
   void goToApiKey() {}
 
   @override
   void goToHelp() {}
-  @override void goToJobDetail(String jobId) {}
-  @override void goToCandidateDetail(String jobId, CandidateResult candidate) {}
-  @override void goToRankings(RankingsScreenData data) {}
-  @override Future<bool> pushDeleteConfirm(DeleteConfirmArgs args) async => true;
-  @override Future<void> pushActionResult(ActionResultData data) async {}
-  @override void pop() => popCount++;
+  @override
+  void goToJobDetail(String jobId) {}
+  @override
+  void goToCandidateDetail(String jobId, CandidateResult candidate) {}
+  @override
+  void goToRankings(RankingsScreenData data) {}
+  @override
+  Future<bool> pushDeleteConfirm(DeleteConfirmArgs args) async => true;
+  @override
+  Future<void> pushActionResult(ActionResultData data) async {}
+  @override
+  void pop() => popCount++;
 }
 
 class _FakeCreateJob implements CreateJob {
   Object? error;
-  Future<Job> result = Future.value(const Job(id: 'j1', title: 'T', description: '', status: 'open', createdAt: 'x'));
+  Future<Job> result = Future.value(
+    const Job(
+      id: 'j1',
+      title: 'T',
+      description: '',
+      status: 'open',
+      createdAt: 'x',
+    ),
+  );
   @override
-  Future<Job> call({required String title, required String description, File? jdFile, String? jdFileName}) async {
+  Future<Job> call({
+    required String title,
+    required String description,
+    UploadFile? jdFile,
+  }) async {
     if (error != null) throw error!;
     return await result;
   }
@@ -51,10 +75,12 @@ void main() {
     getIt.registerLazySingleton<CreateJob>(() => _FakeCreateJob());
     addTearDown(() => getIt.unregister<CreateJob>());
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [navigatorProvider.overrideWithValue(navigator)],
-      child: const MaterialApp(home: JobFormScreen()),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [navigatorProvider.overrideWithValue(navigator)],
+        child: const MaterialApp(home: JobFormScreen()),
+      ),
+    );
     await tester.pump();
 
     await tester.enterText(find.byType(TextFormField).at(0), '  X  ');
@@ -62,6 +88,8 @@ void main() {
     await tester.tap(find.text('Create job'));
     await tester.pump();
     await tester.pump();
-    print('snackbar="Created \\"T\\""=${find.text('Created "T"').evaluate().length} failed=${find.textContaining('Failed to create job').evaluate().length}');
+    print(
+      'snackbar="Created \\"T\\""=${find.text('Created "T"').evaluate().length} failed=${find.textContaining('Failed to create job').evaluate().length}',
+    );
   });
 }

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -24,22 +24,26 @@ class JobFormController extends Notifier<JobFormState> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
+      withData: true,
     );
-    if (result == null || result.files.single.path == null) return null;
-    final file = File(result.files.single.path!);
-    final name = result.files.single.name;
+    if (result == null || result.files.isEmpty) return null;
+    final picked = result.files.single;
+    final bytes = picked.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+    final file = UploadFile(name: picked.name, bytes: bytes);
+    final name = file.name;
     final ext = name.split('.').last.toLowerCase();
 
     String? description;
     if (ext == 'txt' || ext == 'md' || ext == 'text') {
       try {
-        final content = await file.readAsString();
+        final content = utf8.decode(file.bytes, allowMalformed: true);
         if (content.trim().isNotEmpty) description = content;
       } catch (_) {
         // Ignore read errors — the user can still type the description.
       }
     }
-    return PickedJdFile(file: file, name: name, description: description);
+    return PickedJdFile(file: file, description: description);
   }
 
   /// Creates the job and reports the outcome with a snackbar. The form's own
@@ -49,8 +53,7 @@ class JobFormController extends Notifier<JobFormState> {
     BuildContext context, {
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -58,7 +61,6 @@ class JobFormController extends Notifier<JobFormState> {
         title: title,
         description: description,
         jdFile: jdFile,
-        jdFileName: jdFileName,
       );
       _showJobCreated(messenger, job);
     } catch (e) {
@@ -81,8 +83,7 @@ class JobFormController extends Notifier<JobFormState> {
   Future<Job> createJob({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     state = const JobFormState(
       submitting: true,
@@ -93,7 +94,6 @@ class JobFormController extends Notifier<JobFormState> {
         title: title,
         description: description,
         jdFile: jdFile,
-        jdFileName: jdFileName,
       );
       ref.invalidate(jobsProvider);
       ref.read(navigatorProvider).pop();

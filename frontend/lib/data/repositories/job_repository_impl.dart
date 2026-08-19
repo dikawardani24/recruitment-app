@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:injectable/injectable.dart';
 
 import '../../domain/models/job.dart';
 import '../../domain/models/job_page.dart';
 import '../../domain/models/job_requirements.dart';
+import '../../domain/models/upload_file.dart';
 import '../../domain/repositories/job_repository.dart';
 import '../api/response_models.dart';
 import '../data_sources/job_api_data_source.dart';
@@ -47,14 +46,12 @@ class JobRepositoryImpl implements JobRepository {
   Future<Job> createJob({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     final dto = await _dataSource.createJob(
       title: title,
       description: description,
       jdFile: jdFile,
-      jdFileName: jdFileName,
     );
     return _toJob(dto);
   }

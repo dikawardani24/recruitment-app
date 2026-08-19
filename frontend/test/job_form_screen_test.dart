@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,8 +58,7 @@ class _FakeCreateJob implements CreateJob {
   Future<Job> call({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     calls.add((title: title, description: description));
     final e = error;
@@ -70,12 +68,12 @@ class _FakeCreateJob implements CreateJob {
 }
 
 Job _job() => const Job(
-      id: 'j1',
-      title: 'Backend Engineer',
-      description: 'Build services',
-      status: 'open',
-      createdAt: '2026-08-06T14:05:00',
-    );
+  id: 'j1',
+  title: 'Backend Engineer',
+  description: 'Build services',
+  status: 'open',
+  createdAt: '2026-08-06T14:05:00',
+);
 
 void main() {
   late _FakeNavigator navigator;
@@ -135,7 +133,10 @@ void main() {
     createJob.result = gate.future;
     await pumpForm(tester);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Backend Engineer');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Backend Engineer',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'Build services');
 
     await tester.tap(find.text('Create job'));
@@ -186,7 +187,10 @@ void main() {
     createJob.error = Exception('network down');
     await pumpForm(tester);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Backend Engineer');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Backend Engineer',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'Build services');
     await tester.tap(find.text('Create job'));
     await tester.pump();

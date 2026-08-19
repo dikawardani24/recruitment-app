@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,8 +57,7 @@ class _FakeCreateJob implements CreateJob {
   Future<Job> call({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
+    UploadFile? jdFile,
   }) async {
     calls.add((title: title, description: description));
     final e = error;
@@ -81,11 +79,9 @@ class _SubmitHost extends ConsumerWidget {
         body: Builder(
           builder: (context) => Center(
             child: ElevatedButton(
-              onPressed: () => ref.read(jobFormControllerProvider.notifier).submit(
-                context,
-                title: title,
-                description: description,
-              ),
+              onPressed: () => ref
+                  .read(jobFormControllerProvider.notifier)
+                  .submit(context, title: title, description: description),
               child: const Text('submit'),
             ),
           ),
@@ -96,12 +92,12 @@ class _SubmitHost extends ConsumerWidget {
 }
 
 Job _job() => const Job(
-      id: 'j1',
-      title: 'Backend Engineer',
-      description: 'Build services',
-      status: 'open',
-      createdAt: '2026-08-06T14:05:00',
-    );
+  id: 'j1',
+  title: 'Backend Engineer',
+  description: 'Build services',
+  status: 'open',
+  createdAt: '2026-08-06T14:05:00',
+);
 
 void main() {
   late _FakeNavigator navigator;
@@ -118,8 +114,8 @@ void main() {
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [navigatorProvider.overrideWithValue(navigator)],
-      );
+    overrides: [navigatorProvider.overrideWithValue(navigator)],
+  );
 
   test('createJob shows the submitting state, then pops and resets', () async {
     final container = makeContainer();
@@ -161,7 +157,9 @@ void main() {
     expect(container.read(jobFormControllerProvider).submitting, isFalse);
   });
 
-  testWidgets('submit shows a confirmation snackbar on success', (tester) async {
+  testWidgets('submit shows a confirmation snackbar on success', (
+    tester,
+  ) async {
     createJob.result = Future.value(_job());
     final container = makeContainer();
     addTearDown(container.dispose);

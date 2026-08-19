@@ -1,7 +1,6 @@
 import 'package:injectable/injectable.dart';
-import 'dart:io';
-
 import '../models/job.dart';
+import '../models/upload_file.dart';
 import '../repositories/job_repository.dart';
 
 @Injectable()
@@ -13,13 +12,10 @@ class CreateJob {
   Future<Job> call({
     required String title,
     required String description,
-    File? jdFile,
-    String? jdFileName,
-  }) =>
-      _repository.createJob(
-        title: title,
-        description: description,
-        jdFile: jdFile,
-        jdFileName: jdFileName,
-      );
+    UploadFile? jdFile,
+  }) => _repository.createJob(
+    title: title,
+    description: description,
+    jdFile: jdFile,
+  );
 }
