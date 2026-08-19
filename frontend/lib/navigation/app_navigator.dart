@@ -78,8 +78,6 @@ abstract class AppNavigator {
 
   void goToHelp();
 
-  void goToHelpCategory(String categoryId);
-
   void goToChat();
 
   void goToJobDetail(String jobId);

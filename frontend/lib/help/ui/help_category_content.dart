@@ -1,61 +1,30 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/deferred_page.dart';
-import '../../widgets/gradient_header.dart';
 import '../../widgets/section_card.dart';
-import '../data/help_content.dart';
 import '../models/help_item.dart';
 import 'faq_item.dart';
 
-/// Detail view for one Help & Guidance category: its guidance sections and
-/// its expandable FAQ items.
-class HelpCategoryPage extends StatelessWidget {
-  final String categoryId;
-
-  const HelpCategoryPage({super.key, required this.categoryId});
-
-  @override
-  Widget build(BuildContext context) {
-    final category = helpCategoryById(categoryId);
-    if (category == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Category not found.')),
-      );
-    }
-    return DeferredPage(
-      child: _HelpCategoryContent(category: category),
-    );
-  }
-}
-
-class _HelpCategoryContent extends StatelessWidget {
+/// Renders all guidance sections and FAQ groups of a [HelpCategory] in a
+/// column. Used as the expanded body of the category cards on the help page.
+class HelpCategoryContent extends StatelessWidget {
   final HelpCategory category;
 
-  const _HelpCategoryContent({required this.category});
+  const HelpCategoryContent({super.key, required this.category});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-        children: [
-          GradientHeader(
-            icon: category.icon,
-            title: category.title,
-            subtitle: category.subtitle,
-          ),
-          for (final section in category.sections) ...[
-            const SizedBox(height: 12),
-            _SectionCard(section: section),
-          ],
-          for (final group in category.faqGroups) ...[
-            const SizedBox(height: 12),
-            _FaqGroupCard(group: group),
-          ],
+    final blocks = <Widget>[
+      for (final section in category.sections) _SectionCard(section: section),
+      for (final group in category.faqGroups) _FaqGroupCard(group: group),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < blocks.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          blocks[i],
         ],
-      ),
+      ],
     );
   }
 }

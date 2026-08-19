@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/card_shape.dart';
 import '../models/help_item.dart';
+import 'help_category_content.dart';
 
-/// A tappable card for one Help & Guidance category on the help home.
-class HelpCategoryCard extends StatelessWidget {
+/// An expandable card for a Help & Guidance category. Tapping the header
+/// reveals the category's guidance sections and FAQ items in place instead of
+/// navigating to a separate page.
+class HelpCategoryExpandable extends StatelessWidget {
   final HelpCategory category;
-  final VoidCallback onTap;
 
-  const HelpCategoryCard({super.key, required this.category, required this.onTap});
+  const HelpCategoryExpandable({super.key, required this.category});
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +21,14 @@ class HelpCategoryCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: cardShape(theme),
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        iconColor: scheme.primary,
+        collapsedIconColor: scheme.onSurfaceVariant,
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -37,7 +44,7 @@ class HelpCategoryCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(category.subtitle, style: theme.textTheme.bodySmall),
-        trailing: const Icon(Icons.chevron_right),
+        children: [HelpCategoryContent(category: category)],
       ),
     );
   }

@@ -136,6 +136,11 @@ frontend/lib/
 │   ├── app_navigator.dart    # AppNavigator interface + shared data types
 │   └── go_router_navigator.dart  # go_router-backed AppNavigator
 │
+├── help/                     # Help & Guidance feature
+│   ├── models/               # content model types (sections, blocks, FAQs)
+│   ├── data/                 # static help content + search (no UI strings)
+│   └── ui/                   # help page, expandable category cards, FAQ items
+│
 ├── screens/                  # One file per screen
 │   ├── intro_screen.dart
 │   ├── job_list_screen.dart

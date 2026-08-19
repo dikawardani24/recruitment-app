@@ -17,8 +17,10 @@ architecture: `domain → data → controllers → screens`, with `navigation`,
   queries jobs and candidates at once.
 - **Chat** — recruiter copilot with streaming (SSE) answers, source citations,
   and candidate result cards.
-- **Settings** — light/dark theme and per-provider API-key configuration for the
-  chat models.
+- **Settings** — light/dark theme, per-provider API-key configuration for the
+  chat models, and a **Help & Guidance** center. Help is data-driven
+  (`lib/help/`): categories expand in place to show guidance sections and
+  FAQ answers, and a local search filters categories and FAQ entries live.
 
 ## Run
 
@@ -39,7 +41,7 @@ Start the backend first — see [../docs/setup-and-testing.md](../docs/setup-and
 
 ```bash
 flutter analyze
-flutter test   # ~122 tests (use flutter test, not dart test)
+flutter test   # ~128 tests (use flutter test, not dart test)
 ```
 
 ## Structure
@@ -54,6 +56,7 @@ lib/
 ├── data/            # dio ApiClient, API paths, data sources, repo impls
 ├── controllers/     # Riverpod controllers/notifiers per screen
 ├── navigation/      # AppRoute enum, AppNavigator interface, go_router impl
+├── help/            # Help & Guidance: models, static content data, UI
 ├── screens/         # one file per screen
 ├── widgets/         # shared UI components
 └── theme/           # Material 3 theme + theme-mode controller

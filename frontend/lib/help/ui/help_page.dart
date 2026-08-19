@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../navigation/app_navigator.dart';
-import '../../providers.dart';
 import '../../widgets/deferred_page.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/section_card.dart';
 import '../data/help_content.dart';
 import '../models/help_item.dart';
 import 'faq_item.dart';
-import 'help_category_card.dart';
+import 'help_category_expandable.dart';
 
-/// Help & Guidance home: a search field plus all categories. Search filters
-/// the static content locally and returns matching categories + FAQ entries.
-class HelpPage extends HookConsumerWidget {
+/// Help & Guidance home: a search field plus all categories as expandable
+/// cards. Search filters the static content locally and returns matching
+/// categories + FAQ entries.
+class HelpPage extends HookWidget {
   const HelpPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final navigator = ref.read(navigatorProvider);
+  Widget build(BuildContext context) {
     final query = useState('');
     final trimmed = query.value.trim();
     final results = searchHelp(trimmed);
@@ -55,12 +52,8 @@ class HelpPage extends HookConsumerWidget {
             ),
             Expanded(
               child: trimmed.isEmpty
-                  ? _HelpHome(navigator: navigator)
-                  : _SearchResults(
-                      query: trimmed,
-                      results: results,
-                      navigator: navigator,
-                    ),
+                  ? const _HelpHome()
+                  : _SearchResults(query: trimmed, results: results),
             ),
           ],
         ),
@@ -70,9 +63,7 @@ class HelpPage extends HookConsumerWidget {
 }
 
 class _HelpHome extends StatelessWidget {
-  final AppNavigator navigator;
-
-  const _HelpHome({required this.navigator});
+  const _HelpHome();
 
   @override
   Widget build(BuildContext context) {
@@ -88,10 +79,7 @@ class _HelpHome extends StatelessWidget {
         for (final category in helpCategories)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: HelpCategoryCard(
-              category: category,
-              onTap: () => navigator.goToHelpCategory(category.id),
-            ),
+            child: HelpCategoryExpandable(category: category),
           ),
       ],
     );
@@ -101,13 +89,8 @@ class _HelpHome extends StatelessWidget {
 class _SearchResults extends StatelessWidget {
   final String query;
   final HelpSearchResults results;
-  final AppNavigator navigator;
 
-  const _SearchResults({
-    required this.query,
-    required this.results,
-    required this.navigator,
-  });
+  const _SearchResults({required this.query, required this.results});
 
   @override
   Widget build(BuildContext context) {
@@ -135,10 +118,7 @@ class _SearchResults extends StatelessWidget {
           for (final category in results.categories)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: HelpCategoryCard(
-                category: category,
-                onTap: () => navigator.goToHelpCategory(category.id),
-              ),
+              child: HelpCategoryExpandable(category: category),
             ),
         ],
         if (results.faqHits.isNotEmpty) ...[

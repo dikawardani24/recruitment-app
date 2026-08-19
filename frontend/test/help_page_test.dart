@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ai_ats/di.dart';
 import 'package:ai_ats/help/data/help_content.dart';
-import 'package:ai_ats/help/ui/help_category_page.dart';
 import 'package:ai_ats/help/ui/help_page.dart';
 import 'package:ai_ats/main.dart';
 import 'package:ai_ats/providers.dart';
@@ -67,21 +66,6 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Help category content is a lazy ListView; scroll until [text] is built.
-  Future<void> scrollInCategory(WidgetTester tester, String text) async {
-    await tester.scrollUntilVisible(
-      find.text(text),
-      300,
-      scrollable: find
-          .descendant(
-            of: find.byType(HelpCategoryPage),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
-  }
-
   testWidgets('settings shows a Help & Guidance entry that opens the help page', (
     tester,
   ) async {
@@ -108,20 +92,24 @@ void main() {
     }
   });
 
-  testWidgets('tapping a category opens its guidance content', (tester) async {
+  testWidgets('tapping a category expands its guidance content in place', (
+    tester,
+  ) async {
     await pumpApp(tester);
     await openHelp(tester);
+
+    // Content is hidden until the category is expanded.
+    expect(find.text('Candidate status'), findsNothing);
 
     await tester.tap(find.text('Candidate Ranking'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(HelpCategoryPage), findsOneWidget);
-    await scrollInCategory(tester, 'Candidate status');
     expect(find.text('Candidate status'), findsOneWidget);
     expect(
       find.textContaining('MET \u2014 the candidate sufficiently matches'),
       findsOneWidget,
     );
+    expect(find.byType(HelpPage), findsOneWidget);
   });
 
   testWidgets('FAQ items expand to reveal the answer', (tester) async {
@@ -131,10 +119,17 @@ void main() {
     await tester.tap(find.text('Candidate Ranking'));
     await tester.pumpAndSettle();
 
-    await scrollInCategory(
-      tester,
-      'Why does an unrelated CV receive a score of 0?',
+    await tester.scrollUntilVisible(
+      find.text('Why does an unrelated CV receive a score of 0?'),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(HelpPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Why does an unrelated CV receive a score of 0?'));
     await tester.pumpAndSettle();
@@ -166,16 +161,5 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('No results for'), findsOneWidget);
-  });
-
-  testWidgets('unknown category route shows a not-found message', (tester) async {
-    await pumpApp(tester);
-
-    final app = tester.widget<AtsApp>(find.byType(AtsApp));
-    app.router.push('/settings/help/nope');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(HelpCategoryPage), findsOneWidget);
-    expect(find.text('Category not found.'), findsOneWidget);
   });
 }

@@ -454,11 +454,3 @@ String _categoryText(HelpCategory category) {
   }
   return buffer.toString();
 }
-
-/// Resolves a category by id, or null when unknown.
-HelpCategory? helpCategoryById(String id) {
-  for (final category in helpCategories) {
-    if (category.id == id) return category;
-  }
-  return null;
-}

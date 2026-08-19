@@ -35,9 +35,6 @@ class _FakeNavigator implements AppNavigator {
 
   @override
   void goToHelp() {}
-
-  @override
-  void goToHelpCategory(String categoryId) {}
   @override
   void goToJobDetail(String jobId) {}
   @override
