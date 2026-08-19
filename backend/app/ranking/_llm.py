@@ -86,26 +86,30 @@ Rules:
 """
 
 
-async def rank_with_llm(settings: Settings, job: dict, candidates: list[dict]) -> list[LLMReasoning]:
+async def rank_with_llm(
+    settings: Settings,
+    job: dict,
+    candidates: list[dict],
+    api_key: str,
+    model: str,
+    base_url: str | None = None,
+) -> list[LLMReasoning]:
     """Rank candidates with an LLM. Raises LLMRankingError on any failure so the
-    caller can fall back to deterministic scoring."""
-    if not settings.ranking_llm_enabled:
-        raise LLMRankingError("llm_not_configured")
-
+    caller can fall back to other providers or deterministic scoring."""
     import openai
 
     kwargs: dict = {
-        "api_key": settings.ranking_llm_api_key,
+        "api_key": api_key,
         "timeout": settings.llm_timeout_ms / 1000.0,
     }
-    if settings.ranking_llm_base_url:
-        kwargs["base_url"] = settings.ranking_llm_base_url
+    if base_url:
+        kwargs["base_url"] = base_url
     client = openai.AsyncOpenAI(**kwargs)
 
     try:
         response = await bounded_retry(
             lambda: client.chat.completions.create(
-                model=settings.ranking_llm_model,
+                model=model,
                 temperature=0.2,
                 messages=[
                     {

@@ -107,13 +107,13 @@ class _FakeDetailNotifier extends JobDetailNotifier {
   }
 
   @override
-  Future<RankResponse> rankJob(String jobId) async {
+  Future<RankResponse> rankJob(String jobId, {String? apiKey}) async {
     rankedJobs.add(jobId);
     return const RankResponse(source: 'rules', results: []);
   }
 
   @override
-  Future<void> rankCv(String jobId, String cvId) async {
+  Future<void> rankCv(String jobId, String cvId, {String? apiKey}) async {
     rankedCvs.add(cvId);
     final index = cvs.indexWhere((c) => c.cvId == cvId);
     if (index >= 0) {

@@ -133,11 +133,18 @@ async def list_cvs(job_id: str) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+from pydantic import BaseModel, Field
+
+
+class RankRequest(BaseModel):
+    api_key: str | None = Field(None, description="Optional per-request AI API key")
+
+
 @router.post("/jobs/{job_id}/rank")
-async def rank_job(job_id: str) -> dict:
+async def rank_job(job_id: str, payload: RankRequest = RankRequest()) -> dict:
     """Score + rank every parsed CV, with reasoning (LLM when configured, else rules)."""
     try:
-        return await rank_job_use_case().execute(job_id)
+        return await rank_job_use_case().execute(job_id, api_key=payload.api_key)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -145,10 +152,10 @@ async def rank_job(job_id: str) -> dict:
 
 
 @router.post("/jobs/{job_id}/cvs/{cv_id}/rank")
-async def rank_cv(job_id: str, cv_id: str) -> dict:
+async def rank_cv(job_id: str, cv_id: str, payload: RankRequest = RankRequest()) -> dict:
     """Score + rank a single CV against the job's requirements."""
     try:
-        return await rank_cv_use_case().execute(job_id, cv_id)
+        return await rank_cv_use_case().execute(job_id, cv_id, api_key=payload.api_key)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

@@ -52,17 +52,19 @@ class CandidateApiDataSource {
     return _client.get(ApiPaths.cvs(jobId), parse: _resultList);
   }
 
-  Future<RankResponseDto> rankJob(String jobId) {
+  Future<RankResponseDto> rankJob(String jobId, {String? apiKey}) {
     return _client.post(
       ApiPaths.rank(jobId),
+      data: {'api_key': apiKey},
       parse: (data) =>
           RankResponseMapper.fromJson(data as Map<String, dynamic>),
     );
   }
 
-  Future<CandidateResponse> rankCv(String jobId, String cvId) {
+  Future<CandidateResponse> rankCv(String jobId, String cvId, {String? apiKey}) {
     return _client.post(
       ApiPaths.cvRank(jobId, cvId),
+      data: {'api_key': apiKey},
       parse: (data) => CandidateResponseMapper.fromJson(
         (data as Map<String, dynamic>)['result'] as Map<String, dynamic>,
       ),

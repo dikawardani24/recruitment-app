@@ -22,7 +22,7 @@ from app.config import Settings
 from app.rag._indexer import EmbeddingIndexer
 from app.rag._retriever import retrieve_evidence
 
-logger = logging.getLogger("ats.chat")
+logger = logging.getLogger("ai_ats.chat")
 
 _CHITCHAT_REPLIES = {
     "greeting": (

@@ -90,10 +90,10 @@ class JobDetailNotifier extends Notifier<JobDetailState> {
 
   /// Ranks every candidate and returns the response so the controller can
   /// navigate to the ranking page.
-  Future<RankResponse> rankJob(String jobId) async {
+  Future<RankResponse> rankJob(String jobId, {String? apiKey}) async {
     _start('Ranking candidates…');
     try {
-      final response = await getIt<RankJob>()(jobId);
+      final response = await getIt<RankJob>()(jobId, apiKey: apiKey);
       ref.invalidate(rankingsProvider(jobId));
       await refreshCvs(jobId);
       return response;
@@ -103,8 +103,8 @@ class JobDetailNotifier extends Notifier<JobDetailState> {
   }
 
   /// Ranks a single CV and refreshes the CV list and rankings.
-  Future<void> rankCv(String jobId, String cvId) async {
-    await getIt<RankCv>()(jobId, cvId);
+  Future<void> rankCv(String jobId, String cvId, {String? apiKey}) async {
+    await getIt<RankCv>()(jobId, cvId, apiKey: apiKey);
     ref.invalidate(cvsProvider(jobId));
     ref.invalidate(rankingsProvider(jobId));
     await ref.read(cvsProvider(jobId).future);

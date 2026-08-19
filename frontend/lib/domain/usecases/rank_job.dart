@@ -8,5 +8,6 @@ class RankJob {
 
   final CandidateRepository _repository;
 
-  Future<RankResponse> call(String jobId) => _repository.rankJob(jobId);
+  Future<RankResponse> call(String jobId, {String? apiKey}) =>
+      _repository.rankJob(jobId, apiKey: apiKey);
 }

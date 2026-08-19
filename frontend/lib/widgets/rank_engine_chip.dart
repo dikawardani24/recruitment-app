@@ -12,7 +12,7 @@ class RankEngineChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final by = rankedBy;
     if (by == null || by.isEmpty) return const SizedBox.shrink();
-    final isLlm = by == 'llm';
+    final isLlm = by.startsWith('llm');
     final color = isLlm ? Colors.deepPurple : Colors.blueGrey;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

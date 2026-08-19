@@ -97,7 +97,7 @@ class _FakeDetailNotifier extends JobDetailNotifier {
   }
 
   @override
-  Future<void> rankCv(String jobId, String cvId) async {
+  Future<void> rankCv(String jobId, String cvId, {String? apiKey}) async {
     rankedCvs.add(cvId);
     final index = cvs.indexWhere((c) => c.cvId == cvId);
     if (index >= 0) {

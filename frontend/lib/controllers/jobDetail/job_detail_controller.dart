@@ -9,6 +9,7 @@ import '../../screens/delete_confirm_screen.dart';
 import '../../widgets/cv_upload_overlay.dart';
 import '../upload/upload_controller.dart';
 import '../deleteConfirm/delete_confirm_controller.dart';
+import '../api_key_controller.dart';
 import 'job_detail_notifier.dart';
 
 /// Owns every job detail action end to end: confirmations, API calls (via
@@ -56,7 +57,11 @@ class JobDetailController {
     }
 
     try {
-      final response = await _notifier.rankJob(jobId);
+      final keys = _ref.read(apiKeyProvider);
+      final apiKey =
+          keys[ApiKeyProvider.gemini.id] ?? keys[ApiKeyProvider.openrouter.id];
+
+      final response = await _notifier.rankJob(jobId, apiKey: apiKey);
       if (!context.mounted) return;
       final title = _ref.read(jobProvider(jobId)).value?.title ?? 'Job';
       _ref
@@ -94,7 +99,11 @@ class JobDetailController {
       return false;
     }
     try {
-      await _notifier.rankCv(jobId, cvId);
+      final keys = _ref.read(apiKeyProvider);
+      final apiKey =
+          keys[ApiKeyProvider.gemini.id] ?? keys[ApiKeyProvider.openrouter.id];
+
+      await _notifier.rankCv(jobId, cvId, apiKey: apiKey);
       return true;
     } catch (e) {
       if (context.mounted) {

@@ -8,6 +8,6 @@ class RankCv {
 
   final CandidateRepository _repository;
 
-  Future<CandidateResult> call(String jobId, String cvId) =>
-      _repository.rankCv(jobId, cvId);
+  Future<CandidateResult> call(String jobId, String cvId, {String? apiKey}) =>
+      _repository.rankCv(jobId, cvId, apiKey: apiKey);
 }

@@ -28,7 +28,7 @@ enum RankingEngine {
   final String description;
 
   static RankingEngine fromSource(String? source) =>
-      source == 'llm' ? RankingEngine.ai : RankingEngine.inApp;
+      (source?.startsWith('llm') == true) ? RankingEngine.ai : RankingEngine.inApp;
 }
 
 /// Shows the label/color/icon used for a given ranked-by source value.
@@ -105,7 +105,7 @@ class RankedByInfoDialog extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
-            _CurrentEngineCard(engine: current),
+            _CurrentEngineCard(engine: current, source: currentRankedBy),
             const SizedBox(height: 20),
             Text('Ranking engines', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -146,12 +146,16 @@ class RankedByInfoDialog extends StatelessWidget {
 
 class _CurrentEngineCard extends StatelessWidget {
   final RankingEngine engine;
+  final String? source;
 
-  const _CurrentEngineCard({required this.engine});
+  const _CurrentEngineCard({required this.engine, this.source});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final modelName =
+        source != null && source!.startsWith('llm:') ? source!.substring(4) : null;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -172,7 +176,7 @@ class _CurrentEngineCard extends StatelessWidget {
                   style: theme.textTheme.bodySmall,
                 ),
                 Text(
-                  engine.label,
+                  engine.label + (modelName != null ? ' ($modelName)' : ''),
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: engine.color,
                     fontWeight: FontWeight.w600,

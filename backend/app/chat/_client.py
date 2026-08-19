@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 
 from app.config import ChatModelOption, Settings
@@ -21,6 +22,7 @@ class ToolCall:
 
 
 MAX_TOOL_ROUNDS = 3
+logger = logging.getLogger("ai_ats.chat.client")
 
 
 class ChatClient:
@@ -200,6 +202,7 @@ class ChatClient:
         runtime_api_key: str | None = None,
     ) -> str:
         if not self.settings.chat_enabled_with_key(runtime_api_key):
+            logger.warning("chat AI unavailable: no provider API key configured")
             raise ChatError("chat_not_configured")
         last_error: ChatError | None = None
         for option in self._attempts(model_id, runtime_api_key):
@@ -207,6 +210,10 @@ class ChatClient:
                 return await self._complete_with(option, system, user, tools, execute_tool)
             except ChatError as exc:
                 last_error = exc
+                logger.warning(
+                    "chat AI provider failed provider=%s model=%s error=%s",
+                    option.provider, option.model, exc,
+                )
         assert last_error is not None
         raise last_error
 
@@ -269,6 +276,7 @@ class ChatClient:
         Provider failover happens before any text is sent: if establishing the
         stream fails, the next [ChatClient._attempts] option is tried."""
         if not self.settings.chat_enabled_with_key(runtime_api_key):
+            logger.warning("chat AI unavailable: no provider API key configured")
             raise ChatError("chat_not_configured")
         last_error: ChatError | None = None
         for option in self._attempts(model_id, runtime_api_key):
@@ -280,6 +288,10 @@ class ChatClient:
                 return
             except ChatError as exc:
                 last_error = exc
+                logger.warning(
+                    "chat AI stream provider failed provider=%s model=%s error=%s",
+                    option.provider, option.model, exc,
+                )
         assert last_error is not None
         raise last_error
 

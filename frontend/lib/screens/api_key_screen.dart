@@ -176,8 +176,8 @@ class _HelpCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'API keys allow the Copilot to connect to AI models directly using your account. '
-              'This overrides server defaults and provides a more personalized experience.',
+              'API keys allow the app to connect to AI models directly using your account. '
+              'This overrides server defaults for both the Recruiter Copilot and Candidate Ranking.',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 16),

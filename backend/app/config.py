@@ -153,31 +153,73 @@ class Settings:
     def llm_enabled(self) -> bool:
         return bool(self.llm_api_key)
 
-    @property
-    def ranking_llm_enabled(self) -> bool:
-        """Whether ranking has an AI provider available.
+    def ranking_llm_enabled(self, runtime_key: str | None = None) -> bool:
+        """Whether ranking has an AI provider available."""
+        return bool(self.llm_api_key or self.openrouter_api_key or runtime_key)
 
-        Ranking prefers the configured default LLM (Gemini by default). If it
-        is not configured, the first configured OpenRouter model is used. The
-        ranking service still falls back to deterministic rules if this call
-        fails.
+    def ranking_attempts(self, runtime_key: str | None = None) -> list[dict]:
+        """Return the list of AI provider configurations to attempt for ranking,
+        in priority order.
         """
-        return bool(self.llm_api_key or self.openrouter_api_key)
+        if runtime_key:
+            # A client-supplied key pins ranking to a single provider.
+            is_or = runtime_key.startswith("sk-or-")
+            return [
+                {
+                    "api_key": runtime_key,
+                    "model": (
+                        self.openrouter_models[0]
+                        if is_or and self.openrouter_models
+                        else self.llm_model
+                    ),
+                    "base_url": self.openrouter_base_url if is_or else self.llm_base_url,
+                    "provider": "runtime",
+                }
+            ]
 
-    @property
-    def ranking_llm_api_key(self) -> str | None:
-        return self.llm_api_key or self.openrouter_api_key
+        attempts = []
+        if self.llm_api_key:
+            attempts.append(
+                {
+                    "api_key": self.llm_api_key,
+                    "model": self.llm_model,
+                    "base_url": self.llm_base_url,
+                    "provider": "default",
+                }
+            )
+        if self.openrouter_api_key:
+            attempts.append(
+                {
+                    "api_key": self.openrouter_api_key,
+                    "model": (
+                        self.openrouter_models[0]
+                        if self.openrouter_models
+                        else self.llm_model
+                    ),
+                    "base_url": self.openrouter_base_url,
+                    "provider": "openrouter",
+                }
+            )
+        return attempts
 
-    @property
-    def ranking_llm_base_url(self) -> str | None:
+    def ranking_llm_api_key(self, runtime_key: str | None = None) -> str | None:
+        return runtime_key or self.llm_api_key or self.openrouter_api_key
+
+    def ranking_llm_base_url(self, runtime_key: str | None = None) -> str | None:
+        if runtime_key:
+            # Simple heuristic: OpenRouter keys usually start with sk-or-
+            if runtime_key.startswith("sk-or-"):
+                return self.openrouter_base_url
+            return self.llm_base_url
         if self.llm_api_key:
             return self.llm_base_url
         if self.openrouter_api_key:
             return self.openrouter_base_url
         return None
 
-    @property
-    def ranking_llm_model(self) -> str:
+    def ranking_llm_model(self, runtime_key: str | None = None) -> str:
+        if runtime_key and runtime_key.startswith("sk-or-"):
+            return self.openrouter_models[0] if self.openrouter_models else self.llm_model
         if self.llm_api_key:
             return self.llm_model
         return self.openrouter_models[0] if self.openrouter_models else self.llm_model

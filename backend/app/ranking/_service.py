@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from app.config import Settings
 from app.extraction import Profile
-from app.ranking._llm import LLMRankingError, rank_with_llm
+from app.ranking._llm import LLMRankingError, LLMReasoning, rank_with_llm
 from app.ranking._relevance import NOT_MET, evaluate_relevance
 from app.ranking._scoring import bucket_for, rule_reasoning, score_profile
 
 _NOT_MET_BUCKET = "not_met"
+logger = logging.getLogger("ai_ats.ranking")
 _NOT_MET_EXPLANATION = "Candidate's professional background is not relevant to this job."
 
 
@@ -23,7 +25,13 @@ class RankingService:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    async def rank(self, requirements: dict, profiles: list[Profile], cvs: list[dict]) -> tuple[list[dict], str]:
+    async def rank(
+        self,
+        requirements: dict,
+        profiles: list[Profile],
+        cvs: list[dict],
+        api_key: str | None = None,
+    ) -> tuple[list[dict], str]:
         relevance = [evaluate_relevance(profiles[i], requirements) for i in range(len(profiles))]
         relevant_idx = [i for i, r in enumerate(relevance) if r["classification"] != NOT_MET]
 
@@ -31,8 +39,10 @@ class RankingService:
             cvs[i]["id"]: score_profile(profiles[i], requirements, self.settings)
             for i in relevant_idx
         }
-        llm_rankings = await self._llm_rank(requirements, [profiles[i] for i in relevant_idx])
-        source = "llm" if llm_rankings is not None else "rules"
+        llm_rankings, model_used = await self._llm_rank(
+            requirements, [profiles[i] for i in relevant_idx], api_key=api_key
+        )
+        source = f"llm:{model_used}" if llm_rankings is not None else "rules"
 
         ranked = []
         if llm_rankings:
@@ -60,17 +70,38 @@ class RankingService:
         ranked.sort(key=_sort_key, reverse=True)
         return ranked, source
 
-    async def _llm_rank(self, requirements: dict, profiles: list[Profile]):
-        if not self.settings.ranking_llm_enabled or not profiles:
-            return None
-        try:
-            return await rank_with_llm(
-                self.settings,
-                _flatten_requirements(requirements),
-                [p.as_dict() for p in profiles],
-            )
-        except LLMRankingError:
-            return None
+    async def _llm_rank(
+        self, requirements: dict, profiles: list[Profile], api_key: str | None = None
+    ) -> tuple[list[LLMReasoning] | None, str | None]:
+        if not self.settings.ranking_llm_enabled(api_key) or not profiles:
+            if profiles:
+                logger.warning(
+                    "ranking AI unavailable: no provider API key configured; using In-App rules"
+                )
+            return None, None
+
+        attempts = self.settings.ranking_attempts(api_key)
+        for i, config in enumerate(attempts):
+            try:
+                res = await rank_with_llm(
+                    self.settings,
+                    _flatten_requirements(requirements),
+                    [p.as_dict() for p in profiles],
+                    api_key=config["api_key"],
+                    model=config["model"],
+                    base_url=config["base_url"],
+                )
+                return res, config["model"]
+            except LLMRankingError as exc:
+                is_last = i == len(attempts) - 1
+                level = logging.ERROR if is_last else logging.WARNING
+                msg = (
+                    "AI ranking failed! provider=%s model=%s error=%s. "
+                    + ("Falling back to deterministic In-App rules." if is_last else "Trying fallback provider...")
+                )
+                logger.log(level, msg, config["provider"], config["model"], exc)
+
+        return None, None
 
 
 def _not_met_entry(cv: dict, requirements: dict, relevance: dict) -> dict:

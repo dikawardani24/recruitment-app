@@ -21,7 +21,7 @@ class RankCv:
         self.cv_repo = cv_repo
         self.settings = settings
 
-    async def execute(self, job_id: str, cv_id: str) -> dict:
+    async def execute(self, job_id: str, cv_id: str, api_key: str | None = None) -> dict:
         job = await self.repo.get_by_id(job_id)
         if job is None:
             raise NotFoundError("job_not_found")
@@ -37,7 +37,7 @@ class RankCv:
 
         profile = Profile.from_cv(cv.as_dict())
         ranked, source = await RankingService(self.settings).rank(
-            requirements, [profile], [cv.as_dict()]
+            requirements, [profile], [cv.as_dict()], api_key=api_key
         )
         item = ranked[0]
         item["status"] = "ranked"

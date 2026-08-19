@@ -62,8 +62,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
   }
 
   @override
-  Future<RankResponse> rankJob(String jobId) async {
-    final dto = await _dataSource.rankJob(jobId);
+  Future<RankResponse> rankJob(String jobId, {String? apiKey}) async {
+    final dto = await _dataSource.rankJob(jobId, apiKey: apiKey);
     return RankResponse(
       source: dto.source,
       results: dto.results.map(_toCandidate).toList(),
@@ -71,8 +71,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
   }
 
   @override
-  Future<CandidateResult> rankCv(String jobId, String cvId) async {
-    return _toCandidate(await _dataSource.rankCv(jobId, cvId));
+  Future<CandidateResult> rankCv(String jobId, String cvId, {String? apiKey}) async {
+    return _toCandidate(await _dataSource.rankCv(jobId, cvId, apiKey: apiKey));
   }
 
   @override

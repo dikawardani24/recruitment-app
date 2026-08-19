@@ -18,9 +18,9 @@ abstract class CandidateRepository {
 
   Future<List<CandidateResult>> listCvs(String jobId);
 
-  Future<RankResponse> rankJob(String jobId);
+  Future<RankResponse> rankJob(String jobId, {String? apiKey});
 
-  Future<CandidateResult> rankCv(String jobId, String cvId);
+  Future<CandidateResult> rankCv(String jobId, String cvId, {String? apiKey});
 
   Future<List<CandidateResult>> getRankings(String jobId);
 
