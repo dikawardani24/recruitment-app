@@ -1,0 +1,44 @@
+Job Title:
+Backend Developer
+
+About the Job:
+We are looking for a Backend Developer to design, build, and operate reliable
+server-side systems and APIs. You will own services that power our web and
+mobile products, collaborating with frontend and product teams to ship features
+end to end.
+
+Responsibilities:
+- Design and implement REST APIs using Python and FastAPI.
+- Build and optimize PostgreSQL data models and queries.
+- Containerize and deploy backend services with Docker.
+- Architect scalable microservices and background job pipelines.
+- Write unit and integration tests and maintain CI/CD pipelines.
+- Use Git and GitHub for version control and peer reviews.
+
+Required Qualifications:
+- 3+ years of professional experience as a backend developer.
+- Strong knowledge of Python and FastAPI.
+- Solid understanding of REST API design and API development.
+- Bachelor's degree in Computer Science or a related field.
+
+Required Skills:
+- Python
+- FastAPI
+- PostgreSQL
+- Docker
+- REST APIs
+- Git
+- SQL
+- Microservices
+- API design
+
+Preferred Qualifications:
+- Experience with Redis, Celery, or message queues.
+- Familiarity with AWS or Google Cloud.
+- Knowledge of CI/CD and backend architecture patterns.
+
+Experience Requirements:
+- 3+ years of professional backend development experience.
+
+Education Requirements:
+- Bachelor's degree or higher in a relevant field.

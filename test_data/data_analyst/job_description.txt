@@ -1,0 +1,40 @@
+Job Title:
+Data Analyst
+
+About the Job:
+We are looking for a Data Analyst to turn raw data into actionable insights for
+product and business teams. You will build reports, dashboards, and analyses
+that guide decisions across the company.
+
+Responsibilities:
+- Write SQL queries to extract and clean data from warehouse tables.
+- Build dashboards in Power BI or Tableau for business stakeholders.
+- Analyze trends and present findings with clear data visualizations.
+- Maintain Excel models and automate recurring analysis with Python.
+- Collaborate with data engineers to improve data quality.
+
+Required Qualifications:
+- 2+ years of experience in data analysis or a related role.
+- Strong command of SQL and Python for data analysis.
+- Bachelor's degree in a quantitative or related field.
+
+Required Skills:
+- SQL
+- Python
+- Pandas
+- Excel
+- Power BI
+- Statistics
+- Data visualization
+- Data analysis
+
+Preferred Qualifications:
+- Experience with Tableau or Looker.
+- Familiarity with A/B testing and experimentation.
+- Knowledge of basic statistics and hypothesis testing.
+
+Experience Requirements:
+- 2+ years of professional data analysis experience.
+
+Education Requirements:
+- Bachelor's degree or higher in a quantitative field.
