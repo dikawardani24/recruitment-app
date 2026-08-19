@@ -16,6 +16,6 @@ if ! command -v flutter >/dev/null 2>&1; then
     exit 1
 fi
 
-mapfile -t ARGS < <(extract_api_base_flag "$@")
+extract_api_base_flag "$@"
 
-flutter build apk --release --split-per-abi "$(api_base_dart_define)" "${ARGS[@]}"
+flutter build apk --release --split-per-abi "$(api_base_dart_define)" "${API_BASE_ARGS[@]}"

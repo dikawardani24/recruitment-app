@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Shared helper for choosing the backend API base URL when running or building
-# the Flutter frontend. Sourced by run.sh and build_apk.sh.
+# the Flutter frontend. Sourced by run.sh, build_apk.sh, and build_web.sh.
 #
 # Resolution priority:
 #   1. --api-base <url> (or --api-base=<url>) CLI flag
@@ -22,36 +22,36 @@ API_BASE_URLS=(
   "https://recruitment-app-z4kg.onrender.com/api"
 )
 
-# Removes any --api-base flag from the argument list, stores the value in
-# API_BASE_FLAG, and prints the remaining arguments (one per line).
+# Parses the argument list, strips any --api-base flag, and stores the results
+# in the caller's shell: API_BASE_FLAG (the URL from the flag) and
+# API_BASE_ARGS (the remaining arguments). Must be called directly, never in a
+# command substitution / pipeline subshell, or the results would be lost.
 extract_api_base_flag() {
-  local rest=() flag="" skip=0
+  API_BASE_FLAG=""
+  API_BASE_ARGS=()
+  local skip=0
   while (($#)); do
     if ((skip)); then
       skip=0; shift; continue
     fi
     case "$1" in
       --api-base=*)
-        flag="${1#--api-base=}"
+        API_BASE_FLAG="${1#--api-base=}"
         ;;
       --api-base)
         if (($# >= 2)); then
-          flag="$2"; skip=1
+          API_BASE_FLAG="$2"; skip=1
         else
           echo "--api-base requires a value." >&2
           return 1
         fi
         ;;
       *)
-        rest+=("$1")
+        API_BASE_ARGS+=("$1")
         ;;
     esac
     shift
   done
-  API_BASE_FLAG="$flag"
-  if ((${#rest[@]})); then
-    printf '%s\n' "${rest[@]}"
-  fi
 }
 
 # Prompts the user to pick a backend (used when stdin is a TTY).

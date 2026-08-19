@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Launch the Flutter frontend.
-#   ./run_script.sh run [flutter run args...]
+# Build a release bundle of the Flutter frontend for web.
+#   ./run_script.sh build_web [flutter build web args...]
 #
 # Choose the backend API base URL with --api-base <url>, or pick from an
-# interactive menu when none is given. Pass device/target args through, e.g.:
-#   ./run_script.sh run -d chrome
+# interactive menu when none is given. The bundle is written to build/web.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -19,4 +18,4 @@ fi
 
 extract_api_base_flag "$@"
 
-flutter run "$(api_base_dart_define)" "${API_BASE_ARGS[@]}"
+flutter build web --release "$(api_base_dart_define)" "${API_BASE_ARGS[@]}"

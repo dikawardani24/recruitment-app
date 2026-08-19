@@ -37,6 +37,18 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
 
 Start the backend first — see [../docs/setup-and-testing.md](../docs/setup-and-testing.md).
 
+## Build
+
+```bash
+../scripts/run_script.sh frontend/build_apk   # Android release APKs, split per ABI
+../scripts/run_script.sh frontend/build_web   # Web release bundle → build/web
+```
+
+Both build scripts point the app at a backend API base URL. Pass
+`--api-base <url>` (e.g. `--api-base https://recruitment-app-z4kg.onrender.com/api`)
+to pick one explicitly, or let the script prompt from a menu of known backends
+(Local, Android emulator, deployed Render instance).
+
 ## Test
 
 ```bash
